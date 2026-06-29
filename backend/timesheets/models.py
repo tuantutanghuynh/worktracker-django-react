@@ -1,9 +1,9 @@
 from django.db import models
 from django.conf import settings
-
+from django.core.validators import MinValueValidator, MaxValueValidator   # <-- thêm dòng này
 # BẢNG 10: time_locks (Kiểm soát Chốt sổ & Khóa kỳ báo cáo)
 class TimeLock(models.Model):
-    lock_month = models.PositiveSmallIntegerField()
+    lock_month = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
     lock_year = models.PositiveSmallIntegerField()
     is_locked = models.BooleanField(default=True)
     locked_by = models.ForeignKey(
