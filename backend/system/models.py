@@ -18,14 +18,13 @@ class AuditLog(models.Model):
     table_name = models.CharField(max_length=50)  # Tên bảng bị tác động
     record_id = models.IntegerField()  # ID của dòng dữ liệu bị tác động
 
-    # Sử dụng JSONField của PostgreSQL để lưu trữ dữ liệu dạng Object, rất dễ truy vấn sau này
-    old_values = models.JSONField(blank=True, null=True)  # Dữ liệu cũ trước khi sửa
-    new_values = models.JSONField(blank=True, null=True)  # Dữ liệu mới sau khi sửa
+    # Sử dụng JSONField của PostgreSQL để lưu trữ dữ liệu dạng Object
+    old_values = models.JSONField(blank=True, null=True)  
+    new_values = models.JSONField(blank=True, null=True)  
 
-    # GenericIPAddressField chuẩn hóa và validate định dạng IP tự động
-    ip_address = models.GenericIPAddressField()
+    # <-- ĐÃ SỬA THEO FR-93 (DB IMPACT): Cho phép null khi tiến trình chạy ngầm qua Celery
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
 
-    # Bắt buộc đánh INDEX để phục vụ Table Partitioning sau này 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):

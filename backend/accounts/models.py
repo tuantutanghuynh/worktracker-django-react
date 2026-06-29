@@ -55,9 +55,7 @@ class CustomUser(AbstractUser):
 
     # Sử dụng email làm tài khoản đăng nhập chính, bắt buộc đánh chỉ mục (INDEX)
     email = models.EmailField(max_length=155, unique=True, db_index=True)
-    role = models.ForeignKey(
-        Role, on_delete=models.RESTRICT, null=True
-    )  # Khóa ngoại xác định thẩm quyền cốt lõi
+    role = models.ForeignKey(Role, on_delete=models.RESTRICT, null=True)  # Khóa ngoại xác định thẩm quyền cốt lõi
 
     # Trường is_active đã được định nghĩa sẵn trong AbstractUser với cơ chế chuyển FALSE khi nghỉ việc
 
