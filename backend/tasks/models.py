@@ -13,7 +13,6 @@ class Task(models.Model):
         IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
         REVIEWING = 'REVIEWING', 'Reviewing'
         COMPLETED = 'COMPLETED', 'Completed'
-        ON_HOLD = 'ON_HOLD', 'On Hold'  # <-- Đã bổ sung theo FR Revision 2
         CANCELLED = 'CANCELLED', 'Cancelled'
 
     # FK trỏ đến jobs. Chặn xóa dự án nếu bên trong đã có Task
