@@ -1,5 +1,8 @@
-# system/permissions.py
+# system/permissions_manager.py
 from rest_framework import permissions
+from projects.models import Job
+from tasks.models import Task
+from timesheets.models import LogWork
 
 class IsManager(permissions.BasePermission):
     """
@@ -16,11 +19,14 @@ class IsManager(permissions.BasePermission):
 
 class IsJobManager(permissions.BasePermission):
     """
-    FR-31, FR-99: Đảm bảo Manager chỉ có thể thao tác trên các Job/Task do chính họ quản lý.
+    FR-31, FR-99, FR-117: Row-level scope — Manager chỉ thao tác trên Job/Task/LogWork
+    thuộc job mà chính họ là jobs.manager_id. KHÔNG dùng departments.manager_id.
     """
     def has_object_permission(self, request, view, obj):
-        if hasattr(obj, 'manager'):  # Nếu đối tượng là Job
-            return obj.manager == request.user
-        if hasattr(obj, 'job'):      # Nếu đối tượng là Task hoặc LogWork
-            return obj.job.manager == request.user
+        if isinstance(obj, Job):
+            return obj.manager_id == request.user.id
+        if isinstance(obj, Task):
+            return obj.job.manager_id == request.user.id
+        if isinstance(obj, LogWork):
+            return obj.task.job.manager_id == request.user.id
         return False

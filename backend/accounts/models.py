@@ -1,115 +1,256 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
 
-# BẢNG 1: roles (Danh mục Vai trò)
+# ============================================================
+# BẢNG 1: roles
+# Danh mục vai trò: ADMIN, MANAGER, EMPLOYEE
+# ============================================================
 class Role(models.Model):
     code = models.CharField(
-        max_length=50, unique=True, db_index=True
-    )  # Mã vai trò backend (ADMIN, MANAGER, EMPLOYEE)
-    name = models.CharField(
-        max_length=100
-    )  # Tên hiển thị UI (Quản trị viên, Quản lý dự án...)
+        max_length=50,
+        unique=True,
+        db_index=True,
+    )
+    name = models.CharField(max_length=100)
     description = models.CharField(
-        max_length=255, blank=True, null=True
-    )  # Mô tả chi tiết quyền hạn
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        db_table = "roles"
 
     def __str__(self):
         return self.name
 
 
-# BẢNG 2: permissions (Danh mục Quyền hạn chi tiết)
+# ============================================================
+# BẢNG 2: permissions
+# Danh mục quyền hành động trong hệ thống
+# ============================================================
 class Permission(models.Model):
     code = models.CharField(
-        max_length=100, unique=True, db_index=True
-    )  # Mã hành động API (client:create, task:assign...)
-    name = models.CharField(max_length=150)  # Tên giải nghĩa của quyền
+        max_length=100,
+        unique=True,
+        db_index=True,
+    )
+    name = models.CharField(max_length=150)
+
+    class Meta:
+        db_table = "permissions"
 
     def __str__(self):
         return self.code
 
 
-# BẢNG 3: role_permissions (Bảng trung gian liên kết Nhiều - Nhiều giữa Vai trò và Quyền)
+# ============================================================
+# BẢNG 3: role_permissions
+# Bảng trung gian giữa Role và Permission
+# ============================================================
 class RolePermission(models.Model):
     role = models.ForeignKey(
-        Role, on_delete=models.CASCADE
-    )  # Xóa vai trò thì tự động xóa liên kết quyền
+        Role,
+        on_delete=models.CASCADE,
+        related_name="role_permissions",
+    )
     permission = models.ForeignKey(
-        Permission, on_delete=models.CASCADE
-    )  # Xóa quyền thì tự động xóa liên kết vai trò
+        Permission,
+        on_delete=models.CASCADE,
+        related_name="role_permissions",
+    )
 
     class Meta:
-        # Thiết lập ràng buộc Unique để triệt tiêu rủi ro trùng lặp cấu hình (Thay thế khóa chính phức hợp trong Django)
+        db_table = "role_permissions"
         constraints = [
             models.UniqueConstraint(
-                fields=["role", "permission"], name="unique_role_permission"
+                fields=["role", "permission"],
+                name="unique_role_permission",
             )
         ]
 
+    def __str__(self):
+        return f"{self.role.code} - {self.permission.code}"
 
-# BẢNG 4: users (Tài khoản người dùng - Phiên bản gọt mỏng tối ưu)
+
+# ============================================================
+# Custom User Manager
+# Cần có vì hệ thống dùng email để đăng nhập thay vì username
+# ============================================================
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Email is required.")
+
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+
+        # Theo tài liệu, user phải có role.
+        # Nếu tạo superuser bằng lệnh createsuperuser, hệ thống sẽ hỏi role.
+        # Nếu tạo bằng code mà không truyền role, báo lỗi rõ ràng.
+        if extra_fields.get("role") is None and extra_fields.get("role_id") is None:
+            raise ValueError(
+                "Superuser must have a role. Create ADMIN role first and pass role or role_id."
+            )
+
+        return self.create_user(email, password, **extra_fields)
+
+
+# ============================================================
+# BẢNG 4: users
+# Tài khoản người dùng
+# Chỉ lưu thông tin authentication và authorization cốt lõi
+# Profile cá nhân lưu ở employee_profiles
+# ============================================================
 class CustomUser(AbstractUser):
-    # Loại bỏ trường không cần thiết của Django mặc định để tăng tốc độ truy vấn đăng nhập
+    username = None
     first_name = None
     last_name = None
 
-    # Sử dụng email làm tài khoản đăng nhập chính, bắt buộc đánh chỉ mục (INDEX)
-    email = models.EmailField(max_length=155, unique=True, db_index=True)
-    role = models.ForeignKey(Role, on_delete=models.RESTRICT, null=True)  # Khóa ngoại xác định thẩm quyền cốt lõi
+    email = models.EmailField(
+        max_length=155,
+        unique=True,
+        db_index=True,
+    )
+    role = models.ForeignKey(
+        Role,
+        on_delete=models.RESTRICT,
+        related_name="users", null=True
+    )
 
-    # Trường is_active đã được định nghĩa sẵn trong AbstractUser với cơ chế chuyển FALSE khi nghỉ việc
+    # AbstractUser đã có is_active, nhưng khai báo lại để thêm db_index
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+    )
 
-    USERNAME_FIELD = "email"  # Chỉ định Django dùng email để đăng nhập thay vì username
-    REQUIRED_FIELDS = ["username"]  # Các trường bắt buộc khi tạo superuser qua lệnh
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = "email"
+
+    # Vì role là ForeignKey bắt buộc, createsuperuser sẽ yêu cầu nhập role id.
+    REQUIRED_FIELDS = ["role"]
+
+    class Meta:
+        db_table = "users"
 
     def __str__(self):
         return self.email
 
 
-# BẢNG 5: password_resets (Quản lý Token Quên mật khẩu)
+# ============================================================
+# BẢNG 5: password_resets
+# Token quên mật khẩu
+# ============================================================
 class PasswordReset(models.Model):
-    email = models.CharField(
-        max_length=155, db_index=True
-    )  # Khóa tìm kiếm siêu tốc khi bấm link
+    email = models.EmailField(
+        max_length=155,
+        db_index=True,
+    )
     token = models.CharField(
-        max_length=255, unique=True, db_index=True
-    )  # Mã chuỗi token an toàn
-    is_used = models.BooleanField(default=False)  # Cờ chặn dùng lại link cũ
-    expires_at = models.DateTimeField()  # Thời gian hết hạn
+        max_length=255,
+        unique=True,
+        db_index=True,
+    )
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        db_table = "password_resets"
 
-# BẢNG 6: departments (Danh mục Phòng ban / Đội nhóm) [cite: 498]
+    def __str__(self):
+        return self.email
+
+
+# ============================================================
+# BẢNG 6: departments
+# Phòng ban / đội nhóm
+#
+# Lưu ý quan trọng:
+# departments.manager_id chỉ là thông tin tổ chức / directory.
+# Không dùng field này để tính Manager access scope.
+# Manager scope phải dựa vào jobs.manager_id.
+# ============================================================
 class Department(models.Model):
     manager = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name="managed_departments",
-    )  # Nếu tài khoản Manager bị xóa, phòng ban vẫn tồn tại
-    name = models.CharField(max_length=100, unique=True)  # Chặn trùng lặp tên phòng ban
-    description = models.TextField(blank=True, null=True)
+    )
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "departments"
 
     def __str__(self):
         return self.name
 
 
-# BẢNG 7: employee_profiles (Hồ sơ Nhân viên - Áp dụng giải pháp bóc tách hồ sơ)
+# ============================================================
+# BẢNG 7: employee_profiles
+# Hồ sơ cá nhân của user
+# Tách khỏi users để users chỉ giữ authentication data
+# ============================================================
 class EmployeeProfile(models.Model):
-    # Trường user_id đóng vai trò vừa là Khóa chính, vừa là Khóa ngoại liên kết 1-1 tới bảng users
     user = models.OneToOneField(
-        CustomUser, on_delete=models.CASCADE, primary_key=True, related_name="profile"
+        CustomUser,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="profile",
     )
     full_name = models.CharField(max_length=150)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+    )
     department = models.ForeignKey(
-        Department, on_delete=models.RESTRICT, null=True, related_name="employees"
-    )  # Chặn xóa phòng ban nếu vẫn còn nhân viên bên trong
+        Department,
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="employees",
+    )
     avatar_url = models.CharField(
-        max_length=500, blank=True, null=True
-    )  # Đường dẫn ảnh đại diện
+        max_length=500,
+        blank=True,
+        null=True,
+    )
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "employee_profiles"
 
     def __str__(self):
         return self.full_name
