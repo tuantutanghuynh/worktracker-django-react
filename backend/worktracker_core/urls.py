@@ -1,31 +1,26 @@
-"""
-URL configuration for worktracker_core project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView  # <-- Thêm dòng này
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+# File cấu hình URL chính của toàn dự án.
+# Django đọc file này đầu tiên khi nhận một request, sau đó chuyển tiếp sang file urls.py của từng app tương ứng.
 urlpatterns = [
+    # Trang quản trị nội bộ Django (dành cho dev, không phải giao diện công ty).
     path('admin/', admin.site.urls),
 
-    # --- CỔNG XÁC THỰC (Dùng chung để các thành viên lấy Token test) ---
+    # --- CỔNG XÁC THỰC JWT ---
+    # Dùng chung cho tất cả thành viên để lấy token đăng nhập.
+    # POST /api/v1/auth/login/   → gửi email + password, nhận access token + refresh token.
+    # POST /api/v1/auth/refresh/ → gửi refresh token, nhận access token mới (gia hạn phiên).
     path('api/v1/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/v1/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-    # --- KHU VỰC CỦA MANAGER ---
-    path('api/v1/manager/', include('tasks.urls_manager')),
-    path('api/v1/manager/', include('timesheets.urls_manager')),
+    # --- SCOPE CỦA MINH ANH (Admin) ---
+    # Chuyển tiếp các request có prefix 'api/projects/' sang projects/urls.py.
+    # Bao gồm: Clients (/api/projects/clients/) và Jobs (/api/projects/jobs/).
+    path('api/projects/', include('projects.urls')),
+
+    # Chuyển tiếp các request có prefix 'api/system/' sang system/urls.py.
+    # Bao gồm: AuditLogs (/api/system/audit-logs/) — chỉ đọc.
+    path('api/system/', include('system.urls')),
 ]
