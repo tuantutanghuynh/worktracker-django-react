@@ -142,3 +142,22 @@ STATIC_URL = 'static/'
 
 # CHỈ ĐỊNH SỬ DỤNG BẢNG USER TÙY BIẾN THAY VÌ MẶC ĐỊNH CỦA DJANGO
 AUTH_USER_MODEL = 'accounts.CustomUser'
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://localhost:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "accounts.authentication.CachedIsActiveJWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
