@@ -1,0 +1,258 @@
+from django.db import transaction
+from django.utils import timezone
+
+from rest_framework.exceptions import APIException, PermissionDenied
+
+from tasks.models import Task, TaskComment
+from system.models import Notification
+from system.services.audit_manager_service import snapshot, log_action
+from system.services.notification_manager_service import (
+    notify,
+    resolve_task_recipients,
+)
+
+
+ACTOR_ASSIGNEE = "ASSIGNEE"
+ACTOR_JOB_MANAGER = "JOB_MANAGER"
+ACTOR_ADMIN = "ADMIN"
+
+ADMIN_ROLE_CODE = "ADMIN"
+MANAGER_ROLE_CODE = "MANAGER"
+EMPLOYEE_ROLE_CODE = "EMPLOYEE"
+
+
+class InvalidTaskTransition(APIException):
+    status_code = 400
+    default_detail = "Invalid task status transition."
+    default_code = "invalid_task_transition"
+
+
+class BusinessRuleError(APIException):
+    status_code = 400
+    default_detail = "Business rule violation."
+    default_code = "business_rule_error"
+
+
+TASK_TRANSITIONS = {
+    (Task.Status.TODO, Task.Status.IN_PROGRESS): [
+        ACTOR_ASSIGNEE,
+        ACTOR_JOB_MANAGER,
+    ],
+    (Task.Status.IN_PROGRESS, Task.Status.REVIEWING): [
+        ACTOR_ASSIGNEE,
+    ],
+    (Task.Status.IN_PROGRESS, Task.Status.TODO): [
+        ACTOR_ASSIGNEE,
+        ACTOR_JOB_MANAGER,
+    ],
+    (Task.Status.REVIEWING, Task.Status.COMPLETED): [
+        ACTOR_JOB_MANAGER,
+    ],
+    (Task.Status.REVIEWING, Task.Status.IN_PROGRESS): [
+        ACTOR_JOB_MANAGER,
+    ],
+    (Task.Status.TODO, Task.Status.CANCELLED): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
+    (Task.Status.IN_PROGRESS, Task.Status.CANCELLED): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
+    (Task.Status.REVIEWING, Task.Status.CANCELLED): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
+}
+
+
+EVENT_MAP = {
+    (Task.Status.IN_PROGRESS, Task.Status.REVIEWING): Notification.EventType.TASK_SUBMITTED,
+    (Task.Status.REVIEWING, Task.Status.COMPLETED): Notification.EventType.TASK_APPROVED,
+    (Task.Status.REVIEWING, Task.Status.IN_PROGRESS): Notification.EventType.TASK_REJECTED,
+}
+
+
+def get_user_role_code(user):
+    role = getattr(user, "role", None)
+    return getattr(role, "code", None)
+
+
+def get_action_name(from_status, to_status):
+    if from_status == Task.Status.REVIEWING and to_status == Task.Status.COMPLETED:
+        return "APPROVE_TASK"
+
+    if from_status == Task.Status.REVIEWING and to_status == Task.Status.IN_PROGRESS:
+        return "REJECT_TASK"
+
+    if to_status == Task.Status.CANCELLED:
+        return "CANCEL_TASK"
+
+    return "UPDATE_TASK_STATUS"
+
+
+def get_event_type(from_status, to_status):
+    return EVENT_MAP.get(
+        (from_status, to_status),
+        Notification.EventType.TASK_STATUS_CHANGED,
+    )
+
+
+def get_transition_title(from_status, to_status, task):
+    if to_status == Task.Status.COMPLETED:
+        return "Task approved"
+
+    if from_status == Task.Status.REVIEWING and to_status == Task.Status.IN_PROGRESS:
+        return "Task rejected"
+
+    if to_status == Task.Status.REVIEWING:
+        return "Task submitted for review"
+
+    if to_status == Task.Status.CANCELLED:
+        return "Task cancelled"
+
+    return "Task status changed"
+
+
+def assert_actor(user, task, allowed_actors):
+    """
+    Kiểm tra user có thuộc actor được phép cho transition hay không.
+    """
+    role_code = get_user_role_code(user)
+
+    if ACTOR_ADMIN in allowed_actors and role_code == ADMIN_ROLE_CODE:
+        return
+
+    if (
+        ACTOR_JOB_MANAGER in allowed_actors
+        and role_code == MANAGER_ROLE_CODE
+        and task.job.manager_id == user.id
+    ):
+        return
+
+    if (
+        ACTOR_ASSIGNEE in allowed_actors
+        and task.assignee_id == user.id
+    ):
+        return
+
+    raise PermissionDenied("USER_NOT_ALLOWED_FOR_THIS_TASK_TRANSITION")
+
+
+def validate_transition(task, to_status, reason=None):
+    transition_key = (task.status, to_status)
+    allowed_actors = TASK_TRANSITIONS.get(transition_key)
+
+    if allowed_actors is None:
+        raise InvalidTaskTransition("INVALID_TASK_STATUS_TRANSITION")
+
+    if (
+        task.status == Task.Status.REVIEWING
+        and to_status == Task.Status.IN_PROGRESS
+        and not reason
+    ):
+        raise BusinessRuleError("REJECTION_REASON_REQUIRED")
+
+    if to_status == Task.Status.CANCELLED and not reason:
+        raise BusinessRuleError("CANCELLATION_REASON_REQUIRED")
+
+    return allowed_actors
+
+
+def apply_transition(*, user, task, to_status, reason=None, request=None):
+    """
+    Áp dụng transition Task theo bảng §8.1.
+
+    Dùng cho:
+    - Employee submit task.
+    - Manager approve/reject/cancel.
+    - Kanban cross-column drag-and-drop.
+    """
+    clean_reason = reason.strip() if isinstance(reason, str) else reason
+
+    with transaction.atomic():
+        locked_task = (
+            Task.objects.select_for_update()
+            .select_related("job", "assignee", "creator")
+            .get(pk=task.pk)
+        )
+
+        from_status = locked_task.status
+
+        allowed_actors = validate_transition(
+            task=locked_task,
+            to_status=to_status,
+            reason=clean_reason,
+        )
+
+        assert_actor(
+            user=user,
+            task=locked_task,
+            allowed_actors=allowed_actors,
+        )
+
+        old_values = snapshot(
+            locked_task,
+            fields=["status", "completed_at"],
+        )
+
+        if to_status == Task.Status.COMPLETED:
+            locked_task.completed_at = timezone.now()
+        else:
+            locked_task.completed_at = None
+
+        locked_task.status = to_status
+
+        locked_task.save(
+            update_fields=[
+                "status",
+                "completed_at",
+                "updated_at",
+            ]
+        )
+
+        if (
+            from_status == Task.Status.REVIEWING
+            and to_status == Task.Status.IN_PROGRESS
+        ):
+            TaskComment.objects.create(
+                task=locked_task,
+                user=user,
+                content=clean_reason,
+                comment_type=TaskComment.CommentType.REJECTION_NOTE,
+            )
+
+        action_name = get_action_name(
+            from_status=from_status,
+            to_status=to_status,
+        )
+
+        log_action(
+            user=user,
+            action=action_name,
+            table_name="tasks",
+            record_id=locked_task.id,
+            old_values=old_values,
+            new_values={
+                "status": locked_task.status,
+                "completed_at": locked_task.completed_at,
+                "reason": clean_reason,
+            },
+            request=request,
+        )
+
+        recipients = resolve_task_recipients(
+            locked_task,
+            exclude_user=user,
+        )
+
+        notify(
+            recipients=recipients,
+            event_type=get_event_type(from_status, to_status),
+            title=get_transition_title(from_status, to_status, locked_task),
+            content=f"Task status changed from {from_status} to {to_status}: {locked_task.title}",
+            related_url=f"/manager/tasks/{locked_task.id}",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
+        )
+
+    return locked_task
