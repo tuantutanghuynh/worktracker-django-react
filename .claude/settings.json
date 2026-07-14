@@ -9,7 +9,9 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git push *)",
-      "PowerShell(cd \"c:\\\\Users\\\\Admin\\\\OneDrive\\\\IT\\\\1. TERM 2\\\\ProjectSem2\\\\worktracker-django-react\\\\backend\"; Remove-Item \"config\\\\\" -Recurse -Force; if \\(-not \\(Test-Path \"config\\\\\"\\)\\) { Write-Host \"config/ deleted\" } else { Write-Host \"config/ still exists\" })"
+      "PowerShell(cd \"c:\\\\Users\\\\Admin\\\\OneDrive\\\\IT\\\\1. TERM 2\\\\ProjectSem2\\\\worktracker-django-react\\\\backend\"; Remove-Item \"config\\\\\" -Recurse -Force; if \\(-not \\(Test-Path \"config\\\\\"\\)\\) { Write-Host \"config/ deleted\" } else { Write-Host \"config/ still exists\" })",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)"
     ]
   }
 }
