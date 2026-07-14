@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'simple_history',
     'corsheaders',
+    'openpyxl',
 
     # --- CÁC APP CỦA DỰ ÁN WORK-TRACKER ---
     'accounts',
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     'tasks',
     'timesheets',
     'system',
+    'reports',
 ]
 
 MIDDLEWARE = [

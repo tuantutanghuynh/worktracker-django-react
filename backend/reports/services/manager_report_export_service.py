@@ -1,6 +1,8 @@
 from io import BytesIO
 from datetime import datetime
 
+from openpyxl import Workbook
+
 from rest_framework.exceptions import APIException
 
 from reports.services.manager_task_summary_report_service import (
@@ -257,13 +259,6 @@ def autosize_worksheet_columns(workbook):
 
 
 def export_xlsx(*, report_type, report_data):
-    try:
-        from openpyxl import Workbook
-    except ImportError as exc:
-        raise ReportExportError(
-            "openpyxl is not installed. Install it with: pip install openpyxl"
-        ) from exc
-
     workbook = Workbook()
 
     if report_type == "TASK_SUMMARY":
