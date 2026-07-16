@@ -3,7 +3,7 @@ from django.db import models
 
 
 # ============================================================
-# BẢNG 1: roles
+# BẢNG 1: role
 # Danh mục vai trò: ADMIN, MANAGER, EMPLOYEE
 # ============================================================
 class Role(models.Model):

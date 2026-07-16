@@ -17,3 +17,8 @@ class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
         fields = '__all__'
+    
+    def validate_client(self, value):
+        if not value.is_active:
+            raise serializers.ValidationError("Cannot assign job to an inactive client")
+        return value

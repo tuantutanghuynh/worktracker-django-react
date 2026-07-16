@@ -26,3 +26,7 @@ class ClientViewSet(viewsets.ModelViewSet):
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
+    
+    def perform_destroy(self, instance):
+        instance.status = 'CANCELLED' #Solf delete
+        instance.save()

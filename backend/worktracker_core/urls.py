@@ -19,7 +19,7 @@ urlpatterns = [
     # Chuyển tiếp các request có prefix 'api/projects/' sang projects/urls.py.
     # Bao gồm: Clients (/api/projects/clients/) và Jobs (/api/projects/jobs/).
     path('api/projects/', include('projects.urls')),
-
+    path('api/accounts/', include('accounts.urls')),
     # Chuyển tiếp các request có prefix 'api/system/' sang system/urls.py.
     # Bao gồm: AuditLogs (/api/system/audit-logs/) — chỉ đọc.
     path('api/system/', include('system.urls')),
