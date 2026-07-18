@@ -1,4 +1,9 @@
 from rest_framework import viewsets
+from rest_framework.views import APIView
+
+from rest_framework.response import Response
+
+from django.db.models import Sum
 
 from accounts.permissions import HasPermission
 from .models import AuditLog
@@ -42,7 +47,8 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(created_at__date__gte=date_from)
             # __date__gte: so sánh phần DATE (bỏ giờ phút), >=date_from — kỹ thuật Field Lookup    
             
-        date_to = self.request.query_params.get('date_from')
-        if date_from:
-            queryset = queryset.filter(created_at__date__lte=date_from)
+        date_to = self.request.query_params.get('date_to')
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+            #lte = less than or equal
         return queryset

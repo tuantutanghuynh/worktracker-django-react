@@ -15,6 +15,12 @@ from django.db import models
 #   (Celery, system-triggered) có thể không có request IP.
 # ============================================================
 class AuditLog(models.Model):
+
+    class Severity(models.TextChoices):
+        CRITICAL = 'CRITICAL', 'Critical'
+        WARNING  = 'WARNING',  'Warning'
+        NORMAL   = 'NORMAL',   'Normal'
+
     id = models.BigAutoField(primary_key=True)
 
     user = models.ForeignKey(
@@ -27,6 +33,13 @@ class AuditLog(models.Model):
 
     # Tên hành động: 'CREATE_JOB', 'SOFT_DELETE_CLIENT', 'LOCK_TIMESHEET', ...
     action = models.CharField(max_length=50)
+    severity = models.CharField(
+        max_length=10,
+        choices=Severity.choices,
+        default=Severity.NORMAL,
+        db_index=True,
+    )
+    summary = models.TextField(blank=True, null=True)
 
     # Tên bảng bị tác động. Phải khớp tên bảng vật lý trong DB
     # (vd: 'jobs', 'clients', 'tasks'), KHÔNG phải tên Django model.

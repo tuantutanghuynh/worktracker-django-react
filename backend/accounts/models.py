@@ -18,6 +18,7 @@ class Role(models.Model):
         blank=True,
         null=True,
     )
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "roles"
@@ -37,6 +38,7 @@ class Permission(models.Model):
         db_index=True,
     )
     name = models.CharField(max_length=150)
+    group = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         db_table = "permissions"
@@ -247,6 +249,7 @@ class EmployeeProfile(models.Model):
         blank=True,
         null=True,
     )
+    joined_date = models.DateField(blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

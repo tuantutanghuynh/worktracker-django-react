@@ -60,6 +60,12 @@ class Client(models.Model):
 # cho mục đích này (xem FR-31, FR-99, FR-117).
 # ============================================================
 class Job(models.Model):
+
+    class Priority(models.TextChoices):
+        HIGH   = 'HIGH',   'High'
+        MEDIUM = 'MEDIUM', 'Medium'
+        LOW    = 'LOW',    'Low'
+
     # ENUM trạng thái dự án (FR-29: Job Status Management)
     class Status(models.TextChoices):
         PLANNING = "PLANNING", "Planning"
@@ -86,7 +92,14 @@ class Job(models.Model):
         related_name="managed_jobs",
     )
 
+    job_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
     job_name = models.CharField(max_length=255)
+    priority = models.CharField(
+        max_length=10,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+        db_index=True,
+    )
     description = models.TextField(
         blank=True,
         null=True,
