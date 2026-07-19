@@ -1,5 +1,7 @@
 from io import BytesIO
 from datetime import datetime
+from django.template.loader import render_to_string
+from xhtml2pdf import pisa
 
 from openpyxl import Workbook
 
@@ -286,15 +288,32 @@ def export_xlsx(*, report_type, report_data):
 
 def export_pdf(*, report_type, report_data):
     """
-    PDF export để placeholder an toàn.
-
-    Lý do:
-    - PDF cần thư viện riêng như reportlab hoặc WeasyPrint.
-    - Nếu chưa cài mà import trực tiếp sẽ làm toàn bộ backend lỗi.
+    Xuất file PDF sử dụng xhtml2pdf và Django Template.
     """
-    raise ReportExportError(
-        "PDF export is not implemented yet. Use XLSX for now or install/configure a PDF library such as reportlab."
+    # 1. Chọn file HTML tương ứng với loại báo cáo
+    if report_type == "TASK_SUMMARY":
+        template_path = "reports/task_summary_pdf.html"
+    elif report_type == "TIMESHEET_DETAIL":
+        template_path = "reports/timesheet_detail_pdf.html"
+    else:
+        raise ReportExportError("UNSUPPORTED_REPORT_TYPE")
+
+    # 2. Bơm dữ liệu vào template để tạo ra mã HTML hoàn chỉnh
+    html_string = render_to_string(template_path, report_data)
+
+    # 3. Dùng xhtml2pdf "chụp" mã HTML đó thành file PDF
+    output = BytesIO()
+    pisa_status = pisa.CreatePDF(
+        src=html_string,
+        dest=output,
+        encoding='utf-8'
     )
+
+    # 4. Kiểm tra lỗi trong quá trình tạo
+    if pisa_status.err:
+        raise ReportExportError("Error during PDF generation.")
+
+    return output.getvalue()
 
 
 def export_manager_report(*, user, filters, request=None):

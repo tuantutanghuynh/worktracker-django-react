@@ -18,7 +18,7 @@ from projects.services.job_status_manager_service import manager_change_job_stat
 
 from tasks.models import Task
 
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole
+from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
 from system.scoping_manager import scoped_jobs
 from system.services.audit_manager_service import snapshot, log_action
 
@@ -36,6 +36,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
 
     http_method_names = [
@@ -45,6 +46,24 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         "head",
         "options",
     ]
+    
+    def get_permissions(self):
+        """
+        Khai báo required_permission động dựa trên action hiện tại.
+        HasPermissionCode sẽ tự động lấy giá trị này để kiểm duyệt.
+        """
+        action_permissions = {
+            "list": "job:view",
+            "retrieve": "job:view",
+            "create": "job:create",
+            "partial_update": "job:update",
+            "change_status": "job:change_status",
+        }
+        
+        # Gán quyền tương ứng vào self, nếu action không nằm trong dict trên, nó sẽ gán None (bị chặn)
+        self.required_permission = action_permissions.get(self.action)
+        
+        return super().get_permissions()
 
     def get_queryset(self):
         """

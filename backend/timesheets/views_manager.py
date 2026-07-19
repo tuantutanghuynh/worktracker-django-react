@@ -31,7 +31,7 @@ from timesheets.services.timelock_manager_service import (
     unlock_job_period,
 )
 
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole
+from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
 from system.scoping_manager import (
     get_scoped_object_or_404,
     scoped_jobs,
@@ -51,6 +51,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
 
     http_method_names = [
@@ -59,6 +60,18 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
         "head",
         "options",
     ]
+
+    def get_permissions(self):
+        action_permissions = {
+            "list": "timesheet:view",
+            "retrieve": "timesheet:view",
+            "approve": "timesheet:review",
+            "reject": "timesheet:review",
+            "correct": "timesheet:correct",
+            "void": "timesheet:void",
+        }
+        self.required_permission = action_permissions.get(self.action)
+        return super().get_permissions()
 
     def get_queryset(self):
         return (
@@ -271,6 +284,7 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
 
     http_method_names = [
@@ -280,6 +294,16 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
         "options",
     ]
 
+    def get_permissions(self):
+        action_permissions = {
+            "list": "timelock:view",
+            "retrieve": "timelock:view",
+            "create": "timelock:lock",
+            "unlock": "timelock:unlock",
+        }
+        self.required_permission = action_permissions.get(self.action)
+        return super().get_permissions()
+    
     def get_queryset(self):
         return (
             scoped_timelocks(self.request.user)

@@ -1,0 +1,333 @@
+Tổng kết trạng thái WorkTracker Manager Backend
+Tính đến hiện tại, các phần chính của backend nhóm Manager đã được triển khai theo từng giai đoạn như sau.
+1. Giai đoạn 0 — Nền tảng system
+Đã hoàn thành các file nền tảng dùng chung cho Manager:
+system/permissions_manager.py
+system/scoping_manager.py
+system/services/audit_manager_service.py
+system/services/notification_manager_service.py
+Đã thống nhất
+Permission class chuẩn:
+IsActiveAuthenticated
+IsManagerRole
+HasPermissionCode
+Không dùng tên cũ:
+IsManager
+IsJobManager
+Scope chuẩn của Manager:
+jobs.manager_id = request.user.id
+Không dùng:
+departments.manager_id
+Đã có chức năng nền
+- Scope queryset theo Manager
+- Ghi AuditLog
+- Tạo Notification
+- Best-effort realtime/email placeholder
+- Kiểm tra active user
+- Kiểm tra role Manager
+2. Giai đoạn 1 — projects / Job API
+Đã hoàn thành các file:
+projects/serializers_manager.py
+projects/filters_manager.py
+projects/views_manager.py
+projects/urls_manager.py
+projects/services/job_status_manager_service.py
+Endpoint đã có
+GET    /api/manager/jobs/
+POST   /api/manager/jobs/
+GET    /api/manager/jobs/{id}/
+PATCH  /api/manager/jobs/{id}/
+POST   /api/manager/jobs/{id}/status/
+Logic đã xử lý
+- Manager chỉ thấy Job của mình
+- Manager tạo Job thì manager = request.user
+- Không cho frontend tự gửi manager_id
+- Validate deadline >= start_date
+- Đổi trạng thái Job qua service riêng
+- Không xóa vật lý Job
+- Có audit khi tạo/sửa/đổi status
+3. Giai đoạn 2 — tasks / Task, Kanban, Review
+Đã hoàn thành các file:
+tasks/serializers_manager.py
+tasks/filters_manager.py
+tasks/views_manager.py
+tasks/urls_manager.py
+tasks/services/order_index_manager_service.py
+tasks/services/task_transition_manager_service.py
+tasks/services/task_manager_service.py
+Endpoint đã có
+GET    /api/manager/tasks/
+POST   /api/manager/tasks/
+GET    /api/manager/tasks/{id}/
+PATCH  /api/manager/tasks/{id}/
+POST   /api/manager/tasks/{id}/status/
+POST   /api/manager/tasks/{id}/approve/
+POST   /api/manager/tasks/{id}/reject/
+POST   /api/manager/tasks/{id}/cancel/
+POST   /api/manager/tasks/{id}/move/
+GET    /api/manager/tasks/{id}/comments/
+POST   /api/manager/tasks/{id}/comments/
+GET    /api/manager/tasks/{id}/attachments/
+POST   /api/manager/tasks/{id}/attachments/
+GET    /api/manager/tasks/{id}/followers/
+POST   /api/manager/tasks/{id}/follow/
+POST   /api/manager/tasks/{id}/unfollow/
+GET    /api/manager/jobs/{job_id}/kanban/
+Logic đã xử lý
+- Manager chỉ thấy Task thuộc Job của mình
+- Tạo Task qua service
+- Update Task qua service
+- Deadline Task không vượt deadline Job
+- Assignee phải là Employee active
+- Kanban reorder dùng order_index
+- Kéo Task sang cột khác phải qua state machine
+- Approve/reject/cancel dùng apply_transition()
+- Reject tạo TaskComment loại REJECTION_NOTE
+- Comment/attachment/follower đã có endpoint
+- Có audit và notification
+Bạn đã báo phần Task test OK.
+4. Giai đoạn 3 — timesheets / LogWork, TimeLock
+Đã hoàn thành các file:
+timesheets/serializers_manager.py
+timesheets/filters_manager.py
+timesheets/views_manager.py
+timesheets/urls_manager.py
+timesheets/services/daily_total_manager_service.py
+timesheets/services/timelock_manager_service.py
+timesheets/services/logwork_review_manager_service.py
+Endpoint đã có
+GET    /api/manager/log-works/
+GET    /api/manager/log-works/{id}/
+POST   /api/manager/log-works/{id}/approve/
+POST   /api/manager/log-works/{id}/reject/
+POST   /api/manager/log-works/{id}/correct/
+POST   /api/manager/log-works/{id}/void/
+GET    /api/manager/time-locks/
+POST   /api/manager/time-locks/
+GET    /api/manager/time-locks/{id}/
+POST   /api/manager/time-locks/{id}/unlock/
+Logic đã xử lý
+- Manager chỉ thấy LogWork thuộc Task trong Job của mình
+- Approve LogWork
+- Reject LogWork
+- Correct LogWork
+- Void LogWork
+- Rebuild DailyUserTimesheet
+- Tổng giờ/ngày không vượt 24h
+- JOB TimeLock cho Manager
+- Manager không xử lý GLOBAL lock
+- Period bị lock thì chặn approve/reject/correct/void
+- Có audit cho thao tác nhạy cảm
+5. Giai đoạn 4 — reports / Dashboard, Reports, Export
+App đúng đã xác nhận là:
+reports
+Không dùng:
+report
+Đã hoàn thành các file:
+reports/serializers_manager.py
+reports/views_manager.py
+reports/urls_manager.py
+reports/services/manager_dashboard_service.py
+reports/services/manager_task_summary_report_service.py
+reports/services/manager_timesheet_detail_report_service.py
+reports/services/manager_report_export_service.py
+Endpoint đã reverse OK
+Bạn đã kiểm tra thành công:
+/api/manager/dashboard/
+/api/manager/reports/task-summary/
+/api/manager/reports/timesheet-detail/
+/api/manager/reports/export/
+Endpoint đã có
+GET  /api/manager/dashboard/
+GET  /api/manager/reports/task-summary/
+GET  /api/manager/reports/timesheet-detail/
+POST /api/manager/reports/export/
+Logic đã xử lý
+- Dashboard theo tháng/năm
+- Task Summary Report
+- Timesheet Detail Report
+- Export XLSX
+- Ghi audit REPORT_EXPORTED
+- PDF hiện tại là placeholder, chưa triển khai thật
+openpyxl
+Đã cài và kiểm tra OK:
+openpyxl 3.1.5
+Pylance warning đã xử lý xong.
+6. worktracker_core/urls.py
+Đang dùng đúng:
+path("api/manager/", include("projects.urls_manager")),
+path("api/manager/", include("tasks.urls_manager")),
+path("api/manager/", include("timesheets.urls_manager")),
+path("api/manager/", include("reports.urls_manager")),
+Không dùng:
+/api/v1/manager/
+7. Trạng thái hiện tại
+Có thể xem trạng thái hiện tại là:
+Manager backend implementation cơ bản đã hoàn thành theo module:
+system → projects → tasks → timesheets → reports
+Các bước kiểm tra đã OK:
+- python manage.py check
+- Import checks
+- Reverse route checks
+- Task module test OK
+- Reports route reverse OK
+- openpyxl import OK
+Các bước cần làm tiếp theo
+Từ thời điểm này, không nên viết thêm module mới ngay. Nên chuyển sang kiểm thử, rà soát bảo mật, permission và tài liệu API.
+Bước 1 — Test chức năng Reports bằng dữ liệu thật
+Cần test các endpoint:
+GET  /api/manager/dashboard/
+GET  /api/manager/reports/task-summary/
+GET  /api/manager/reports/timesheet-detail/
+POST /api/manager/reports/export/
+Cần kiểm tra:
+- Dữ liệu chỉ nằm trong scope Manager
+- Filter hoạt động đúng
+- Summary tính đúng
+- Export XLSX tải được file
+- AuditLog có REPORT_EXPORTED
+Bước 2 — Test end-to-end toàn bộ Manager flow
+Cần test theo luồng thật:
+1. Manager tạo Job
+2. Manager tạo Task trong Job
+3. Assign Employee
+4. Employee có LogWork hoặc tạo LogWork test
+5. Manager approve/reject/correct/void LogWork
+6. Manager lock/unlock kỳ công
+7. Dashboard và Reports phản ánh đúng dữ liệu
+8. Export báo cáo
+Mục tiêu là kiểm tra toàn bộ dữ liệu liên kết giữa:
+Job → Task → LogWork → TimeLock → Report
+Bước 3 — Test bảo mật scope giữa nhiều Manager
+Cần tạo thêm một Manager thứ hai.
+Mục tiêu:
+Manager A không được thấy dữ liệu của Manager B
+Cần test:
+- Job khác Manager
+- Task khác Manager
+- LogWork khác Manager
+- TimeLock khác Manager
+- Reports với job_id thuộc Manager khác
+Kết quả đúng phải là:
+403 hoặc 404
+Không được trả dữ liệu.
+Bước 4 — Rà soát AuditLog
+Cần kiểm tra bảng:
+audit_logs
+Các action cần có:
+CREATE_JOB
+UPDATE_JOB
+UPDATE_JOB_STATUS
+CREATE_TASK
+UPDATE_TASK
+REORDER_TASK
+APPROVE_TASK
+REJECT_TASK
+CANCEL_TASK
+UPLOAD_TASK_ATTACHMENT
+APPROVE_LOG_WORK
+REJECT_LOG_WORK
+CORRECT_LOG_WORK
+VOID_LOG_WORK
+LOCK_TIMESHEET
+UNLOCK_TIMESHEET
+REPORT_EXPORTED
+Cần kiểm tra:
+- user_id đúng
+- action đúng
+- table_name đúng
+- record_id đúng
+- old_values/new_values có dữ liệu hợp lý
+Bước 5 — Rà soát Notification
+Cần kiểm tra bảng:
+notifications
+Các event cần xem:
+TASK_ASSIGNED
+TASK_STATUS_CHANGED
+TASK_SUBMITTED
+TASK_APPROVED
+TASK_REJECTED
+TASK_COMMENT
+TASK_ATTACHMENT
+TIMESHEET_LOCK
+TIMESHEET_UNLOCK
+Cần kiểm tra:
+- Người nhận đúng
+- Không gửi cho người ngoài scope
+- Không tạo notification trùng bất thường
+- Nội dung title/content ổn
+Bước 6 — Chuẩn hóa permission code
+Hiện tại các view chủ yếu dùng:
+IsActiveAuthenticated
+IsManagerRole
+Chưa bật chặt:
+HasPermissionCode
+Cần làm sau khi test nghiệp vụ ổn.
+Công việc:
+1. Chốt danh sách permission code
+2. Seed vào bảng permissions
+3. Gán permission cho role MANAGER
+4. Thêm required_permission vào view/action
+5. Bật HasPermissionCode
+6. Test user thiếu quyền bị chặn đúng
+Ví dụ permission nhóm Manager:
+job:view
+job:create
+job:update
+job:change_status
+task:view
+task:create
+task:update
+task:assign
+task:review
+task:cancel
+task:comment
+task:attachment
+timesheet:view
+timesheet:review
+timesheet:correct
+timesheet:void
+timesheet:lock
+timesheet:unlock
+report:view
+report:export
+Danh sách này cần đối chiếu tài liệu trước khi chốt.
+Bước 7 — Quyết định PDF export
+Hiện tại:
+XLSX: đã có
+PDF: placeholder, chưa làm thật
+Cần quyết định:
+Lựa chọn
+Ý nghĩa
+Giữ XLSX
+Không làm PDF thật, PDF trả lỗi rõ ràng
+Làm PDF thật
+Cần chọn thư viện reportlab hoặc WeasyPrint
+Không nên tự quyết định phần này vì còn phụ thuộc yêu cầu đồ án/tài liệu.
+Bước 8 — Viết automated tests
+Sau khi test tay OK, nên viết test tự động cho các rule quan trọng:
+- Manager scope
+- Job status transition
+- Task state machine
+- Task deadline <= Job deadline
+- Daily total <= 24h
+- TimeLock chặn sửa LogWork
+- Reports không leak dữ liệu Manager khác
+- Export ghi AuditLog
+Bước 9 — Cập nhật tài liệu API cho frontend
+Cần tạo API contract cho frontend.
+Nội dung cần có:
+- Endpoint
+- Method
+- Auth required
+- Permission required
+- Query params
+- Request body
+- Response mẫu
+- Error mẫu
+Chia theo nhóm:
+Auth
+Manager Jobs
+Manager Tasks
+Manager Timesheets
+Manager Reports

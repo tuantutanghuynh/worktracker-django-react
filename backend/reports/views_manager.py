@@ -22,7 +22,7 @@ from reports.services.manager_report_export_service import (
     export_manager_report,
 )
 
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole
+from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
 
 
 class ManagerDashboardView(APIView):
@@ -37,7 +37,9 @@ class ManagerDashboardView(APIView):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
+    required_permission = "report:view"
 
     def get(self, request):
         today = timezone.localdate()
@@ -78,7 +80,9 @@ class ManagerTaskSummaryReportView(APIView):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
+    required_permission = "report:view"
 
     def get(self, request):
         serializer = ManagerTaskSummaryReportQuerySerializer(
@@ -117,7 +121,9 @@ class ManagerTimesheetDetailReportView(APIView):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
+    required_permission = "report:view"
 
     def get(self, request):
         serializer = ManagerTimesheetDetailReportQuerySerializer(
@@ -165,7 +171,9 @@ class ManagerReportExportView(APIView):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
+    required_permission = "report:export"
 
     def post(self, request):
         serializer = ManagerReportExportQuerySerializer(

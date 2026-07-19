@@ -27,7 +27,7 @@ from tasks.services.task_manager_service import (
 from tasks.services.task_transition_manager_service import apply_transition
 
 from system.models import Notification
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole
+from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
 from system.scoping_manager import (
     get_scoped_object_or_404,
     scoped_jobs,
@@ -53,6 +53,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
 
     http_method_names = [
@@ -62,6 +63,26 @@ class TaskViewSet(viewsets.ModelViewSet):
         "head",
         "options",
     ]
+
+    def get_permissions(self):
+        action_permissions = {
+            "list": "task:view",
+            "retrieve": "task:view",
+            "create": "task:create",
+            "partial_update": "task:update",
+            "change_status": "task:change_status",
+            "approve_task": "task:review",
+            "reject_task": "task:review",
+            "cancel_task": "task:cancel",
+            "move_task": "task:change_status",
+            "comments": "task:comment",
+            "attachments": "task:attachment",
+            "followers": "task:follow",
+            "follow": "task:follow",
+            "unfollow": "task:follow",
+        }
+        self.required_permission = action_permissions.get(self.action)
+        return super().get_permissions()
 
     def get_queryset(self):
         """
@@ -606,7 +627,9 @@ class ManagerJobKanbanView(APIView):
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
+        HasPermissionCode,
     ]
+    required_permission = "task:view"  # <--- Khai báo cứng quyền cho toàn bộ class này
 
     def get(self, request, job_id):
         job = get_scoped_object_or_404(
