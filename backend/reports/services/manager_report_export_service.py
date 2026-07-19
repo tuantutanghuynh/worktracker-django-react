@@ -180,7 +180,7 @@ def write_timesheet_detail_sheet(workbook, report_data):
                 row["review_status"],
                 reviewed_by["full_name"] if reviewed_by else "",
                 row["reviewed_at"],
-                row["reviewed_note"],
+                row["review_note"],
                 adjusted_by["full_name"] if adjusted_by else "",
                 row["adjusted_at"],
                 row["adjustment_reason"],

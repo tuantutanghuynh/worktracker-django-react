@@ -288,7 +288,7 @@ def serialize_logwork_row(logwork, locked_map):
         "description": logwork.description,
         "review_status": logwork.review_status,
         "reviewed_at": logwork.reviewed_at,
-        "reviewed_note": logwork.reviewed_note,
+        "review_note": logwork.review_note,
         "adjusted_at": logwork.adjusted_at,
         "adjustment_reason": logwork.adjustment_reason,
         "created_at": logwork.created_at,

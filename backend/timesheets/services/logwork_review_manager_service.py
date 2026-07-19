@@ -81,20 +81,20 @@ def approve_logwork(
                 "review_status",
                 "reviewed_by",
                 "reviewed_at",
-                "reviewed_note",
+                "review_note",
             ],
         )
 
         locked_logwork.review_status = LogWork.ReviewStatus.APPROVED
         locked_logwork.reviewed_by = user
         locked_logwork.reviewed_at = timezone.now()
-        locked_logwork.reviewed_note = note
+        locked_logwork.review_note = note
         locked_logwork.save(
             update_fields=[
                 "review_status",
                 "reviewed_by",
                 "reviewed_at",
-                "reviewed_note",
+                "review_note",
                 "updated_at",
             ]
         )
@@ -116,7 +116,7 @@ def approve_logwork(
                     "review_status",
                     "reviewed_by",
                     "reviewed_at",
-                    "reviewed_note",
+                    "review_note",
                 ],
             ),
             request=request,
@@ -171,20 +171,20 @@ def reject_logwork(
                 "review_status",
                 "reviewed_by",
                 "reviewed_at",
-                "reviewed_note",
+                "review_note",
             ],
         )
 
         locked_logwork.review_status = LogWork.ReviewStatus.REJECTED
         locked_logwork.reviewed_by = user
         locked_logwork.reviewed_at = timezone.now()
-        locked_logwork.reviewed_note = clean_reason
+        locked_logwork.review_note = clean_reason
         locked_logwork.save(
             update_fields=[
                 "review_status",
                 "reviewed_by",
                 "reviewed_at",
-                "reviewed_note",
+                "review_note",
                 "updated_at",
             ]
         )
@@ -206,7 +206,7 @@ def reject_logwork(
                     "review_status",
                     "reviewed_by",
                     "reviewed_at",
-                    "reviewed_note",
+                    "review_note",
                 ],
             ),
             request=request,
@@ -366,7 +366,7 @@ def void_logwork(
                 "review_status",
                 "reviewed_by",
                 "reviewed_at",
-                "reviewed_note",
+                "review_note",
                 "adjusted_by",
                 "adjusted_at",
                 "adjustment_reason",
@@ -376,7 +376,7 @@ def void_logwork(
         locked_logwork.review_status = LogWork.ReviewStatus.VOIDED
         locked_logwork.reviewed_by = user
         locked_logwork.reviewed_at = timezone.now()
-        locked_logwork.reviewed_note = clean_reason
+        locked_logwork.review_note = clean_reason
         locked_logwork.adjusted_by = user
         locked_logwork.adjusted_at = timezone.now()
         locked_logwork.adjustment_reason = clean_reason
@@ -385,7 +385,7 @@ def void_logwork(
                 "review_status",
                 "reviewed_by",
                 "reviewed_at",
-                "reviewed_note",
+                "review_note",
                 "adjusted_by",
                 "adjusted_at",
                 "adjustment_reason",
@@ -410,7 +410,7 @@ def void_logwork(
                     "review_status",
                     "reviewed_by",
                     "reviewed_at",
-                    "reviewed_note",
+                    "review_note",
                     "adjusted_by",
                     "adjusted_at",
                     "adjustment_reason",

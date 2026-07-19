@@ -63,7 +63,7 @@ class ManagerLogWorkListSerializer(serializers.ModelSerializer):
             "review_status",
             "reviewed_by",
             "reviewed_at",
-            "reviewed_note",
+            "review_note",
             "created_at",
             "updated_at",
         ]

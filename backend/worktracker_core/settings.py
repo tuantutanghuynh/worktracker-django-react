@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'simple_history',
     'corsheaders',
-    'openpyxl',
+    "drf_spectacular",
 
     # --- CÁC APP CỦA DỰ ÁN WORK-TRACKER ---
     'accounts',
@@ -162,4 +162,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "WorkTracker API",
+    "DESCRIPTION": "Tài liệu API chính thức cho hệ thống WorkTracker (Manager, Employee, Admin).",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
