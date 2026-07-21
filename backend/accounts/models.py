@@ -38,8 +38,6 @@ class Permission(models.Model):
         db_index=True,
     )
     name = models.CharField(max_length=150)
-    description = models.CharField(max_length=255, blank=True, null=True)
-    group = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         db_table = "permissions"
