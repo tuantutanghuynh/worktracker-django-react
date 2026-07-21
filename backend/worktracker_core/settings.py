@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'simple_history',
     'corsheaders',
+    'drf_spectacular',
 
     # --- CÁC APP CỦA DỰ ÁN WORK-TRACKER ---
     'accounts',
@@ -152,4 +153,5 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
