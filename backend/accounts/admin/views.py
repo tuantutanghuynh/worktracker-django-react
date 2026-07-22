@@ -14,7 +14,20 @@ from ..authentication import set_user_active_status
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.select_related('role', 'profile').all()
     serializer_class = UserSerializer
-
+    
+    def get_queryset(self):
+        qs = CustomUser.objects.select_related('role', 'profile').all()
+        params = self.request.query_params
+        if email := params.get('email'):
+            qs = qs.filter(email__icontains=email)
+        if role := params.get('role'):
+            qs = qs.filter(role__code=role)
+        if department := params.get('department'):
+            qs = qs.filter(profile__department_id=department)
+        if (is_active := params.get('is_active')) is not None:
+            qs = qs.filter(is_active=is_active.lower()=='true')
+        return qs
+        
     def get_permissions(self):
         if self.action == 'create':
             return [HasPermission('user:create')]

@@ -42,6 +42,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         user = CustomUser(**validated_data)
         user.set_password(password)
         user.save()
+        EmployeeProfile.objects.create(user=user)
         return user
 
 
