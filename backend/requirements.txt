@@ -14,4 +14,19 @@ redis==8.0.1
 sqlparse==0.5.5
 tzdata==2026.2
 xhtml2pdf==0.2.16
-drf-spectacular==0.27.2 
+drf-spectacular==0.27.2
+
+# --- Celery (Email bất đồng bộ) ---
+celery==5.5.2
+django-celery-results==2.5.1
+
+# --- Django Channels (WebSocket Real-time) ---
+channels==4.2.2
+channels-redis==4.2.1
+daphne==4.2.0
+
+# --- 
+pytest==8.3.2 
+pytest-django==4.9.0 
+pytest-cov==5.0.0 
+model-bakery==1.19.5

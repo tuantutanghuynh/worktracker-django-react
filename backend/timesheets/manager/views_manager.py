@@ -4,7 +4,7 @@ from rest_framework.exceptions import MethodNotAllowed
 from rest_framework.response import Response
 
 from timesheets.models import LogWork, TimeLock
-from timesheets.serializers_manager import (
+from timesheets.manager.serializers_manager import (
     ManagerLogWorkApproveSerializer,
     ManagerLogWorkCorrectSerializer,
     ManagerLogWorkDetailSerializer,
@@ -16,7 +16,7 @@ from timesheets.serializers_manager import (
     ManagerTimeLockListSerializer,
     ManagerTimeLockUnlockSerializer,
 )
-from timesheets.filters_manager import (
+from timesheets.manager.filters_manager import (
     ManagerLogWorkFilter,
     ManagerTimeLockFilter,
 )
@@ -31,8 +31,8 @@ from timesheets.services.timelock_manager_service import (
     unlock_job_period,
 )
 
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
-from system.scoping_manager import (
+from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
+from system.security.scoping_manager import (
     get_scoped_object_or_404,
     scoped_jobs,
     scoped_logworks,

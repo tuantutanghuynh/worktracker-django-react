@@ -1,6 +1,6 @@
 from rest_framework.routers import DefaultRouter
 
-from timesheets.views_manager import (
+from timesheets.manager.views_manager import (
     ManagerLogWorkViewSet,
     ManagerTimeLockViewSet,
 )

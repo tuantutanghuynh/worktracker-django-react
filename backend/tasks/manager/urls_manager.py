@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from tasks.views_manager import TaskViewSet, ManagerJobKanbanView
+from tasks.manager.views_manager import TaskViewSet, ManagerJobKanbanView
 
 
 router = DefaultRouter()

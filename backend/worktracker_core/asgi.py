@@ -1,16 +1,35 @@
 """
 ASGI config for worktracker_core project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
+Hỗ trợ cả HTTP (Django) và WebSocket (Django Channels).
 """
 
 import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'worktracker_core.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "worktracker_core.settings")
 
-application = get_asgi_application()
+# Khởi tạo Django HTTP application trước
+django_asgi_app = get_asgi_application()
+
+from channels.auth import AuthMiddlewareStack
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.security.websocket import AllowedHostsOriginValidator
+
+import system.routing
+
+application = ProtocolTypeRouter(
+    {
+        # HTTP request đi vào Django như bình thường
+        "http": django_asgi_app,
+
+        # WebSocket request đi vào Channels
+        # AllowedHostsOriginValidator: chặn WebSocket từ origin không hợp lệ
+        # AuthMiddlewareStack: tự động load session/user từ cookie
+        "websocket": AllowedHostsOriginValidator(
+            AuthMiddlewareStack(
+                URLRouter(system.routing.websocket_urlpatterns)
+            )
+        ),
+    }
+)

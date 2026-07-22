@@ -55,53 +55,59 @@ def validate_channel(channel):
 
 def push_realtime_best_effort(notifications):
     """
-    Placeholder cho Django Channels.
+    Push Notification real-time qua Django Channels.
 
-    Giai đoạn này chưa triển khai Channels vì chưa có consumer/routing.
-    Khi có WebSocket layer, bổ sung code gửi group theo user_id ở đây.
+    Mỗi user được group riêng: "user_{user_id}".
+    NotificationConsumer sẽ forward payload xuống client.
 
     Hàm này không được raise lỗi làm hỏng transaction chính.
     """
     try:
-        # TODO:
-        # from asgiref.sync import async_to_sync
-        # from channels.layers import get_channel_layer
-        #
-        # channel_layer = get_channel_layer()
-        # for notification in notifications:
-        #     async_to_sync(channel_layer.group_send)(
-        #         f"user_{notification.user_id}",
-        #         {
-        #             "type": "notification.message",
-        #             "payload": {
-        #                 "id": notification.id,
-        #                 "event_type": notification.event_type,
-        #                 "title": notification.title,
-        #                 "content": notification.content,
-        #                 "related_url": notification.related_url,
-        #                 "created_at": notification.created_at.isoformat(),
-        #             },
-        #         },
-        #     )
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+
+        if channel_layer is None:
+            return None
+
+        for notification in notifications:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{notification.user_id}",
+                {
+                    "type": "notification.message",
+                    "payload": {
+                        "id": notification.id,
+                        "event_type": notification.event_type,
+                        "title": notification.title,
+                        "content": notification.content,
+                        "related_url": notification.related_url,
+                        "created_at": notification.created_at.isoformat() if notification.created_at else None,
+                    },
+                },
+            )
+
         return None
+
     except Exception:
         return None
 
 
 def enqueue_email_best_effort(notifications):
     """
-    Placeholder cho Celery email task.
+    Đẩy task gửi email vào Celery Queue.
 
-    Khi có Celery task gửi mail, bổ sung enqueue ở đây.
+    Mỗi Notification được enqueue riêng lẻ.
     Hàm này không được raise lỗi làm hỏng transaction chính.
     """
     try:
-        # TODO:
-        # from system.tasks import send_notification_email_task
-        #
-        # for notification in notifications:
-        #     send_notification_email_task.delay(notification.id)
+        from system.tasks import send_notification_email_task
+
+        for notification in notifications:
+            send_notification_email_task.delay(notification.id)
+
         return None
+
     except Exception:
         return None
 

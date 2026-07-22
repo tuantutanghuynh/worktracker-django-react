@@ -6,7 +6,7 @@ from django.db.models import Count, Q, Sum
 
 from tasks.models import Task
 from timesheets.models import LogWork
-from system.scoping_manager import (
+from system.security.scoping_manager import (
     scoped_jobs,
     scoped_tasks,
     scoped_logworks,

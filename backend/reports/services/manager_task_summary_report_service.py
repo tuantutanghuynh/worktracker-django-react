@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.db.models import Count
 
 from tasks.models import Task
-from system.scoping_manager import scoped_tasks
+from system.security.scoping_manager import scoped_tasks
 
 
 def decimal_to_float(value):

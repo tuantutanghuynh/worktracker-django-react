@@ -6,7 +6,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from projects.models import Job
 from tasks.models import Task, TaskFollower
 from system.models import Notification
-from system.scoping_manager import scoped_jobs, scoped_tasks, get_scoped_object_or_404
+from system.security.scoping_manager import scoped_jobs, scoped_tasks, get_scoped_object_or_404
 from system.services.audit_manager_service import snapshot, log_action
 from system.services.notification_manager_service import notify
 

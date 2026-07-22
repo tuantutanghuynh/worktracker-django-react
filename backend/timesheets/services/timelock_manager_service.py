@@ -241,7 +241,7 @@ def unlock_job_period(
 
     with transaction.atomic():
         locked_time_lock = (
-            TimeLock.objects.select_for_update()
+            TimeLock.objects.select_for_update(of=("self",))
             .select_related("job")
             .get(pk=time_lock.pk)
         )

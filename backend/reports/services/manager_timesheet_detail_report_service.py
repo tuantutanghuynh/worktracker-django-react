@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db.models import Sum
 
 from timesheets.models import LogWork, TimeLock
-from system.scoping_manager import scoped_logworks
+from system.security.scoping_manager import scoped_logworks
 
 
 def decimal_to_float(value):

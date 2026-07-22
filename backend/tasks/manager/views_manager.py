@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.db.models import Count
 
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed, ValidationError
@@ -8,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from tasks.models import Task, TaskComment, TaskFollower
-from tasks.serializers_manager import (
+from tasks.manager.serializers_manager import (
     ManagerKanbanMoveSerializer,
     ManagerTaskAttachmentSerializer,
     ManagerTaskCommentSerializer,
@@ -18,17 +19,18 @@ from tasks.serializers_manager import (
     ManagerTaskStatusSerializer,
     ManagerTaskUpdateSerializer,
 )
-from tasks.filters_manager import ManagerTaskFilter
+from tasks.manager.filters_manager import ManagerTaskFilter
 from tasks.services.task_manager_service import (
     create_task,
     move_task_kanban,
     update_task,
 )
 from tasks.services.task_transition_manager_service import apply_transition
+from tasks.services.file_upload_service import save_task_attachment, delete_task_attachment_file
 
 from system.models import Notification
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
-from system.scoping_manager import (
+from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
+from system.security.scoping_manager import (
     get_scoped_object_or_404,
     scoped_jobs,
     scoped_tasks,
@@ -470,12 +472,13 @@ class TaskViewSet(viewsets.ModelViewSet):
         GET  /api/manager/tasks/{id}/attachments/
         POST /api/manager/tasks/{id}/attachments/
 
-        Giai đoạn này lưu metadata file:
-        - file_name
-        - file_url
-        - file_size
+        POST nhận file qua multipart/form-data:
+            - file (required): File đính kèm (tối đa 20MB).
 
-        File vật lý xử lý bởi File Storage Service ở bước tích hợp sau.
+        File vật lý được lưu tại:
+            media/task_attachments/<task_id>/<uuid>.<ext>
+        Metadata (file_name, file_url, file_size) lưu vào DB.
+        Nếu lưu DB thất bại, file vật lý sẽ được rollback.
         """
         task = self.get_object()
 
@@ -496,38 +499,56 @@ class TaskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        serializer = ManagerTaskAttachmentSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # POST: nhận file upload thật
+        uploaded_file = request.FILES.get("file")
 
-        with transaction.atomic():
-            attachment = serializer.save(
-                task=task,
-                user=request.user,
-            )
+        if not uploaded_file:
+            raise ValidationError({"file": "Không tìm thấy file trong request. Hãy gửi file qua field 'file'."})
 
-            log_action(
-                user=request.user,
-                action="UPLOAD_TASK_ATTACHMENT",
-                table_name="task_attachments",
-                record_id=attachment.id,
-                old_values=None,
-                new_values=snapshot(attachment),
-                request=request,
-            )
+        # Lưu file vật lý trước — nếu fail ở bước này, DB không được đụng tới
+        file_info = save_task_attachment(task.id, uploaded_file)
 
-            recipients = resolve_task_recipients(
-                task,
-                exclude_user=request.user,
-            )
+        file_url_saved = file_info["file_url"]
 
-            notify(
-                recipients=recipients,
-                event_type=Notification.EventType.TASK_ATTACHMENT,
-                title="New task attachment",
-                content=f"New attachment uploaded to task: {task.title}",
-                related_url=f"/manager/tasks/{task.id}",
-                channel=Notification.ChannelType.SYSTEM_ONLY,
-            )
+        try:
+            with transaction.atomic():
+                from tasks.models import TaskAttachment
+                attachment = TaskAttachment.objects.create(
+                    task=task,
+                    user=request.user,
+                    file_name=file_info["file_name"],
+                    file_url=file_url_saved,
+                    file_size=file_info["file_size"],
+                )
+
+                log_action(
+                    user=request.user,
+                    action="UPLOAD_TASK_ATTACHMENT",
+                    table_name="task_attachments",
+                    record_id=attachment.id,
+                    old_values=None,
+                    new_values=snapshot(attachment),
+                    request=request,
+                )
+
+                recipients = resolve_task_recipients(
+                    task,
+                    exclude_user=request.user,
+                )
+
+                notify(
+                    recipients=recipients,
+                    event_type=Notification.EventType.TASK_ATTACHMENT,
+                    title="New task attachment",
+                    content=f"New attachment uploaded to task: {task.title}",
+                    related_url=f"/manager/tasks/{task.id}",
+                    channel=Notification.ChannelType.SYSTEM_ONLY,
+                )
+
+        except Exception:
+            # Nếu DB thất bại: xóa file vật lý để đảm bảo nhất quán (NFR-21)
+            delete_task_attachment_file(file_url_saved)
+            raise
 
         output_serializer = ManagerTaskAttachmentSerializer(attachment)
 
@@ -535,6 +556,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             output_serializer.data,
             status=status.HTTP_201_CREATED,
         )
+
 
     @action(detail=True, methods=["get"], url_path="followers")
     def followers(self, request, pk=None):

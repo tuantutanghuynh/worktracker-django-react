@@ -6,20 +6,20 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from projects.models import Job
-from projects.serializers_manager import (
+from projects.manager.serializers_manager import (
     ManagerJobCreateSerializer,
     ManagerJobDetailSerializer,
     ManagerJobListSerializer,
     ManagerJobStatusChangeSerializer,
     ManagerJobUpdateSerializer,
 )
-from projects.filters_manager import ManagerJobFilter
+from projects.manager.filters_manager import ManagerJobFilter
 from projects.services.job_status_manager_service import manager_change_job_status
 
 from tasks.models import Task
 
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
-from system.scoping_manager import scoped_jobs
+from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
+from system.security.scoping_manager import scoped_jobs
 from system.services.audit_manager_service import snapshot, log_action
 
 

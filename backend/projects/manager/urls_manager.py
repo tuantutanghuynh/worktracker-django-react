@@ -1,6 +1,6 @@
 from rest_framework.routers import DefaultRouter
 
-from projects.views_manager import ManagerJobViewSet
+from projects.manager.views_manager import ManagerJobViewSet
 
 
 router = DefaultRouter()

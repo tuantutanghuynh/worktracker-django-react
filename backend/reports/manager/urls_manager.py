@@ -1,6 +1,6 @@
 from django.urls import path
 
-from reports.views_manager import (
+from reports.manager.views_manager import (
     ManagerDashboardView,
     ManagerReportExportView,
     ManagerTaskSummaryReportView,

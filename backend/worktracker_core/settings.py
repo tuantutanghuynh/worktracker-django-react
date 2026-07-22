@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',                 # ASGI server — PHẢI đặt trước staticfiles
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,6 +45,8 @@ INSTALLED_APPS = [
     'simple_history',
     'corsheaders',
     "drf_spectacular",
+    'django_celery_results',  # Lưu kết quả Celery Task vào DB
+    'channels',               # Django Channels — WebSocket layer
 
     # --- CÁC APP CỦA DỰ ÁN WORK-TRACKER ---
     'accounts',
@@ -137,10 +140,14 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
 STATIC_URL = 'static/'
+
+# --- CẤU HÌNH LƯU TRỮ FILE (MEDIA) ---
+# File upload sẽ lưu vào thư mục media/ trong BASE_DIR
+import os
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 
 # CHỈ ĐỊNH SỬ DỤNG BẢNG USER TÙY BIẾN THAY VÌ MẶC ĐỊNH CỦA DJANGO
 AUTH_USER_MODEL = 'accounts.CustomUser'
@@ -151,6 +158,9 @@ CACHES = {
         "LOCATION": "redis://localhost:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "protocol": 2,
+            }
         }
     }
 }
@@ -172,3 +182,35 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+# ============================================================
+# CELERY — Sử dụng Redis DB=2 (broker) và DB=3 (result)
+# Phân tách khỏi Cache (DB=1) để tránh tranh chấp dữ liệu
+# ============================================================
+CELERY_BROKER_URL = "redis://localhost:6379/2"
+CELERY_RESULT_BACKEND = "django-db"   # Lưu vào DB qua django-celery-results
+CELERY_CACHE_BACKEND = "django-cache" # Fallback cache backend
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+
+# ============================================================
+# DJANGO CHANNELS — Channel Layer dùng Redis DB=4
+# Phân tách khỏi Cache (DB=1) và Celery (DB=2, 3)
+# ============================================================
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("localhost", 6379)],
+            "prefix": "worktracker",
+            "capacity": 1500,       # Số message tối đa mỗi channel
+            "expiry": 60,           # Message hết hạn sau 60 giây nếu không được xử lý
+        },
+    },
+}
+
+# Chỉ định Daphne làm ASGI application (thay Django WSGI mặc định)
+ASGI_APPLICATION = "worktracker_core.asgi.application"

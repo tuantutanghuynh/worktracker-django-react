@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from reports.serializers_manager import (
+from reports.manager.serializers_manager import (
     ManagerDashboardQuerySerializer,
     ManagerReportExportQuerySerializer,
     ManagerTaskSummaryReportQuerySerializer,
@@ -22,7 +22,7 @@ from reports.services.manager_report_export_service import (
     export_manager_report,
 )
 
-from system.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
+from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
 
 
 class ManagerDashboardView(APIView):

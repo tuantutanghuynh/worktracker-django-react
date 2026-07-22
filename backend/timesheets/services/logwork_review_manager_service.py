@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
 from timesheets.models import LogWork
-from system.scoping_manager import scoped_logworks
+from system.security.scoping_manager import scoped_logworks
 from system.services.audit_manager_service import snapshot, log_action
 
 from timesheets.services.daily_total_manager_service import (
@@ -32,7 +32,7 @@ def assert_logwork_in_manager_scope(user, logwork):
 def get_locked_scoped_logwork(user, logwork_id):
     return (
         scoped_logworks(user)
-        .select_for_update()
+        .select_for_update(of=("self",))
         .select_related(
             "task",
             "task__job",
