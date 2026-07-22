@@ -25,7 +25,7 @@ channels==4.2.2
 channels-redis==4.2.1
 daphne==4.2.0
 
-# --- 
+# --- Test
 pytest==8.3.2 
 pytest-django==4.9.0 
 pytest-cov==5.0.0 
