@@ -242,6 +242,7 @@ def build_job_summary(logworks):
         if job_id not in data:
             data[job_id] = {
                 "job_id": job_id,
+                "job_code": job.job_code,  # ➕ BỔ SUNG: job_code
                 "job_name": job.job_name,
                 "total_logs": 0,
                 "total_hours": Decimal("0.00"),
@@ -256,6 +257,7 @@ def build_job_summary(logworks):
         result.append(
             {
                 "job_id": row["job_id"],
+                "job_code": row["job_code"], # ➕ BỔ SUNG: job_code
                 "job_name": row["job_name"],
                 "total_logs": row["total_logs"],
                 "total_hours": decimal_to_float(row["total_hours"]),
@@ -311,6 +313,7 @@ def serialize_logwork_row(logwork, locked_map):
         },
         "job": {
             "id": job.id,
+            "job_code": job.job_code,    # ➕ BỔ SUNG: Mã Job (VD: ERP-2024-068)
             "job_name": job.job_name,
             "status": job.status,
             "deadline": job.deadline,

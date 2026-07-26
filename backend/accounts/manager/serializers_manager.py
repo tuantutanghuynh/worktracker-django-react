@@ -21,6 +21,7 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source="profile.phone_number", read_only=True)
     department = ManagerDepartmentMiniSerializer(source="profile.department", read_only=True)
     avatar_url = serializers.CharField(source="profile.avatar_url", read_only=True)
+    joined_date = serializers.DateField(source="profile.joined_date", read_only=True) # ➕ BỔ SUNG: Ngày vào công ty
 
     class Meta:
         model = CustomUser
@@ -32,6 +33,7 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
             "phone_number",
             "department",
             "avatar_url",
+            "joined_date",
         ]
 
 

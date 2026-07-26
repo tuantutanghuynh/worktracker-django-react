@@ -84,6 +84,8 @@ def log_action(
     old_values=None,
     new_values=None,
     request=None,
+    severity=AuditLog.Severity.NORMAL,  # ➕ BỔ SUNG: Mức độ nghiêm trọng (CRITICAL, WARNING, NORMAL)
+    summary=None,                       # ➕ BỔ SUNG: Dòng tóm tắt hành động
 ):
     """
     Ghi audit log.
@@ -105,6 +107,8 @@ def log_action(
     return AuditLog.objects.create(
         user=user if getattr(user, "is_authenticated", False) else None,
         action=action,
+        severity=severity,              # ➕ BỔ SUNG: Lưu severity vào DB
+        summary=summary,                # ➕ BỔ SUNG: Lưu summary vào DB
         table_name=table_name,
         record_id=record_id,
         old_values=json_safe(old_values) if old_values is not None else None,

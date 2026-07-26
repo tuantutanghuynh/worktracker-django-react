@@ -18,7 +18,7 @@ class Role(models.Model):
         blank=True,
         null=True,
     )
-
+    is_active = models.BooleanField(default=True)
     class Meta:
         db_table = "roles"
 
@@ -247,6 +247,7 @@ class EmployeeProfile(models.Model):
         blank=True,
         null=True,
     )
+    joined_date = models.DateField(blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

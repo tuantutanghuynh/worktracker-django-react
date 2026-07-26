@@ -697,6 +697,7 @@ class ManagerJobKanbanView(APIView):
             {
                 "job": {
                     "id": job.id,
+                    "job_code": job.job_code,    # ➕ BỔ SUNG: Mã Job
                     "job_name": job.job_name,
                     "status": job.status,
                     "deadline": job.deadline,

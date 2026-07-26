@@ -62,6 +62,7 @@ def write_task_summary_sheet(workbook, report_data):
     headers = [
         "Task ID",
         "Title",
+        "Job Code",  # ➕ BỔ SUNG: Cột Mã Job
         "Job",
         "Assignee",
         "Priority",
@@ -79,6 +80,7 @@ def write_task_summary_sheet(workbook, report_data):
             [
                 row["id"],
                 row["title"],
+                row["job"]["job_code"],  # ➕ BỔ SUNG: Ghi giá trị job_code vào Excel
                 row["job"]["job_name"],
                 row["assignee"]["full_name"],
                 row["priority"],
@@ -140,6 +142,7 @@ def write_timesheet_detail_sheet(workbook, report_data):
         "Work Date",
         "Employee",
         "Department",
+        "Job Code",  # ➕ BỔ SUNG
         "Job",
         "Task",
         "Task Status",
@@ -172,6 +175,7 @@ def write_timesheet_detail_sheet(workbook, report_data):
                 row["work_date"],
                 employee["full_name"],
                 department["name"] if department else "",
+                row["job"]["job_code"],  # ➕ BỔ SUNG
                 row["job"]["job_name"],
                 row["task"]["title"],
                 row["task"]["status"],
@@ -374,6 +378,8 @@ def export_manager_report(*, user, filters, request=None):
             "filename": filename,
             "filters": dict(filters),
         },
+
+        summary=f"Manager exported {report_type} report as {file_format} file ({filename})", # ➕ TẠO SUMMARY RÕ RÀNG
         request=request,
     )
 

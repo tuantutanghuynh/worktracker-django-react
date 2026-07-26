@@ -20,12 +20,15 @@ class ManagerJobFilter:
         "created_at",
         "updated_at",
         "job_name",
+        "job_code",    # ➕ BỔ SUNG: Cho phép sắp xếp theo Mã Job
+        "priority",    # ➕ BỔ SUNG: Cho phép sắp xếp theo Độ ưu tiên
         "status",
     }
 
     @classmethod
     def apply(cls, queryset, params):
         queryset = cls.filter_status(queryset, params)
+        queryset = cls.filter_priority(queryset, params) # ➕ BỔ SUNG GỌI LỌC PRIORITY
         queryset = cls.filter_client(queryset, params)
         queryset = cls.filter_deadline_range(queryset, params)
         queryset = cls.filter_search(queryset, params)
@@ -79,6 +82,22 @@ class ManagerJobFilter:
         return queryset
 
     @classmethod
+    def filter_priority(cls, queryset, params):
+        priority = params.get("priority")
+        if not priority:
+            return queryset
+
+        valid_priorities = {value for value, label in Job.Priority.choices}
+        if priority not in valid_priorities:
+            raise ValidationError(
+                {
+                    "priority": f"Invalid priority. Must be one of: {sorted(valid_priorities)}"
+                }
+            )
+
+        return queryset.filter(priority=priority)
+
+    @classmethod
     def filter_client(cls, queryset, params):
         client_id = params.get("client_id")
 
@@ -127,19 +146,17 @@ class ManagerJobFilter:
 
     @classmethod
     def filter_search(cls, queryset, params):
-        search = params.get("search")
-
-        if not search:
-            return queryset
-
-        search = search.strip()
+        search = (params.get("search") or "").strip()
 
         if not search:
             return queryset
 
         return queryset.filter(
             Q(job_name__icontains=search)
+            | Q(job_code__icontains=search)
             | Q(description__icontains=search)
+            | Q(client__client_name__icontains=search)  # ➕ BỔ SUNG: Tìm theo tên KH
+            | Q(client__industry__icontains=search)      # ➕ BỔ SUNG: Tìm theo ngành nghề
         )
 
     @classmethod

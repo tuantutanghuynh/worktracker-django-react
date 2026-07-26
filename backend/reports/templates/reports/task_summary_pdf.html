@@ -54,6 +54,7 @@
             <tr>
                 <th>ID</th>
                 <th>Tên Task</th>
+                <th>Mã Job</th>  
                 <th>Dự án (Job)</th>
                 <th>Người phụ trách</th>
                 <th>Độ ưu tiên</th>
@@ -66,6 +67,7 @@
             <tr>
                 <td>{{ row.id }}</td>
                 <td>{{ row.title }}</td>
+                <td>{{ row.job.job_code }}</td>
                 <td>{{ row.job.job_name }}</td>
                 <td>{{ row.assignee.full_name }}</td>
                 <td>{{ row.priority }}</td>
@@ -74,7 +76,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7" style="text-align: center;">Không có dữ liệu</td>
+                <td colspan="8" style="text-align: center;">Không có dữ liệu</td>
             </tr>
             {% endfor %}
         </tbody>

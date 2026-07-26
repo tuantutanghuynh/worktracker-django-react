@@ -40,7 +40,34 @@ class Client(models.Model):
     is_active = models.BooleanField(
         default=True,
         db_index=True,
+
     )
+    
+    # ➕ --- CÁC TRƯỜNG MỞ RỘNG ĐỀ XUẤT NÂNG CẤP (ENTERPRISE EXTENSIONS) ---
+    address = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )  # Địa chỉ trụ sở / Địa chỉ xuất hóa đơn
+
+    industry = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )  # Lĩnh vực hoạt động (IT, Banking, Finance...)
+
+    notes = models.TextField(
+        blank=True,
+        null=True,
+    )  # Ghi chú nội bộ / Lưu ý khi hợp tác
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )  # Ngày khởi tạo bản ghi
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )  # Ngày cập nhật thông tin gần nhất
 
     class Meta:
         db_table = "clients"
@@ -60,6 +87,12 @@ class Client(models.Model):
 # cho mục đích này (xem FR-31, FR-99, FR-117).
 # ============================================================
 class Job(models.Model):
+
+    class Priority(models.TextChoices):
+        HIGH   = 'HIGH',   'High'
+        MEDIUM = 'MEDIUM', 'Medium'
+        LOW    = 'LOW',    'Low'
+
     # ENUM trạng thái dự án (FR-29: Job Status Management)
     class Status(models.TextChoices):
         PLANNING = "PLANNING", "Planning"
@@ -86,7 +119,15 @@ class Job(models.Model):
         related_name="managed_jobs",
     )
 
+    job_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
     job_name = models.CharField(max_length=255)
+
+    priority = models.CharField(
+    max_length=10,
+    choices=Priority.choices,
+    default=Priority.MEDIUM,
+    db_index=True,
+    )
     description = models.TextField(
         blank=True,
         null=True,

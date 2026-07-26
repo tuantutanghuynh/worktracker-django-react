@@ -11,6 +11,14 @@ class ManagerClientMiniSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "client_name",
+            "tax_code",        # ➕ BỔ SUNG: Mã số thuế
+            "contact_person",  # ➕ BỔ SUNG: Người liên hệ
+            "contact_email",   # ➕ BỔ SUNG: Email liên hệ
+            "contact_phone",   # ➕ BỔ SUNG: SĐT liên hệ
+            "address",         # ➕ BỔ SUNG: Địa chỉ trụ sở
+            "industry",        # Lĩnh vực hoạt động
+            "notes",           # ➕ BỔ SUNG: Ghi chú nội bộ
+            "is_active",       # ➕ BỔ SUNG: Trạng thái hoạt động
         ]
 
 
@@ -37,8 +45,10 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "id",
+            "job_code",  # ➕ BỔ SUNG: Mã dự án (VD: ERP-2024-068)
             "job_name",
             "client",
+            "priority",  # ➕ BỔ SUNG: Mức độ ưu tiên (HIGH, MEDIUM, LOW)
             "status",
             "start_date",
             "deadline",
@@ -114,7 +124,9 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "client_id",
+            "job_code",  # ➕ BỔ SUNG: Cho phép truyền mã dự án
             "job_name",
+            "priority",  # ➕ BỔ SUNG: Cho phép chọn độ ưu tiên (Mặc định MEDIUM)
             "description",
             "start_date",
             "deadline",
@@ -157,6 +169,7 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "job_name",
+            "priority",    # ➕ BỔ SUNG: Cho phép sửa độ ưu tiên khi Edit Job
             "description",
             "deadline",
         ]

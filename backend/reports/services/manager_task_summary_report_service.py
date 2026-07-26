@@ -101,6 +101,7 @@ def build_job_summary(queryset):
         queryset
         .values(
             "job_id",
+            "job__job_code",  # ➕ BỔ SUNG: Thêm job_code vào values
             "job__job_name",
             "job__status",
             "job__deadline",
@@ -112,6 +113,7 @@ def build_job_summary(queryset):
     return [
         {
             "job_id": row["job_id"],
+            "job_code": row["job__job_code"],  # ➕ BỔ SUNG: job_code
             "job_name": row["job__job_name"],
             "job_status": row["job__status"],
             "job_deadline": row["job__deadline"],
@@ -193,6 +195,7 @@ def serialize_task_row(task):
         "updated_at": task.updated_at,
         "job": {
             "id": task.job_id,
+            "job_code": task.job.job_code,  # ➕ BỔ SUNG: job_code
             "job_name": task.job.job_name,
             "status": task.job.status,
             "deadline": task.job.deadline,

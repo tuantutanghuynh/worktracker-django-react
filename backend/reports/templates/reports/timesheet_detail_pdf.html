@@ -52,6 +52,7 @@
                 <th>ID</th>
                 <th>Ngày làm</th>
                 <th>Nhân viên</th>
+                <th>Mã Job</th>           <!-- ➕ BỔ SUNG -->
                 <th>Dự án (Job)</th>
                 <th>Task</th>
                 <th>Số giờ</th>
@@ -64,6 +65,7 @@
                 <td>{{ row.id }}</td>
                 <td>{{ row.work_date }}</td>
                 <td>{{ row.employee.full_name }}</td>
+                <td>{{ row.job.job_code }}</td>       <!-- ➕ BỔ SUNG -->
                 <td>{{ row.job.job_name }}</td>
                 <td>{{ row.task.title }}</td>
                 <td>{{ row.hours_spent }}</td>
@@ -71,7 +73,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7" style="text-align: center;">Không có dữ liệu</td>
+                <td colspan="8" style="text-align: center;">Không có dữ liệu</td>
             </tr>
             {% endfor %}
         </tbody>

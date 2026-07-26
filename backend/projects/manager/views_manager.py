@@ -205,6 +205,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
             job,
             fields=[
                 "job_name",
+                "priority",    # ➕ BỔ SUNG: Chụp lại độ ưu tiên cũ
                 "description",
                 "deadline",
             ],
@@ -230,6 +231,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
                     updated_job,
                     fields=[
                         "job_name",
+                        "priority",
                         "description",
                         "deadline",
                     ],
