@@ -128,14 +128,20 @@ frontend/src/
 │   └── employee/              # EmployeeDashboard, MyTasks, EmployeeTimesheet, Notifications, MyPerformance, Profile
 │
 ├── services/                  # Gọi API Backend qua Axios (.js)
-│   ├── apiClient.js           # Axios instance + Interceptor (JWT + Token Revocation)
-│   ├── authService.js         # Login, Refresh token, Logout
-│   ├── jobService.js          # CRUD Job, Change status, List active clients
-│   ├── taskService.js         # CRUD Task, Kanban Move, Transition, Comments, Uploads
-│   ├── timesheetService.js    # Review LogWork (Approve/Reject/Correct/Void), TimeLock
-│   ├── reportService.js       # Dashboard stats, Export XLSX/PDF
-│   ├── teamService.js         # List employees, Assign department
-│   └── systemService.js       # Notifications, Audit logs
+│   ├── apiClient.js           # [CHUNG] Instance Axios + Interceptors (JWT + Token Revocation)
+│   ├── authService.js         # [CHUNG] Login, Refresh token, Logout, Get User Profile
+│   ├── manager/               # 🛡️ Services Phân hệ Manager (Job, Task, Timesheet, Report, Team, System)
+│   │   ├── managerJobService.js
+│   │   ├── managerTaskService.js
+│   │   ├── managerTimesheetService.js
+│   │   ├── managerReportService.js
+│   │   ├── managerTeamService.js
+│   │   └── managerSystemService.js
+│   ├── employee/              # 👤 Services Phân hệ Employee (Phát triển sau)
+│   │   ├── employeeTaskService.js
+│   │   └── employeeTimesheetService.js
+│   └── admin/                 # ⚙️ Services Phân hệ Admin (Phát triển sau)
+│       └── adminClientService.js
 │
 ├── store/                     # Zustand Global Stores (.js)
 │   ├── useAuthStore.js        # User profile, Access/Refresh Token, Role
