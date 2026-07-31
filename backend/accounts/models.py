@@ -3,7 +3,7 @@ from django.db import models
 
 
 # ============================================================
-# BẢNG 1: roles
+# BẢNG 1: role
 # Danh mục vai trò: ADMIN, MANAGER, EMPLOYEE
 # ============================================================
 class Role(models.Model):
@@ -19,6 +19,7 @@ class Role(models.Model):
         null=True,
     )
     is_active = models.BooleanField(default=True)
+
     class Meta:
         db_table = "roles"
 

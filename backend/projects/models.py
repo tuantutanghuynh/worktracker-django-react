@@ -123,11 +123,13 @@ class Job(models.Model):
     job_name = models.CharField(max_length=255)
 
     priority = models.CharField(
-    max_length=10,
-    choices=Priority.choices,
-    default=Priority.MEDIUM,
-    db_index=True,
+        max_length=10,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+        db_index=True,
+
     )
+    
     description = models.TextField(
         blank=True,
         null=True,

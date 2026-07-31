@@ -33,6 +33,13 @@ class AuditLog(models.Model):
 
     # Tên hành động: 'CREATE_JOB', 'SOFT_DELETE_CLIENT', 'LOCK_TIMESHEET', ...
     action = models.CharField(max_length=50)
+    severity = models.CharField(
+        max_length=10,
+        choices=Severity.choices,
+        default=Severity.NORMAL,
+        db_index=True,
+    )
+    summary = models.TextField(blank=True, null=True)
 
     severity = models.CharField(
     max_length=10,

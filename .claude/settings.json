@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git ls-tree *)",
+      "Bash(\"./.venv/Scripts/python.exe\" -m pip install -r requirements.txt)",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(\"./.venv/Scripts/python.exe\" manage.py migrate)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "PowerShell(cd \"c:\\\\Users\\\\Admin\\\\OneDrive\\\\IT\\\\1. TERM 2\\\\ProjectSem2\\\\worktracker-django-react\\\\backend\"; Remove-Item \"config\\\\\" -Recurse -Force; if \\(-not \\(Test-Path \"config\\\\\"\\)\\) { Write-Host \"config/ deleted\" } else { Write-Host \"config/ still exists\" })",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)"
+    ]
+  }
+}
