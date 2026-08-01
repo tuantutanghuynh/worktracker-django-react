@@ -1,4 +1,4 @@
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.utils import timezone
 
 from rest_framework import viewsets
@@ -44,6 +44,14 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         date_to = self.request.query_params.get('date_to')
         if date_to:
             queryset = queryset.filter(created_at__date__lte=date_to)
+
+        if record_id := self.request.query_params.get('record_id'):
+            queryset = queryset.filter(record_id=record_id)
+
+        if keyword := self.request.query_params.get('keyword'):
+            queryset = queryset.filter(
+                Q(old_values__icontains=keyword) | Q(new_values__icontains=keyword)
+            )
 
         return queryset
 
@@ -118,12 +126,12 @@ class AdminReportView(APIView):
         ws.title = 'Clients'
         ws.append(['ID', 'Name', 'Tax Code', 'Contact Email', 'Is Active'])
         for c in Client.objects.all():
-            ws.append([c.id, c.name, c.tax_code, c.contact_email, c.is_active])
+            ws.append([c.id, c.client_name, c.tax_code, c.contact_email, c.is_active])
         #tạo export sheet jobs
         ws2 = wb.create_sheet('Jobs')
         ws2.append(['ID', 'Name', 'Client', 'Status', 'Priority', 'Start Date', 'Deadline'])
         for j in Job.objects.select_related('client').all():
-            ws2.append([j.id, j.name, j.client.name, j.status, j.priority, 
+            ws2.append([j.id, j.job_name, j.client.client_name, j.status, j.priority,
                         str(j.start_date), str(j.deadline)])
         #tạo sheet user
         ws3 = wb.create_sheet('Users')
@@ -133,14 +141,13 @@ class AdminReportView(APIView):
         log_audit_event(
             actor=request.user,
             action='EXPORT',
-            table_name='reports', 
-            record_id=None,
-            record_id=None,
+            table_name='reports',
+            record_id=0,
             request=request,
         )
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = 'attachment; filename = "worktracker_report.xlsx"'
+        response['Content-Disposition'] = 'attachment; filename="worktracker_report.xlsx"'
         wb.save(response)
         return response

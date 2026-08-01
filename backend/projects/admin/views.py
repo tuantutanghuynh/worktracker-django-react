@@ -13,7 +13,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         qs = Client.objects.all()
         params=self.request.query_params
         if name := params.get('name'):
-            qs = qs.filter(name__icontains=name)
+            qs = qs.filter(client_name__icontains=name)
         if (is_active := params.get('is_active')) is not None:
             qs = qs.filter(is_active=is_active.lower() == 'true')
         return qs
