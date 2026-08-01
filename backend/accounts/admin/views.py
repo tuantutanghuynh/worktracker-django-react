@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import CustomUser, Role, Permission, Department
+from ..models import CustomUser, Role, Permission, Department, EmployeeProfile
 from .serializers import (
     UserSerializer, UserCreateSerializer,
     RoleSerializer, PermissionSerializer, DepartmentSerializer,
@@ -12,7 +12,6 @@ from ..authentication import set_user_active_status
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = CustomUser.objects.select_related('role', 'profile').all()
     serializer_class = UserSerializer
     
     def get_queryset(self):
@@ -58,6 +57,16 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save()
         set_user_active_status(user.id, True)
         return Response({'detail': 'User unlocked.'}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['patch'], url_path='assign-department')
+    def assign_department(self, request, pk=None):
+        user = self.get_object()
+        department_id = request.data.get('department')
+        profile, _ = EmployeeProfile.objects.get_or_create(user=user)
+        profile.department_id = department_id
+        profile.save()
+        return Response({'detail': 'Department assigned.'},status=status.HTTP_200_OK)
+
 
 
 class RoleViewSet(viewsets.ModelViewSet):

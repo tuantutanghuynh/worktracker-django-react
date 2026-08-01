@@ -12,7 +12,9 @@ from tasks.models import Task
 from timesheets.models import LogWork
 from ..models import AuditLog
 from .serializers import AuditLogSerializer
-
+from django.http import HttpResponse
+from ..utils import log_audit_event
+import openpyxl
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
@@ -105,3 +107,40 @@ class DashboardView(APIView):
             'task_status':         task_status,
             'audit_summary_today': audit_summary_today,
         })
+
+class AdminReportView(APIView):
+    def get_permissions(self):
+        return [HasPermission('report:export')]
+    def get(self, request):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        #tạo export excel clients 
+        ws.title = 'Clients'
+        ws.append(['ID', 'Name', 'Tax Code', 'Contact Email', 'Is Active'])
+        for c in Client.objects.all():
+            ws.append([c.id, c.name, c.tax_code, c.contact_email, c.is_active])
+        #tạo export sheet jobs
+        ws2 = wb.create_sheet('Jobs')
+        ws2.append(['ID', 'Name', 'Client', 'Status', 'Priority', 'Start Date', 'Deadline'])
+        for j in Job.objects.select_related('client').all():
+            ws2.append([j.id, j.name, j.client.name, j.status, j.priority, 
+                        str(j.start_date), str(j.deadline)])
+        #tạo sheet user
+        ws3 = wb.create_sheet('Users')
+        ws3.append(['ID', 'Email', 'Role', 'Is Active'])
+        for u in CustomUser.objects.select_related('role').all():
+            ws3.append([u.id, u.email, u.role.code if u.role else '', u.is_active])            
+        log_audit_event(
+            actor=request.user,
+            action='EXPORT',
+            table_name='reports', 
+            record_id=None,
+            record_id=None,
+            request=request,
+        )
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename = "worktracker_report.xlsx"'
+        wb.save(response)
+        return response

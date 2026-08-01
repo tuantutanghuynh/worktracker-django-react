@@ -34,20 +34,34 @@ class Client(models.Model):
         blank=True,
         null=True,
     )
-
     # Cờ Soft Delete. Chuyển về False thay vì xóa vật lý.
     # INDEX để filter active/inactive nhanh.
     is_active = models.BooleanField(
         default=True,
         db_index=True,
     )
-
+    address = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+    industry = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    notes = models.TextField(
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
     class Meta:
         db_table = "clients"
 
     def __str__(self):
-        return self.client_name
-
+        return self.client_name  
 
 # ============================================================
 # BẢNG 9: jobs

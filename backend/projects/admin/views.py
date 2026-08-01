@@ -7,9 +7,17 @@ from system.utils import log_audit_event
 
 
 class ClientViewSet(viewsets.ModelViewSet):
-    queryset = Client.objects.all()
     serializer_class = ClientSerializer
 
+    def get_queryset(self):
+        qs = Client.objects.all()
+        params=self.request.query_params
+        if name := params.get('name'):
+            qs = qs.filter(name__icontains=name)
+        if (is_active := params.get('is_active')) is not None:
+            qs = qs.filter(is_active=is_active.lower() == 'true')
+        return qs
+    
     def get_permissions(self):
         if self.action == 'create':
             return [HasPermission('client:create')]
