@@ -16,7 +16,8 @@
       "PowerShell(py -3.12 --version 2>&1)",
       "PowerShell(py -3.11 --version 2>&1)",
       "PowerShell(py --list 2>&1)",
-      "PowerShell(winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>&1)"
+      "PowerShell(winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>&1)",
+      "WebSearch"
     ]
   }
 }

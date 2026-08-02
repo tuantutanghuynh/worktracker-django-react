@@ -1,3 +1,16 @@
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  SHARED FILE — File cấu hình trung tâm, MỌI branch đều đụng         │
+# │                                                                      │
+# │  ĐIỂM CONFLICT KHI MERGE:                                            │
+# │  1. INSTALLED_APPS → Long thêm 'reports', Tú thêm 'timesheets'      │
+# │     → Uncomment từng app sau khi merge từng nhánh                    │
+# │  2. DEFAULT_AUTHENTICATION_CLASSES → Tú có WorkTrackerJWTAuth        │
+# │     → Đổi sau khi merge Tú (xem TODO bên dưới)                      │
+# │  3. SIMPLE_JWT → Kiểm tra Long/Tú có chỉnh ACCESS_TOKEN_LIFETIME ?   │
+# │  4. Redis DB allocation → Đã chuẩn hóa (DB0-3), giữ nguyên          │
+# │  5. Django version → Team dùng 6.0.6, mình dùng 5.2.15              │
+# │     → Cần họp nhóm để thống nhất trước khi nâng cấp                 │
+# └─────────────────────────────────────────────────────────────────────┘
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -131,6 +144,16 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Tài liệu API chính thức cho hệ thống WorkTracker (Admin / Manager / Employee).',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SECURITY': [{'bearerAuth': []}],
+    'COMPONENTS': {
+        'securitySchemes': {
+            'bearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
+        }
+    },
 }
 
 

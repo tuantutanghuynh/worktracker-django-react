@@ -1,5 +1,10 @@
+from django.db import transaction
 from django.db.models import Sum, Q
 from django.utils import timezone
+from django.core.cache import cache
+
+DASHBOARD_CACHE_KEY = 'admin:dashboard'
+DASHBOARD_CACHE_TTL = 30  # seconds — dashboard data cũ tối đa 30 giây
 
 from rest_framework import viewsets
 from rest_framework.views import APIView
@@ -62,6 +67,10 @@ class DashboardView(APIView):
         return [HasPermission('audit:view')]
 
     def get(self, request):
+        cached = cache.get(DASHBOARD_CACHE_KEY)
+        if cached:
+            return Response(cached)
+
         today = timezone.now().date()
 
         active_clients = Client.objects.filter(is_active=True).count()
@@ -104,7 +113,7 @@ class DashboardView(APIView):
             'timesheet_locked':  audit_today.filter(action='LOCK_TIMESHEET').count(),
         }
 
-        return Response({
+        data = {
             'active_clients':      active_clients,
             'running_jobs':        running_jobs,
             'total_work_hours':    total_hours,
@@ -114,23 +123,35 @@ class DashboardView(APIView):
             'clients_overview':    clients_overview,
             'task_status':         task_status,
             'audit_summary_today': audit_summary_today,
-        })
+        }
+        cache.set(DASHBOARD_CACHE_KEY, data, timeout=DASHBOARD_CACHE_TTL)
+        return Response(data)
 
 class AdminReportView(APIView):
     def get_permissions(self):
         return [HasPermission('report:export')]
+
+    @transaction.atomic
     def get(self, request):
+        # Filter theo khoảng thời gian tạo job (optional)
+        date_from = request.query_params.get('date_from')
+        date_to   = request.query_params.get('date_to')
+
         wb = openpyxl.Workbook()
         ws = wb.active
-        #tạo export excel clients 
         ws.title = 'Clients'
         ws.append(['ID', 'Name', 'Tax Code', 'Contact Email', 'Is Active'])
         for c in Client.objects.all():
             ws.append([c.id, c.client_name, c.tax_code, c.contact_email, c.is_active])
-        #tạo export sheet jobs
+
         ws2 = wb.create_sheet('Jobs')
         ws2.append(['ID', 'Name', 'Client', 'Status', 'Priority', 'Start Date', 'Deadline'])
-        for j in Job.objects.select_related('client').all():
+        job_qs = Job.objects.select_related('client').all()
+        if date_from:
+            job_qs = job_qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            job_qs = job_qs.filter(created_at__date__lte=date_to)
+        for j in job_qs:
             ws2.append([j.id, j.job_name, j.client.client_name, j.status, j.priority,
                         str(j.start_date), str(j.deadline)])
         #tạo sheet user

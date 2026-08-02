@@ -1,3 +1,13 @@
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  SHARED FILE — Xác thực JWT cho toàn hệ thống                       │
+# │                                                                      │
+# │  MERGE RISK (TuanTu-3):                                              │
+# │  Tú có class WorkTrackerJWTAuthentication — cùng chức năng,          │
+# │  tên khác. Sau khi merge với Tú cần:                                 │
+# │  1. Chọn giữ lại 1 class (đề xuất: dùng tên của Tú làm chuẩn)      │
+# │  2. Cập nhật settings.py → DEFAULT_AUTHENTICATION_CLASSES            │
+# │     (đã có TODO sẵn trong settings.py)                               │
+# └─────────────────────────────────────────────────────────────────────┘
 from django.core.cache import cache                                    # đọc/ghi cache (đang dùng LocMemCache)
 from rest_framework_simplejwt.authentication import JWTAuthentication  # class xác thực JWT gốc của simplejwt
 from rest_framework.exceptions import AuthenticationFailed             # exception trả về lỗi 401

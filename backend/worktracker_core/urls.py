@@ -1,3 +1,14 @@
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  SHARED FILE — URL router trung tâm, MỌI branch đăng ký vào đây     │
+# │                                                                      │
+# │  ĐIỂM CONFLICT KHI MERGE:                                            │
+# │  1. LongNguyen → thêm các path 'api/manager/' (đã comment sẵn)      │
+# │     Sau merge Long: uncomment khối "── MANAGER scope ──"             │
+# │  2. TuanTu-3 → thêm các path 'api/timesheets/', 'api/auth/' employee │
+# │     Sau merge Tú: uncomment khối "── EMPLOYEE + TIMESHEETS ──"       │
+# │  3. accounts.urls_auth → Tú có file này, MinhAnh chưa có             │
+# │     Sau merge Tú: thay 2 dòng JWT thô bằng include('accounts.urls_auth') │
+# └─────────────────────────────────────────────────────────────────────┘
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
