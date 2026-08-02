@@ -213,3 +213,5 @@ CHANNEL_LAYERS = {
 # Chỉ định Daphne làm ASGI application (thay Django WSGI mặc định)
 ASGI_APPLICATION = "worktracker_core.asgi.application"
 
+WORK_DAYS_PER_WEEK = int(os.environ.get("WORK_DAYS_PER_WEEK", 6))
+DAILY_WORKING_HOURS = int(os.environ.get("DAILY_WORKING_HOURS", 8))

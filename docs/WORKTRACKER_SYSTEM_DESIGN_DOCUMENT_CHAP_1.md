@@ -154,7 +154,7 @@ This area covers personal profile viewing and updating, avatar upload, contact d
 
 ### 1.4.7 Reporting and Analytics
 
-This area covers executive dashboards (KPI cards, productivity heatmaps, status breakdown charts, timesheet trend lines), task progress summaries, timesheet detail reports, employee performance indicators, and exportable reports in PDF and Excel formats containing job codes and client details.
+This area covers executive dashboards (KPI cards, productivity heatmaps, status breakdown charts, timesheet trend lines), task progress summaries, timesheet detail reports, employee performance indicators, employee Utilization Rate (computed as total logged hours divided by working days times 8 hours, with Workload Status thresholds of Normal below 70%, High from 70% to below 90%, and Overloaded at 90% or above), and exportable reports in PDF and Excel formats containing job codes and client details.
 
 ### 1.4.8 Audit Logging
 

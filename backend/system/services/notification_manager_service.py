@@ -137,15 +137,6 @@ def notify(
     if not recipient_ids:
         return []
 
-    User = get_user_model()
-
-    active_user_ids = list(
-        User.objects.filter(
-            id__in=recipient_ids,
-            is_active=True,
-        ).values_list("id", flat=True)
-    )
-
     notifications = [
         Notification(
             user_id=user_id,
@@ -155,7 +146,7 @@ def notify(
             content=content,
             related_url=related_url,
         )
-        for user_id in active_user_ids
+        for user_id in recipient_ids
     ]
 
     created_notifications = Notification.objects.bulk_create(notifications)

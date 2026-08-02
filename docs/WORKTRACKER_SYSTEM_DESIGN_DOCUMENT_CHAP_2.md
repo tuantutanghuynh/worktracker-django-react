@@ -1082,9 +1082,47 @@ The dashboard shall include indicators such as:
 
 -   Team work hours
 
--   Employee workload comparison
+-   Employee workload comparison (Utilization Rate per FR-83A)
 
 -   Heatmap or productivity visualization
+
+## FR-83A: Employee Utilization Rate
+
+**\[NEW\]** Added to define the canonical workload computation formula used in the Manager Team Members page and Manager Dashboard (FR-83).
+
+The system shall compute an Employee Utilization Rate for each employee within the Manager's job-based scope (FR-99) over a selected date range.
+
+The formula shall be:
+
+```
+Utilization Rate (%) = Total Logged Hours in period
+                       ──────────────────────────────  × 100
+                       Working Days in period × 8
+```
+
+Where:
+
+-   **Total Logged Hours** = SUM of `log_works.hours_spent` for the employee within the date range, excluding records with `review_status = VOIDED`.
+
+-   **Working Days** = number of calendar days in the date range excluding Sundays (Monday through Saturday are working days). Public holidays are not excluded in the current version.
+
+-   **8** = standard working hours per day.
+
+The system shall derive a Workload Status from the computed Utilization Rate using the following thresholds:
+
+  -----------------------------------------------------------------------
+  Utilization Rate        Workload Status     Meaning
+  ----------------------- ------------------- ----------------------------
+  Less than 70%           Normal              Employee has remaining capacity.
+
+  70% to below 90%        High                Employee is heavily loaded; limit new assignments.
+
+  90% or above            Overloaded          Employee is at or beyond full capacity; Manager should intervene.
+  -----------------------------------------------------------------------
+
+Utilization Rate and Workload Status are computed values. They shall not be stored as columns in any database table. They shall be calculated on-the-fly by the backend service layer and returned as additional fields in the API response for the Team Members list and related dashboard endpoints.
+
+Utilization Rate shall default to 0% if the employee has no log work records in the selected date range.
 
 ## FR-84: Employee Personal Dashboard
 

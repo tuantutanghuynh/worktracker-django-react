@@ -277,11 +277,8 @@ def serialize_logwork_row(logwork, locked_map):
 
     is_locked = locked_map.get(period_key, False)
 
-    department = getattr(
-        getattr(logwork.user, "profile", None),
-        "department",
-        None,
-    )
+    profile = getattr(logwork.user, "profile", None)
+    department = getattr(profile, "department", None) if profile else None
 
     return {
         "id": logwork.id,

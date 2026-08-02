@@ -2,6 +2,7 @@ from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db.models import Count, Q, Sum
 
 from tasks.models import Task
@@ -11,6 +12,7 @@ from system.security.scoping_manager import (
     scoped_tasks,
     scoped_logworks,
 )
+from timesheets.services.manager_employee_utilization_service import calculate_working_days
 
 
 def decimal_to_float(value):
@@ -31,63 +33,50 @@ def get_month_range(month, year):
     return start_date, end_date
 
 
-def build_task_status_summary(user):
+def build_task_metrics_summary(user):
     """
-    Đếm số Task theo status trong scope Manager.
-    """
-    raw_rows = (
-        scoped_tasks(user)
-        .values("status")
-        .annotate(total=Count("id"))
-        .order_by("status")
-    )
-
-    summary = {
-        status_value: 0
-        for status_value, status_label in Task.Status.choices
-    }
-
-    for row in raw_rows:
-        summary[row["status"]] = row["total"]
-
-    return summary
-
-
-def build_overdue_task_rate(user):
-    """
-    Tỷ lệ task quá hạn.
-
-    Chỉ tính task chưa terminal:
-    - TODO
-    - IN_PROGRESS
-    - REVIEWING
+    TỐI ƯU HIỆU NĂNG:
+    Gom 2 hàm build_task_status_summary và build_overdue_task_rate làm một,
+    thực hiện ĐÚNG 1 CÂU QUERY SQL DUY NHẤT thay vì 3 câu SQL riêng lẻ.
     """
     today = date.today()
-
-    active_tasks = scoped_tasks(user).exclude(
+    active_condition = Q(
         status__in=[
-            Task.Status.COMPLETED,
-            Task.Status.CANCELLED,
+            Task.Status.TODO,
+            Task.Status.IN_PROGRESS,
+            Task.Status.REVIEWING,
         ]
     )
 
-    total_active = active_tasks.count()
+    metrics = scoped_tasks(user).aggregate(
+        todo=Count("id", filter=Q(status=Task.Status.TODO)),
+        in_progress=Count("id", filter=Q(status=Task.Status.IN_PROGRESS)),
+        reviewing=Count("id", filter=Q(status=Task.Status.REVIEWING)),
+        completed=Count("id", filter=Q(status=Task.Status.COMPLETED)),
+        cancelled=Count("id", filter=Q(status=Task.Status.CANCELLED)),
+        total_active=Count("id", filter=active_condition),
+        overdue=Count("id", filter=active_condition & Q(deadline__lt=today)),
+    )
 
-    overdue_count = active_tasks.filter(
-        deadline__lt=today,
-    ).count()
+    status_summary = {
+        Task.Status.TODO: metrics["todo"] or 0,
+        Task.Status.IN_PROGRESS: metrics["in_progress"] or 0,
+        Task.Status.REVIEWING: metrics["reviewing"] or 0,
+        Task.Status.COMPLETED: metrics["completed"] or 0,
+        Task.Status.CANCELLED: metrics["cancelled"] or 0,
+    }
 
-    if total_active == 0:
-        rate = 0
+    total_active = metrics["total_active"] or 0
+    overdue_count = metrics["overdue"] or 0
+    rate = round((overdue_count / total_active) * 100, 2) if total_active > 0 else 0.0
 
-    else:
-        rate = round((overdue_count / total_active) * 100, 2)
-
-    return {
+    overdue_summary = {
         "total_active_tasks": total_active,
         "overdue_tasks": overdue_count,
         "overdue_rate_percent": rate,
     }
+
+    return status_summary, overdue_summary
 
 
 def build_team_total_hours(user, month, year):
@@ -116,8 +105,15 @@ def build_workload_per_employee(user, month, year):
     So sánh workload theo Employee:
     - open_task_count
     - logged_hours trong tháng
+    - capacity_hours
+    - utilization_rate (%)
+    - workload_status (Normal | High | Overloaded)
     """
     start_date, end_date = get_month_range(month, year)
+
+    daily_hours = getattr(settings, "DAILY_WORKING_HOURS", 8)
+    working_days = calculate_working_days(start_date, end_date)
+    max_capacity_hours = float(working_days * daily_hours)
 
     task_rows = (
         scoped_tasks(user)
@@ -164,6 +160,9 @@ def build_workload_per_employee(user, month, year):
             ),
             "open_task_count": row["open_task_count"],
             "logged_hours": 0.0,
+            "capacity_hours": max_capacity_hours,
+            "utilization_rate": 0.0,
+            "workload_status": "Normal",
         }
 
     for row in hours_rows:
@@ -179,11 +178,31 @@ def build_workload_per_employee(user, month, year):
                 ),
                 "open_task_count": 0,
                 "logged_hours": 0.0,
+                "capacity_hours": max_capacity_hours,
+                "utilization_rate": 0.0,
+                "workload_status": "Normal",
             }
 
         data[user_id]["logged_hours"] = decimal_to_float(
             row["logged_hours"]
         )
+
+    for user_id, emp_data in data.items():
+        logged_h = emp_data["logged_hours"]
+        if max_capacity_hours > 0:
+            rate = round((logged_h / max_capacity_hours) * 100, 1)
+        else:
+            rate = 0.0
+
+        if rate < 70.0:
+            status = "Normal"
+        elif rate < 90.0:
+            status = "High"
+        else:
+            status = "Overloaded"
+
+        emp_data["utilization_rate"] = rate
+        emp_data["workload_status"] = status
 
     return list(data.values())
 
@@ -238,13 +257,14 @@ def build_dashboard(user, month, year):
     trong dashboard Manager.
     """
     managed_jobs_count = scoped_jobs(user).count()
+    status_summary, overdue_task_rate = build_task_metrics_summary(user)
 
     return {
         "month": month,
         "year": year,
         "managed_jobs_count": managed_jobs_count,
-        "task_status_summary": build_task_status_summary(user),
-        "overdue_task_rate": build_overdue_task_rate(user),
+        "task_status_summary": status_summary,
+        "overdue_task_rate": overdue_task_rate,
         "team_total_hours": build_team_total_hours(user, month, year),
         "workload_per_employee": build_workload_per_employee(
             user,

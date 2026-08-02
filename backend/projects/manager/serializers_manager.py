@@ -11,14 +11,14 @@ class ManagerClientMiniSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "client_name",
-            "tax_code",        # ➕ BỔ SUNG: Mã số thuế
+            "tax_code",  # ➕ BỔ SUNG: Mã số thuế
             "contact_person",  # ➕ BỔ SUNG: Người liên hệ
-            "contact_email",   # ➕ BỔ SUNG: Email liên hệ
-            "contact_phone",   # ➕ BỔ SUNG: SĐT liên hệ
-            "address",         # ➕ BỔ SUNG: Địa chỉ trụ sở
-            "industry",        # Lĩnh vực hoạt động
-            "notes",           # ➕ BỔ SUNG: Ghi chú nội bộ
-            "is_active",       # ➕ BỔ SUNG: Trạng thái hoạt động
+            "contact_email",  # ➕ BỔ SUNG: Email liên hệ
+            "contact_phone",  # ➕ BỔ SUNG: SĐT liên hệ
+            "address",  # ➕ BỔ SUNG: Địa chỉ trụ sở
+            "industry",  # Lĩnh vực hoạt động
+            "notes",  # ➕ BỔ SUNG: Ghi chú nội bộ
+            "is_active",  # ➕ BỔ SUNG: Trạng thái hoạt động
         ]
 
 
@@ -57,10 +57,6 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         ]
 
     def get_task_counts(self, obj):
-        """
-        Ưu tiên dùng dữ liệu annotate từ queryset.
-        Nếu view chưa annotate, fallback sang query theo related_name='tasks'.
-        """
         annotated_fields = [
             "total_tasks",
             "todo_count",
@@ -80,25 +76,24 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
                 "cancelled_count": obj.cancelled_count,
             }
 
-        tasks = obj.tasks.all()
+            # 2. FALLBACK TỐI ƯU: Đếm tất cả trạng thái trong CHỈ 1 CÂU QUERY SQL duy nhất
+        from django.db.models import Count, Q
 
-        return {
-            "total_tasks": tasks.count(),
-            "todo_count": tasks.filter(status=Task.Status.TODO).count(),
-            "in_progress_count": tasks.filter(status=Task.Status.IN_PROGRESS).count(),
-            "reviewing_count": tasks.filter(status=Task.Status.REVIEWING).count(),
-            "completed_count": tasks.filter(status=Task.Status.COMPLETED).count(),
-            "cancelled_count": tasks.filter(status=Task.Status.CANCELLED).count(),
-        }
+        counts = obj.tasks.aggregate(
+            total_tasks=Count("id"),
+            todo_count=Count("id", filter=Q(status=Task.Status.TODO)),
+            in_progress_count=Count("id", filter=Q(status=Task.Status.IN_PROGRESS)),
+            reviewing_count=Count("id", filter=Q(status=Task.Status.REVIEWING)),
+            completed_count=Count("id", filter=Q(status=Task.Status.COMPLETED)),
+            cancelled_count=Count("id", filter=Q(status=Task.Status.CANCELLED)),
+        )
+        return counts
 
     def get_is_overdue(self, obj):
-        return (
-            obj.deadline < timezone.localdate()
-            and obj.status not in [
-                Job.Status.COMPLETED,
-                Job.Status.CANCELLED,
-            ]
-        )
+        return obj.deadline < timezone.localdate() and obj.status not in [
+            Job.Status.COMPLETED,
+            Job.Status.CANCELLED,
+        ]
 
 
 class ManagerJobDetailSerializer(ManagerJobListSerializer):
@@ -139,9 +134,7 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
             "status",
         }
 
-        invalid_fields = forbidden_fields.intersection(
-            set(self.initial_data.keys())
-        )
+        invalid_fields = forbidden_fields.intersection(set(self.initial_data.keys()))
 
         if invalid_fields:
             raise serializers.ValidationError(
@@ -156,9 +149,7 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
 
         if start_date and deadline and deadline < start_date:
             raise serializers.ValidationError(
-                {
-                    "deadline": "Job deadline must not be earlier than start date."
-                }
+                {"deadline": "Job deadline must not be earlier than start date."}
             )
 
         return attrs
@@ -169,7 +160,7 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "job_name",
-            "priority",    # ➕ BỔ SUNG: Cho phép sửa độ ưu tiên khi Edit Job
+            "priority",  # ➕ BỔ SUNG: Cho phép sửa độ ưu tiên khi Edit Job
             "description",
             "deadline",
         ]
@@ -183,9 +174,7 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
             "status",
         }
 
-        invalid_fields = forbidden_fields.intersection(
-            set(self.initial_data.keys())
-        )
+        invalid_fields = forbidden_fields.intersection(set(self.initial_data.keys()))
 
         if invalid_fields:
             raise serializers.ValidationError(
@@ -200,9 +189,7 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
 
         if job and new_deadline and new_deadline < job.start_date:
             raise serializers.ValidationError(
-                {
-                    "deadline": "Job deadline must not be earlier than start date."
-                }
+                {"deadline": "Job deadline must not be earlier than start date."}
             )
 
         return attrs
@@ -223,14 +210,16 @@ class ManagerJobStatusChangeSerializer(serializers.Serializer):
         new_status = attrs.get("new_status")
         reason = attrs.get("reason")
 
-        if new_status in [
-            Job.Status.CANCELLED,
-            Job.Status.ON_HOLD,
-        ] and not reason:
+        if (
+            new_status
+            in [
+                Job.Status.CANCELLED,
+                Job.Status.ON_HOLD,
+            ]
+            and not reason
+        ):
             raise serializers.ValidationError(
-                {
-                    "reason": "Reason is required for this status."
-                }
+                {"reason": "Reason is required for this status."}
             )
 
         return attrs

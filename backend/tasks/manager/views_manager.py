@@ -676,22 +676,23 @@ class ManagerJobKanbanView(APIView):
             .order_by("status", "order_index")
         )
 
-        grouped = {
+        grouped_instances = {
             status_value: []
             for status_value, status_label in Task.Status.choices
         }
 
-        for status_value, status_label in Task.Status.choices:
-            status_tasks = [
-                task
-                for task in tasks
-                if task.status == status_value
-            ]
+        # TỐI ƯU HIỆU NĂNG: Duyệt danh sách tasks đúng 1 lần duy nhất O(N) thay vì 5 lần
+        for task in tasks:
+            if task.status in grouped_instances:
+                grouped_instances[task.status].append(task)
 
-            grouped[status_value] = ManagerTaskListSerializer(
+        grouped = {
+            status_value: ManagerTaskListSerializer(
                 status_tasks,
                 many=True,
             ).data
+            for status_value, status_tasks in grouped_instances.items()
+        }
 
         return Response(
             {
