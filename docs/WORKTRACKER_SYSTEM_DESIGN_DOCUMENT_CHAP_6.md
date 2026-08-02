@@ -692,7 +692,7 @@ The `task_attachments` table stores metadata of files attached to tasks.
 
   description       TEXT              NULL                          Task description.
 
-  priority          ENUM              DEFAULT 'MEDIUM', INDEX       Task priority: LOW, MEDIUM, HIGH, URGENT.
+  priority          ENUM              DEFAULT 'MEDIUM', INDEX       Task priority: LOW, MEDIUM, HIGH.
 
   status            ENUM              DEFAULT 'TODO', INDEX         Task status: TODO, IN_PROGRESS, REVIEWING, COMPLETED, CANCELLED.
 
@@ -780,7 +780,7 @@ The `task_attachments` table stores metadata of files attached to tasks.
   ------------------------------------------------------------------------------------------------------------------------
   Column Name       Data Type         Constraint / Key                       Description
   ----------------- ----------------- -------------------------------------- ---------------------------------------------
-  id       INT      PRIMARY KEY, AUTO_INCREMENT   References users(id).
+  id       INT      PRIMARY KEY, AUTO_INCREMENT   Unique daily timesheet record identifier.
 
   user_id           INT               NOT NULL, FOREIGN KEY                  References `users(id)`.
 
@@ -848,7 +848,7 @@ Primary keys are used to uniquely identify records in each table.
 
   permissions             id                       Single-column primary key
 
-  role_permissions        role_id, permission_id   Composite primary key
+  role_permissions        id                       Single-column primary key
 
   users                   id                       Single-column primary key
 
@@ -874,14 +874,14 @@ Primary keys are used to uniquely identify records in each table.
 
   log_works               id                       Single-column primary key
 
-  daily_user_timesheets   user_id, work_date       Composite primary key
+  daily_user_timesheets   id                       Single-column primary key
 
   notifications           id                       Single-column primary key
 
   task_attachments        id                       Single-column primary key
   ------------------------------------------------------------------------------
 
-The `role_permissions` table uses a composite primary key to prevent duplicate role-permission mappings. The `daily_user_timesheets` table uses a composite primary key to ensure that each user has only one daily total-hours record for each work date.
+The `role_permissions` table uses an auto-increment `id` as its primary key, with a `UniqueConstraint` on `(role_id, permission_id)` to prevent duplicate role-permission mappings. The `daily_user_timesheets` table uses an auto-increment `id` as its primary key, with a `UniqueConstraint` on `(user_id, work_date)` to ensure that each user has only one daily total-hours record for each work date.
 
 ## 6.6 Foreign Keys
 
