@@ -496,7 +496,9 @@ The `task_attachments` table stores metadata of files attached to tasks.
 
   role_id           INT               NOT NULL, FOREIGN KEY         References `roles(id)`.
 
-  is_active         BOOLEAN           DEFAULT TRUE, INDEX           Account status used to allow or block system access.
+  is_active             BOOLEAN           DEFAULT TRUE, INDEX           Account status used to allow or block system access.
+
+  must_change_password  BOOLEAN           DEFAULT FALSE                 Flag indicating whether user must change password upon next login.
   ------------------------------------------------------------------------------------------------------------------------
 
 ### 6.4.5 password_resets
@@ -548,6 +550,8 @@ The `task_attachments` table stores metadata of files attached to tasks.
 
   avatar_url        VARCHAR(500)      NULL                                                    URL of the employee avatar image.
 
+  joined_date       DATE              NULL                                                    Employee official onboarding date.
+
   updated_at        DATETIME          DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP   Last profile update time.
   ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -569,6 +573,16 @@ The `task_attachments` table stores metadata of files attached to tasks.
   contact_phone     VARCHAR(20)       NULL                          Contact phone number.
 
   is_active         TINYINT(1)        DEFAULT 1, INDEX              Client active status for soft delete.
+
+  address           VARCHAR(255)      NULL                          Registered headquarter or billing address.
+
+  industry          VARCHAR(100)      NULL                          Business sector or industry (e.g., IT, Banking, Retail).
+
+  notes             TEXT              NULL                          Internal notes or partnership guidelines.
+
+  created_at        DATETIME          DEFAULT CURRENT_TIMESTAMP     Record creation timestamp.
+
+  updated_at        DATETIME          DEFAULT CURRENT_TIMESTAMP     Last update timestamp.
   ---------------------------------------------------------------------------------------------------------
 
 ### 6.4.9 jobs
@@ -582,7 +596,11 @@ The `task_attachments` table stores metadata of files attached to tasks.
 
   manager_id        INT               NOT NULL, FOREIGN KEY         References `users(id)` as the responsible manager.
 
+  job_code          VARCHAR(20)       UNIQUE, INDEX, NULL           Unique human-readable project identifier (e.g., JOB-2026-001).
+
   job_name          VARCHAR(255)      NOT NULL                      Job or project name.
+
+  priority          ENUM              DEFAULT 'MEDIUM', INDEX       Job priority level: HIGH, MEDIUM, LOW.
 
   description       TEXT              NULL                          Job description.
 
@@ -640,6 +658,10 @@ The `task_attachments` table stores metadata of files attached to tasks.
 
   action            VARCHAR(50)       NOT NULL                           Action name, such as CREATE_JOB, SOFT_DELETE_CLIENT, or LOCK_TIMESHEET.
 
+  severity          VARCHAR(10)       DEFAULT 'NORMAL', INDEX            Impact severity level: CRITICAL, WARNING, NORMAL.
+
+  summary           TEXT              NULL                               Human-readable action summary or description.
+
   table_name        VARCHAR(50)       NOT NULL                           Name of the affected table.
 
   record_id         INT               NOT NULL                           ID of the affected record.
@@ -670,7 +692,7 @@ The `task_attachments` table stores metadata of files attached to tasks.
 
   description       TEXT              NULL                          Task description.
 
-  priority          ENUM              DEFAULT 'MEDIUM', INDEX       Task priority: LOW, MEDIUM, HIGH.
+  priority          ENUM              DEFAULT 'MEDIUM', INDEX       Task priority: LOW, MEDIUM, HIGH, URGENT.
 
   status            ENUM              DEFAULT 'TODO', INDEX         Task status: TODO, IN_PROGRESS, REVIEWING, COMPLETED, CANCELLED.
 

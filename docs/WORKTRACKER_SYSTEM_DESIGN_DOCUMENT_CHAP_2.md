@@ -465,15 +465,15 @@ Resolved ambiguity in \"where permitted\" by explicitly restricting manager reas
   ------------------------- ---------------------- -------------------------
   Field                     Manager update         Admin update
 
-  job_name                  Có                     Có
+  job_name                  Yes                    Yes
 
-  description               Có                     Có
+  description               Yes                    Yes
 
-  deadline                  Có (theo rule FR-29)   Có
+  deadline                  Yes (per rule FR-29)   Yes
 
-  status                    Có (theo rule FR-29)   Có
+  status                    Yes (per rule FR-29)   Yes
 
-  manager_id                Không                  Có
+  manager_id                No                     Yes
   ------------------------- ---------------------- -------------------------
 
 \*\*\*Note: \*\*\*\*Reassigning jobs.manager_id immediately transfers access scope for that job and all of its tasks and timesheets to the new manager, and immediately removes that scope from the previous manager. This is a high-impact operation, restricted to Admin only as stated above, and must always be audit-logged (FR-43)*.*
@@ -593,17 +593,17 @@ The system shall require every task to belong to a valid job and be assigned to 
 Added job-status validation at task creation time, for consistency with the status-checking pattern already established for log work in FR-120. The system shall reject task creation if the parent job\'s status is COMPLETED or CANCELLED. If the parent job\'s status is ON_HOLD, task creation shall be rejected unless the job is first resumed (status changed back to ACTIVE or PLANNING)
 
   --------------------------------------------------------------------------
-  Job status                          Cho phép tạo Task mới?
+  Job status                          Allow new Task creation?
   ----------------------------------- --------------------------------------
-  PLANNING                            Có
+  PLANNING                            Yes
 
-  ACTIVE                              Có
+  ACTIVE                              Yes
 
-  ON_HOLD                             Không, trừ khi job được resume trước
+  ON_HOLD                             No, unless job is resumed first
 
-  COMPLETED                           Không
+  COMPLETED                           No
 
-  CANCELLED                           Không
+  CANCELLED                           No
   --------------------------------------------------------------------------
 
 ## FR-33: Validate Task Deadline
@@ -1164,9 +1164,9 @@ The Department filter shall only narrow results within data the requesting user 
 
 ## FR-89: Export Report to File
 
-The system shall allow authorized users to export reports in PDF or Excel format.
+The system shall allow authorized users to export Task Summary and Timesheet Detail reports in PDF (generated via `xhtml2pdf`) or Excel (generated via `openpyxl`) format.
 
-The generated file shall be returned to the user as a temporary downloadable file.
+The generated report file shall format project data with unique job codes (`job_code`) and client metadata, and shall be returned to the user as a temporary downloadable file.
 
 ## FR-90: Read-Only Reporting Process
 
@@ -1934,10 +1934,10 @@ The system shall still persist notification records in the database so that noti
 
 The system shall be implemented using the selected project technology stack:
 
--   Frontend: React Vite, TypeScript, React Router DOM, Zustand, React Hook Form, Zod, TanStack Table, Shadcn UI, Recharts or Chart.js, and DnD Kit.
--   Backend: Django, Django REST Framework, Django Simple JWT, Django Channels, and Celery.
--   Database and Infrastructure: PostgreSQL, Redis, WebSocket, and SMTP Email Service.
--   Supporting Tools: Git, GitHub, Postman, Docker if needed, and Visual Studio Code.
+-   Frontend: React Vite, JavaScript (ES6+ / JSX), Tailwind CSS v4, React Router DOM, Zustand, TanStack Query, React Hook Form, Zod, TanStack Table, Recharts, DnD Kit, Radix UI Primitives, and Sonner.
+-   Backend: Django 6.0, Django REST Framework, Django Simple JWT, Django Channels & Daphne, Celery & django-celery-results, drf-spectacular, django-simple-history, openpyxl, and xhtml2pdf.
+-   Database and Infrastructure: PostgreSQL, Redis (DB=1 cache, DB=2 Celery, DB=4 Channels), WebSocket (`ws/notifications/`), and SMTP Email Service.
+-   Supporting Tools & Automated Testing: pytest (109 testcases), Git, GitHub, Postman, Swagger UI (`/api/docs/`), and Visual Studio Code.
 
 #### NFR-65: Client-Server Architecture Constraint
 
