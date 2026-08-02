@@ -1,58 +1,70 @@
+from django.core.cache import cache
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from django.core.cache import cache                                    # đọc/ghi cache (đang dùng LocMemCache)
-from rest_framework_simplejwt.authentication import JWTAuthentication  # class xác thực JWT gốc của simplejwt
-from rest_framework.exceptions import AuthenticationFailed             # exception trả về lỗi 401
-
-# tiền tố cho cache key — ví dụ user id=5 thì key = "user_active:5"
-ACTIVE_STATUS_CACHE_PREFIX = "user_active:"
-ACTIVE_STATUS_CACHE_TTL = 300  # cache tồn tại 300 giây (5 phút) rồi tự xóa
+# This file makes JWT validation aware of logout: a token is normally trusted
+# until it expires, but LogoutView blacklists its jti in Redis so it can be
+# rejected immediately instead of staying valid for its full lifetime.
 
 
-# đọc trạng thái is_active của user — ưu tiên lấy từ cache, nếu không có thì mới query DB
+# Rejects any token whose jti has been blacklisted in Redis after logout.
+class BlacklistAwareJWTAuthentication(JWTAuthentication):
+
+    # Validates the token signature/expiry via super(), then rejects it if its jti is blacklisted.
+    def get_validated_token(self, raw_token):
+        validated_token = super().get_validated_token(raw_token)
+
+        jti = validated_token["jti"]
+        if cache.get(f"blacklist:{jti}"):
+            raise AuthenticationFailed("Token has been revoked.")
+
+        return validated_token
+
+
+_ACTIVE_CACHE_PREFIX = "user_active:"
+_ACTIVE_CACHE_TTL = 300
+
+
+# Returns is_active from Redis cache; falls back to a DB query on cache miss.
 def get_user_active_status(user_id):
-    cache_key = f"{ACTIVE_STATUS_CACHE_PREFIX}{user_id}"               # tạo key theo user_id
-    cached_value = cache.get(cache_key)                                # thử đọc từ cache
-    if cached_value is not None:
-        return cached_value                                            # có trong cache → trả về luôn, không cần vào DB
+    cache_key = f"{_ACTIVE_CACHE_PREFIX}{user_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
 
-    from accounts.models import CustomUser                             # import ở đây để tránh circular import
+    from accounts.models import CustomUser
     try:
-        is_active = CustomUser.objects.values_list(                    # chỉ lấy đúng cột is_active, không load toàn bộ object
-            "is_active", flat=True
-        ).get(pk=user_id)
+        is_active = CustomUser.objects.values_list("is_active", flat=True).get(pk=user_id)
     except CustomUser.DoesNotExist:
-        return False                                                   # user không tồn tại → coi như không active
+        return False
 
-    cache.set(cache_key, is_active, timeout=ACTIVE_STATUS_CACHE_TTL)  # lưu vào cache để lần sau khỏi query DB
+    cache.set(cache_key, is_active, timeout=_ACTIVE_CACHE_TTL)
     return is_active
 
 
-# cập nhật cache khi admin đổi trạng thái user (lock/unlock) — gọi hàm này sau khi lưu DB
+# Updates the cache immediately when an admin locks or unlocks an account.
 def set_user_active_status(user_id, is_active):
-    cache_key = f"{ACTIVE_STATUS_CACHE_PREFIX}{user_id}"
-    cache.set(cache_key, is_active, timeout=ACTIVE_STATUS_CACHE_TTL)  # ghi đè giá trị cũ trong cache
+    cache.set(f"{_ACTIVE_CACHE_PREFIX}{user_id}", is_active, timeout=_ACTIVE_CACHE_TTL)
 
 
-# xóa cache của user — buộc lần gọi tiếp theo phải đọc lại từ DB
+# Removes the cache entry so the next request reads the value fresh from the DB.
 def invalidate_user_active_status(user_id):
-    cache_key = f"{ACTIVE_STATUS_CACHE_PREFIX}{user_id}"
-    cache.delete(cache_key)                                            # xóa key khỏi cache
+    cache.delete(f"{_ACTIVE_CACHE_PREFIX}{user_id}")
 
 
-# class xác thực JWT tùy chỉnh — thêm bước kiểm tra is_active sau khi token hợp lệ
-# vấn đề: JWT gốc chỉ kiểm tra token đúng chữ ký và chưa hết hạn
-# nhưng nếu admin khóa tài khoản, token cũ vẫn dùng được cho đến khi hết hạn
-# giải pháp: sau khi xác thực token xong, kiểm tra thêm is_active từ cache
-# → admin khóa user → cache cập nhật → API từ chối ngay, không cần đợi token hết hạn
-class CachedIsActiveJWTAuthentication(JWTAuthentication):
+# Extends BlacklistAwareJWTAuthentication with an is_active check via Redis cache (NFR-04).
+# This is the class used in DEFAULT_AUTHENTICATION_CLASSES.
+class WorkTrackerJWTAuthentication(BlacklistAwareJWTAuthentication):
+
+    # Runs blacklist check via super(), then verifies the user is still active before allowing the request.
     def authenticate(self, request):
-        result = super().authenticate(request)      # bước 1: kiểm tra JWT (chữ ký + hạn dùng) theo chuẩn simplejwt
+        result = super().authenticate(request)
         if result is None:
-            return None                             # request không có token → bỏ qua, để Django xử lý tiếp
+            return None
 
-        user, validated_token = result              # unpack: lấy user object và token đã xác thực
-        if not get_user_active_status(user.id):     # bước 2: kiểm tra user có bị khóa không (qua cache)
+        user, validated_token = result
+        if not get_user_active_status(user.id):
             raise AuthenticationFailed(
-                "Account is locked or deactivated.", code="account_inactive"  # trả về lỗi 401
+                "Account is locked or deactivated.", code="account_inactive"
             )
-        return user, validated_token                # xác thực thành công → trả về để Django gắn vào request.user
+        return user, validated_token
