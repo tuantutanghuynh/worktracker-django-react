@@ -34,7 +34,6 @@ class Client(models.Model):
         blank=True,
         null=True,
     )
-
     # Cờ Soft Delete. Chuyển về False thay vì xóa vật lý.
     # INDEX để filter active/inactive nhanh.
     is_active = models.BooleanField(
@@ -42,12 +41,12 @@ class Client(models.Model):
         db_index=True,
 
     )
-    
-    # ➕ --- CÁC TRƯỜNG MỞ RỘNG ĐỀ XUẤT NÂNG CẤP (ENTERPRISE EXTENSIONS) ---
+
     address = models.CharField(
         max_length=255,
         blank=True,
         null=True,
+
     )  # Địa chỉ trụ sở / Địa chỉ xuất hóa đơn
 
     industry = models.CharField(
@@ -73,8 +72,7 @@ class Client(models.Model):
         db_table = "clients"
 
     def __str__(self):
-        return self.client_name
-
+        return self.client_name  
 
 # ============================================================
 # BẢNG 9: jobs

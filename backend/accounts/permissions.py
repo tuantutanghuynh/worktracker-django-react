@@ -1,3 +1,13 @@
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  SHARED FILE — MinhAnh · LongNguyen · TuanTu-3 đều import          │
+# │                                                                      │
+# │  MERGE RISK:                                                         │
+# │  HasPermission được dùng ở MỌI ViewSet trong toàn hệ thống.        │
+# │  - Không đổi cách khởi tạo: HasPermission('code') phải giữ nguyên  │
+# │  - Không đổi tên class                                               │
+# │  - Nếu Long/Tú thêm logic vào has_permission(), review kỹ trước     │
+# │    khi merge — một thay đổi nhỏ sẽ ảnh hưởng toàn bộ RBAC          │
+# └─────────────────────────────────────────────────────────────────────┘
 from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import PermissionDenied
 
