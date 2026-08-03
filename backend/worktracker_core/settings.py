@@ -173,12 +173,16 @@ CORS_ALLOWED_ORIGINS = [
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+    "blacklist": {
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "protocol": 2,
-            }
         }
     }
 }
@@ -198,9 +202,6 @@ CHANNEL_LAYERS = {
         },
     },
 }
-
-# Chỉ định Daphne làm ASGI application (thay Django WSGI mặc định)
-ASGI_APPLICATION = "worktracker_core.asgi.application"
 
 WORK_DAYS_PER_WEEK = int(os.environ.get("WORK_DAYS_PER_WEEK", 6))
 DAILY_WORKING_HOURS = int(os.environ.get("DAILY_WORKING_HOURS", 8))

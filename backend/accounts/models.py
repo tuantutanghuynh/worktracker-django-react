@@ -134,9 +134,7 @@ class CustomUser(AbstractUser):
         db_index=True,
     )
     role = models.ForeignKey(
-        Role,
-        on_delete=models.RESTRICT,
-        related_name="users", null=True
+        Role, on_delete=models.RESTRICT, related_name="users", null=True
     )
 
     # AbstractUser đã có is_active, nhưng khai báo lại để thêm db_index
@@ -145,6 +143,10 @@ class CustomUser(AbstractUser):
         db_index=True,
     )
 
+    must_change_password = models.BooleanField(
+        default=True
+    )  # Cờ buộc đổi mật khẩu lần đầu đăng nhập hoặc sau khi reset
+    
     objects = CustomUserManager()
 
     USERNAME_FIELD = "email"

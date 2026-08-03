@@ -1,5 +1,6 @@
 import calendar
 from datetime import date
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView
@@ -11,9 +12,15 @@ from accounts.manager.serializers_manager import (
     ManagerDepartmentAssignSerializer,
     ManagerEmployeeListSerializer,
 )
-from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
+from system.security.permissions_manager import (
+    IsActiveAuthenticated,
+    IsManagerRole,
+    HasPermissionCode,
+)
 from system.services.audit_manager_service import snapshot, log_action
-from timesheets.services.manager_employee_utilization_service import get_team_workload_summary
+from timesheets.services.manager_employee_utilization_service import (
+    get_team_workload_summary,
+)
 
 
 class ManagerTeamEmployeeListView(ListAPIView):
@@ -56,9 +63,7 @@ class ManagerTeamEmployeeListView(ListAPIView):
         search = self.request.query_params.get("search")
         if search:
             qs = qs.filter(
-                email__icontains=search
-            ) | qs.filter(
-                profile__full_name__icontains=search
+                Q(email__icontains=search) | Q(profile__full_name__icontains=search)
             )
 
         return qs
@@ -102,16 +107,17 @@ class ManagerTeamEmployeeListView(ListAPIView):
         }
 
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context=serializer_context)
+            serializer = self.get_serializer(
+                page, many=True, context=serializer_context
+            )
             response = self.get_paginated_response(serializer.data)
             response.data["summary"] = summary_header
             return response
 
-        serializer = self.get_serializer(queryset, many=True, context=serializer_context)
-        return Response({
-            "summary": summary_header,
-            "results": serializer.data
-        })
+        serializer = self.get_serializer(
+            queryset, many=True, context=serializer_context
+        )
+        return Response({"summary": summary_header, "results": serializer.data})
 
 
 class ManagerEmployeeDepartmentUpdateView(APIView):
@@ -139,9 +145,8 @@ class ManagerEmployeeDepartmentUpdateView(APIView):
     def patch(self, request, user_id):
         # Tìm nhân viên — chỉ cho phép sửa EMPLOYEE, không sửa MANAGER/ADMIN
         try:
-            profile = (
-                EmployeeProfile.objects.select_related("user", "department")
-                .get(user_id=user_id, user__role__code="EMPLOYEE")
+            profile = EmployeeProfile.objects.select_related("user", "department").get(
+                user_id=user_id, user__role__code="EMPLOYEE"
             )
         except EmployeeProfile.DoesNotExist:
             raise NotFound(f"Không tìm thấy nhân viên với ID={user_id}.")

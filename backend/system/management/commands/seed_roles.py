@@ -66,7 +66,8 @@ class Command(BaseCommand):
                 # Reports
                 {'code': 'report:view',         'name': 'View company-wide performance and summary reports'},
                 {'code': 'report:export',       'name': 'Export reports to PDF, Excel, or CSV'},
-
+                # Notification
+                {'code': 'notification:view', 'name': 'View manager notifications'},
                 # System Settings
                 {'code': 'department:create',   'name': 'Create a new department in the system'},
                 {'code': 'department:update',   'name': 'Edit department information'},
@@ -93,6 +94,7 @@ class Command(BaseCommand):
                 'task:view', 'task:create', 'task:update', 'task:delete', 'task:review',
                 'timesheet:view', 'timesheet:lock', 'timesheet:unlock',
                 'timesheet:export', 'timesheet:review', 'timesheet:manage',
+                'notification:view',
                 'report:view', 'report:export',
             ]
             manager_role = Role.objects.get(code='MANAGER')

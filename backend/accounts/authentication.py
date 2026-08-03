@@ -1,22 +1,8 @@
-<<<<<<< HEAD
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
-=======
-# ┌─────────────────────────────────────────────────────────────────────┐
-# │  SHARED FILE — Xác thực JWT cho toàn hệ thống                       │
-# │                                                                      │
-# │  MERGE RISK (TuanTu-3):                                              │
-# │  Tú có class WorkTrackerJWTAuthentication — cùng chức năng,          │
-# │  tên khác. Sau khi merge với Tú cần:                                 │
-# │  1. Chọn giữ lại 1 class (đề xuất: dùng tên của Tú làm chuẩn)      │
-# │  2. Cập nhật settings.py → DEFAULT_AUTHENTICATION_CLASSES            │
-# │     (đã có TODO sẵn trong settings.py)                               │
-# └─────────────────────────────────────────────────────────────────────┘
-from django.core.cache import cache                                    # đọc/ghi cache (đang dùng LocMemCache)
-from rest_framework_simplejwt.authentication import JWTAuthentication  # class xác thực JWT gốc của simplejwt
-from rest_framework.exceptions import AuthenticationFailed             # exception trả về lỗi 401
->>>>>>> origin/MinhAnh
+
+blacklist_cache = caches["blacklist"]
 
 # This file makes JWT validation aware of logout: a token is normally trusted
 # until it expires, but LogoutView blacklists its jti in Redis so it can be
@@ -31,7 +17,7 @@ class BlacklistAwareJWTAuthentication(JWTAuthentication):
         validated_token = super().get_validated_token(raw_token)
 
         jti = validated_token["jti"]
-        if cache.get(f"blacklist:{jti}"):
+        if blacklist_cache.has_key(f"blacklist:{jti}"):
             raise AuthenticationFailed("Token has been revoked.")
 
         return validated_token
