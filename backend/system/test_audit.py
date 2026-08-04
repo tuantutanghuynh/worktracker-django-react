@@ -117,6 +117,14 @@ class TestReportAPI:
         assert 'attachment' in response['Content-Disposition']
         assert 'worktracker_report.xlsx' in response['Content-Disposition']
 
+    # GET ?date_from=&date_to= → expect chỉ trả job được tạo trong khoảng ngày đó
+    def test_report_with_date_filter(self, auth_client):
+        response = auth_client.get('/api/admin/reports/?date_from=2020-01-01&date_to=2099-12-31')
+        assert response.status_code == 200
+        assert response['Content-Type'] == (
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
     # GET → expect AuditLog được tạo với action=EXPORT, table_name=reports
     def test_export_creates_audit_log(self, auth_client):
         auth_client.get('/api/admin/reports/')

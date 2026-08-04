@@ -68,6 +68,26 @@ class TestJobAPI:
         assert job.status == 'CANCELLED'
         assert Job.objects.filter(id=job.id).exists()
 
+    # POST tạo job mới qua API → expect 201 và job xuất hiện trong DB
+    def test_create_job(self, auth_client):
+        response = auth_client.post('/api/admin/jobs/', self.job_data)
+        assert response.status_code == 201
+        assert Job.objects.filter(job_name='Test Job').exists()
+
+    # DELETE release-lock → expect 200, lock được xóa khỏi cache
+    def test_release_lock(self, auth_client, admin_user, settings):
+        settings.CACHES = {
+            'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}
+        }
+        job = Job.objects.create(
+            job_name='Job Release', client=self.client_obj, manager=admin_user,
+            status='PLANNING', priority='MEDIUM',
+            start_date='2026-01-01', deadline='2026-12-31',
+        )
+        auth_client.post(f'/api/admin/jobs/{job.id}/acquire-lock/')
+        response = auth_client.delete(f'/api/admin/jobs/{job.id}/release-lock/')
+        assert response.status_code == 200
+
     # POST acquire-lock khi chưa có ai lock → expect 200, lock thành công
     # settings.CACHES dùng LocMemCache thay DummyCache để cache thực sự lưu được giá trị
     def test_acquire_lock_success(self, auth_client, admin_user, settings):

@@ -67,6 +67,19 @@ class TestUserAPI:
         target.refresh_from_db()
         assert target.profile.department_id == dept.id
 
+    # GET ?role=ADMIN → expect chỉ trả user có role code=ADMIN
+    # role là write_only trong UserSerializer → dùng role_detail để kiểm tra trong response
+    def test_filter_by_role(self, auth_client):
+        response = auth_client.get('/api/auth/users/?role=ADMIN')
+        assert response.status_code == 200
+        assert len(response.data) >= 1
+        assert all(u['role_detail']['code'] == 'ADMIN' for u in response.data)
+
+    # GET không có token → expect 401 Unauthorized
+    def test_unauthenticated_returns_401(self, api_client):
+        response = api_client.get('/api/auth/users/')
+        assert response.status_code == 401
+
     # DELETE → expect 204 và is_active chuyển False, record vẫn còn trong DB
     def test_soft_delete_user(self, auth_client, admin_role):
         target = CustomUser.objects.create_user(
