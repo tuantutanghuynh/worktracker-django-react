@@ -28,7 +28,12 @@
       "PowerShell(py --list 2>&1)",
       "PowerShell(winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>&1)",
       "Skill(artifact-design)",
-      "Skill(artifact-design:*)"
+      "Skill(artifact-design:*)",
+      "Bash(git stash *)",
+      "Bash(git rm *)",
+      "Bash(./.venv/Scripts/python.exe -c \"import django; print\\(django.get_version\\(\\)\\)\")",
+      "Bash(./.venv/Scripts/python.exe -m pytest accounts/ projects/ system/ -q)",
+      "Bash(powershell -Command \"Get-Service -Name '*postgres*' -ErrorAction SilentlyContinue | Select-Object Name, Status; Get-Process -Name '*postgres*' -ErrorAction SilentlyContinue | Select-Object ProcessName, Id\")"
     ]
   }
 }

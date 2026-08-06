@@ -18,15 +18,17 @@ class ClientViewSet(viewsets.ModelViewSet):
         params=self.request.query_params
         if name := params.get('name'):
             qs = qs.filter(client_name__icontains=name)
-        if (is_active := params.get('is_active')) is not None:
+        if (is_active := params.get('is_active')) not in (None, ''):
             qs = qs.filter(is_active=is_active.lower() == 'true')
         return qs
-    
+
     def get_permissions(self):
         if self.action == 'create':
             return [HasPermission('client:create')]
         if self.action == 'destroy':
             return [HasPermission('client:delete')]
+        if self.action in ('list', 'retrieve'):
+            return [HasPermission('client:view')]
         return [HasPermission('client:update')]
 
     @transaction.atomic
@@ -98,6 +100,10 @@ class JobViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == 'create':
             return [HasPermission('job:create')]
+        if self.action == 'destroy':
+            return [HasPermission('job:delete')]
+        if self.action in ('list', 'retrieve'):
+            return [HasPermission('job:view')]
         return [HasPermission('job:update')]
 
     @transaction.atomic

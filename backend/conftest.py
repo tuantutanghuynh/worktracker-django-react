@@ -9,7 +9,8 @@ from accounts.models import CustomUser, Role, Permission, RolePermission
 @pytest.fixture(autouse=True) #autouse=True — fixture này tự chạy cho MỌI test, không cần gọi tay. Thay Redis bằng DummyCache để test không cần Redis đang chạy.
 def use_dummy_cache(settings):
     settings.CACHES = {
-        'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'}
+        'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'},
+        'blacklist': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'},
     }
     
 #tạo APICLient
@@ -41,6 +42,7 @@ def admin_user(db, admin_role):
         password='Test@1234',
         role=admin_role,
         is_active=True,
+        must_change_password=False,
     )
 
 #Tạo client đã đăng nhập- force_authenticate bỏ qua JWT hoàn toàn — gắn user trực tiếp vào request. Dùng để test logic API, không phải test quy trình đăng nhập.

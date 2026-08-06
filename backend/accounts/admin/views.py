@@ -1,7 +1,10 @@
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from system.security.permissions_manager import ROLE_PERMISSION_CACHE_KEY
 
 from ..models import (
     CustomUser,
@@ -35,13 +38,15 @@ class UserViewSet(viewsets.ModelViewSet):
             qs = qs.filter(role__code=role)
         if department := params.get("department"):
             qs = qs.filter(profile__department_id=department)
-        if (is_active := params.get("is_active")) is not None:
+        if (is_active := params.get("is_active")) not in (None, ""):
             qs = qs.filter(is_active=is_active.lower() == "true")
         return qs
 
     def get_permissions(self):
         if self.action == "create":
             return [HasPermission("user:create")]
+        if self.action in ("list", "retrieve"):
+            return [HasPermission("user:view")]
         return [HasPermission("user:update")]
 
     def get_serializer_class(self):
@@ -182,6 +187,7 @@ class RoleViewSet(viewsets.ModelViewSet):
         RolePermission.objects.bulk_create(
             [RolePermission(role=role, permission_id=pid) for pid in permission_ids]
         )
+        cache.delete(ROLE_PERMISSION_CACHE_KEY.format(role_id=role.id))
         log_audit_event(
             actor=request.user,
             action="ASSIGN_ROLE",
@@ -209,6 +215,8 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == "create":
             return [HasPermission("department:create")]
+        if self.action in ("list", "retrieve"):
+            return [HasPermission("department:view")]
         return [HasPermission("department:update")]
 
     @transaction.atomic
