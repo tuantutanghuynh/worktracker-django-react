@@ -3,7 +3,11 @@
     "allow": [
       "WebSearch",
       "Bash(py -0)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(rm -rf backend/.venv)",
+      "Bash(git merge *)"
     ]
   }
 }

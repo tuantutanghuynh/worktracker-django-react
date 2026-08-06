@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Task Summary Report</title>
+    <style>
+        /* Setup khổ giấy A4 nằm ngang */
+        @page {
+            size: A4 landscape;
+            margin: 1cm;
+        }
+        body {
+            font-family: sans-serif;
+            font-size: 11px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .summary-box {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border: 1px solid #bdc3c7;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #bdc3c7;
+            padding: 6px;
+            text-align: left;
+        }
+        th {
+            background-color: #34495e;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Báo Cáo Tổng Hợp Task</h1>
+    
+    <div class="summary-box">
+        <strong>Tổng số Task:</strong> {{ summary.total_tasks }}<br>
+        <strong>Task đang mở:</strong> {{ summary.overdue_summary.total_active_tasks }}<br>
+        <strong>Task quá hạn:</strong> {{ summary.overdue_summary.overdue_tasks }}<br>
+        <strong>Tỷ lệ quá hạn:</strong> {{ summary.overdue_summary.overdue_rate_percent }}%
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Tên Task</th>
+                <th>Mã Job</th>  
+                <th>Dự án (Job)</th>
+                <th>Người phụ trách</th>
+                <th>Độ ưu tiên</th>
+                <th>Trạng thái</th>
+                <th>Hạn chót</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.id }}</td>
+                <td>{{ row.title }}</td>
+                <td>{{ row.job.job_code }}</td>
+                <td>{{ row.job.job_name }}</td>
+                <td>{{ row.assignee.full_name }}</td>
+                <td>{{ row.priority }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.deadline }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center;">Không có dữ liệu</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

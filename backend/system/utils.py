@@ -1,0 +1,25 @@
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  SHARED FILE — MinhAnh · LongNguyen · TuanTu-3 đều import          │
+# │                                                                      │
+# │  MERGE RISK:                                                         │
+# │  log_audit_event() được gọi từ TẤT CẢ các nhánh. Nếu thay đổi     │
+# │  signature (tên tham số, thêm tham số bắt buộc), các nhánh khác    │
+# │  sẽ bị lỗi TypeError khi gọi hàm. Nếu cần thêm tham số, dùng       │
+# │  keyword argument với giá trị mặc định (optional), không bắt buộc. │
+# └─────────────────────────────────────────────────────────────────────┘
+from system.models import AuditLog
+
+def log_audit_event(actor, action, table_name, record_id, old_values=None, new_values=None, request=None):
+    ip_address = None
+    if request is not None:
+        ip_address = request.META.get('REMOTE_ADDR')
+        
+    AuditLog.objects.create(
+        user=actor,
+        action=action,
+        table_name=table_name,
+        record_id=record_id,
+        old_values=old_values,
+        new_values=new_values,
+        ip_address=ip_address,
+    )
