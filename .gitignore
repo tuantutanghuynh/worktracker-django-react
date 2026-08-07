@@ -27,6 +27,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Personal docs
+TuDocs/
+
 # IDE
 .DS_Store
 .vscode/*
