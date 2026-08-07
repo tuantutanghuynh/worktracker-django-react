@@ -30,6 +30,7 @@ lerna-debug.log*
 # IDE
 .DS_Store
 .vscode/*
+.claude/*
 !.vscode/extensions.json
 .idea/
 *.suo

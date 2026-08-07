@@ -64,7 +64,7 @@ class ForgotPasswordView(APIView):
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        reset = serializer.creat_reset_token()
+        reset = serializer.create_reset_token()
 
         if reset is not None:
             send_mail(

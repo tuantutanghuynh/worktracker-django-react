@@ -75,11 +75,11 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                 )
 
             # Defensive layer 2 — 24h Cap + Race Condition
-            DailyUserTimesheet.objects.get_or_create(
+            # select_for_update() trước get_or_create() để: nếu row đã tồn tại, get() nội bộ
+            # khóa nó luôn trong cùng 1 query; nếu chưa tồn tại, get_or_create() tự lo
+            # savepoint + retry khi 2 request cùng tạo mới (xem Django query.py get_or_create()).
+            timesheet, _ = DailyUserTimesheet.objects.select_for_update().get_or_create(
                 user=user, work_date=work_date, defaults={"total_hours": Decimal("0")}
-            )
-            timesheet = DailyUserTimesheet.objects.select_for_update().get(
-                user=user, work_date=work_date
             )
 
             new_total = timesheet.total_hours + hours_spent

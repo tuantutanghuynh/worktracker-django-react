@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - WorkTracker Pro</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome 6 Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    
+    .donut-chart-dashboard {
+      background: conic-gradient(
+        #10b981 0% 72%,      /* Completed / On Track: 72% */
+        #e2e8f0 72% 100%     /* Remaining: 28% */
+      );
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen overflow-hidden flex">
+
+  <!-- ============================================================ -->
+  <!-- LEFT SIDEBAR (FIXED w-64, #0A1128) -->
+  <!-- ============================================================ -->
+  <aside class="w-64 bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0">
+    <div class="space-y-3.5">
+      
+      <!-- BRAND LOGO -->
+      <div class="flex items-center space-x-3 px-2 py-0.5">
+        <svg class="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#60A5FA" />
+              <stop offset="40%" stop-color="#3B82F6" />
+              <stop offset="80%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#1D4ED8" />
+            </linearGradient>
+          </defs>
+          <path d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26" 
+                stroke="url(#wBlueGradient)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="text-xl font-bold tracking-tight text-white leading-none">
+          WorkTracker <span class="text-xs font-semibold text-blue-400">Pro</span>
+        </span>
+      </div>
+
+      <!-- EMPLOYEE NAVIGATION MENU -->
+      <div class="space-y-1">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">EMPLOYEE PORTAL</p>
+        
+        <!-- ACTIVE: Dashboard -->
+        <a href="preview_employee_dashboard.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30 transition">
+          <i class="fa-solid fa-border-all w-5 text-center"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <!-- INACTIVE: My Tasks -->
+        <a href="preview_employee_my_tasks.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-list-check w-5 text-center"></i>
+          <span>My Tasks</span>
+        </a>
+
+        <!-- INACTIVE: Timesheet -->
+        <a href="preview_employee_timesheet.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-clock w-5 text-center"></i>
+          <span>Timesheet</span>
+        </a>
+
+        <!-- INACTIVE: My Performance -->
+        <a href="preview_employee_my_performance.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-chart-line w-5 text-center"></i>
+          <span>My Performance</span>
+        </a>
+
+        <!-- INACTIVE: Notifications -->
+        <a href="preview_employee_notifications.html" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bell w-5 text-center"></i>
+            <span>Notifications</span>
+          </div>
+          <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">5</span>
+        </a>
+
+        <!-- INACTIVE: Profile -->
+        <a href="preview_employee_profile.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-user w-5 text-center"></i>
+          <span>Profile</span>
+        </a>
+      </div>
+
+      <!-- QUICK ACCESS -->
+      <div class="space-y-0.5 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Quick Access</p>
+        <a href="preview_employee_notifications.html" class="flex items-center justify-between px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bell w-5 text-center"></i>
+            <span>Notifications</span>
+          </div>
+          <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">5</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-magnifying-glass w-5 text-center"></i>
+          <span>Search (Ctrl + K)</span>
+        </a>
+      </div>
+
+      <!-- RECENTLY VIEWED JOBS -->
+      <div class="space-y-1 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">Recently Viewed Jobs</p>
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-blue-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Website Redesign</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-emerald-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Mobile App Development</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-purple-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Internal Portal Refactor</p>
+            <span class="text-[9px] font-bold text-blue-400">ON HOLD</span>
+          </div>
+        </div>
+        <a href="preview_employee_my_tasks.html" class="inline-block px-3 pt-0.5 text-[11px] font-medium text-blue-400 hover:underline">View all tasks →</a>
+      </div>
+    </div>
+
+    <!-- USER PROFILE FOOTER -->
+    <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="relative">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-700">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-white leading-tight">Nguyen Van A</p>
+          <p class="text-[10px] text-slate-400">Employee</p>
+        </div>
+      </div>
+      <i class="fa-solid fa-ellipsis-vertical text-slate-500 text-xs hover:text-slate-300 cursor-pointer"></i>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- MAIN WORKSPACE (INDEPENDENT SCROLLBAR) -->
+  <!-- ============================================================ -->
+  <main class="flex-1 bg-slate-50 text-slate-800 p-6 h-screen overflow-y-auto space-y-6">
+    
+    <!-- TOP WORKSPACE BAR -->
+    <header class="flex items-center justify-between border-b border-slate-200 pb-4">
+      <div class="flex items-center space-x-3">
+        <button class="text-slate-500 hover:text-slate-700 text-lg">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <nav class="text-xs text-slate-500 font-medium flex items-center space-x-1.5">
+          <span>Employee</span>
+          <i class="fa-solid fa-chevron-right text-[9px] text-slate-400"></i>
+          <span class="text-slate-800 font-semibold">Dashboard</span>
+        </nav>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <!-- GLOBAL SEARCH BAR -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+          <input type="text" placeholder="Search tasks, jobs..." class="w-64 pl-9 pr-12 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-500 shadow-sm">
+          <span class="absolute right-2.5 top-2 bg-slate-100 text-slate-400 text-[10px] font-mono px-1 rounded border border-slate-200">Ctrl K</span>
+        </div>
+
+        <!-- NOTIFICATION ICON -->
+        <a href="preview_employee_notifications.html" class="relative text-slate-500 hover:text-slate-700 p-1.5">
+          <i class="fa-solid fa-bell text-base"></i>
+          <span class="absolute top-0 right-0 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full border-2 border-white">5</span>
+        </a>
+
+        <!-- USER PROFILE PILL -->
+        <a href="preview_employee_profile.html" class="flex items-center space-x-2 bg-white border border-slate-200 pl-1.5 pr-3 py-1 rounded-full shadow-sm hover:border-slate-300 transition">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-6 h-6 rounded-full object-cover">
+          <span class="text-xs font-semibold text-slate-700">Nguyen Van A</span>
+          <i class="fa-solid fa-chevron-down text-[9px] text-slate-400"></i>
+        </a>
+      </div>
+    </header>
+
+    <!-- WELCOME GREETING BANNER & PERIOD STATUS -->
+    <div class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-md flex items-center justify-between">
+      <div class="space-y-1">
+        <h1 class="text-2xl font-extrabold tracking-tight">Welcome back, Nguyen Van A! 👋</h1>
+        <p class="text-blue-100 text-xs">Here's what's happening with your assigned tasks and work schedule today.</p>
+      </div>
+
+      <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 flex items-center space-x-3">
+        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
+        <div>
+          <div class="flex items-center space-x-1.5 text-xs font-bold text-emerald-300">
+            <i class="fa-solid fa-clock"></i>
+            <span>Timesheet Status: Open</span>
+          </div>
+          <p class="text-[11px] text-blue-100 mt-0.5">May 2026 (01/05/2026 - 31/05/2026)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 KPI STAT CARDS WITH SVG SPARKLINES -->
+    <div class="grid grid-cols-5 gap-4">
+      
+      <!-- KPI 1: Active Tasks -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center">
+            <i class="fa-solid fa-arrow-up text-[9px] mr-1"></i> +2 from last week
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">My Active Tasks</p>
+          <h3 class="text-2xl font-extrabold text-slate-900">8</h3>
+        </div>
+        <!-- Sparkline Blue -->
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-blue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-blue)" d="M0,35 L0,20 C20,15 40,25 60,10 C80,18 100,5 100,5 L100,35 Z" />
+            <path fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" d="M0,20 C20,15 40,25 60,10 C80,18 100,5 100,5" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- KPI 2: Overdue Tasks -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full flex items-center">
+            Need attention
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Overdue Tasks</p>
+          <h3 class="text-2xl font-extrabold text-rose-600">2</h3>
+        </div>
+        <!-- Sparkline Rose -->
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-rose" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-rose)" d="M0,35 L0,15 C25,25 50,10 75,20 C85,12 100,28 100,28 L100,35 Z" />
+            <path fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" d="M0,15 C25,25 50,10 75,20 C85,12 100,28 100,28" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- KPI 3: Hours This Week -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <span class="text-[10px] font-medium text-slate-500">
+            of 40h target
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Hours This Week</p>
+          <h3 class="text-2xl font-extrabold text-slate-900">18.5h</h3>
+        </div>
+        <!-- Sparkline Emerald -->
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-emerald" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-emerald)" d="M0,35 L0,25 C20,20 40,15 60,8 C80,12 100,6 100,6 L100,35 Z" />
+            <path fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" d="M0,25 C20,20 40,15 60,8 C80,12 100,6 100,6" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- KPI 4: Completion Rate -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center">
+            <i class="fa-solid fa-arrow-up text-[9px] mr-1"></i> +8% vs last week
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Completion Rate</p>
+          <h3 class="text-2xl font-extrabold text-slate-900">72%</h3>
+        </div>
+        <!-- Sparkline Purple -->
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-purple" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#a855f7" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-purple)" d="M0,35 L0,22 C25,28 50,15 75,10 C90,8 100,4 100,4 L100,35 Z" />
+            <path fill="none" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" d="M0,22 C25,28 50,15 75,10 C90,8 100,4 100,4" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- KPI 5: Awaiting Review -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex items-center">
+            Ready for review
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Awaiting Review</p>
+          <h3 class="text-2xl font-extrabold text-slate-900">3</h3>
+        </div>
+        <!-- Sparkline Amber -->
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-amber" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-amber)" d="M0,35 L0,18 C30,22 60,10 80,15 C90,12 100,8 100,8 L100,35 Z" />
+            <path fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" d="M0,18 C30,22 60,10 80,15 C90,12 100,8 100,8" />
+          </svg>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MAIN TWO-COLUMN LAYOUT -->
+    <div class="grid grid-cols-12 gap-6">
+      
+      <!-- LEFT COLUMN (8 COLS / 68%) -->
+      <div class="col-span-8 space-y-6">
+        
+        <!-- CARD 1: TODAY'S TASKS TABLE -->
+        <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <h2 class="text-base font-bold text-slate-900">Today's Tasks</h2>
+              <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">8 Assigned</span>
+            </div>
+            <a href="preview_employee_my_tasks.html" class="text-xs font-semibold text-blue-600 hover:underline">View all tasks →</a>
+          </div>
+
+          <!-- FILTER TABS -->
+          <div class="px-4 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center space-x-2 text-xs">
+            <button class="px-3 py-1 rounded-full font-semibold bg-blue-600 text-white shadow-sm">All (8)</button>
+            <button class="px-3 py-1 rounded-full font-medium text-slate-600 hover:bg-slate-200/60">To Do (3)</button>
+            <button class="px-3 py-1 rounded-full font-medium text-slate-600 hover:bg-slate-200/60">In Progress (3)</button>
+            <button class="px-3 py-1 rounded-full font-medium text-slate-600 hover:bg-slate-200/60">Reviewing (1)</button>
+            <button class="px-3 py-1 rounded-full font-medium text-slate-600 hover:bg-slate-200/60">Completed (1)</button>
+          </div>
+
+          <!-- DATA TABLE -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <th class="py-3 px-4">Task</th>
+                  <th class="py-3 px-3">Job / Project</th>
+                  <th class="py-3 px-3">Priority</th>
+                  <th class="py-3 px-3">Status</th>
+                  <th class="py-3 px-3">Deadline</th>
+                  <th class="py-3 px-3 text-right">Logged</th>
+                  <th class="py-3 px-4">Progress</th>
+                  <th class="py-3 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs">
+                
+                <!-- ROW 1 -->
+                <tr class="hover:bg-slate-50/60 transition">
+                  <td class="py-3 px-4">
+                    <p class="font-bold text-slate-900">Design User Interface</p>
+                    <div class="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                      <span><i class="fa-solid fa-comment text-slate-400 mr-0.5"></i> 3</span>
+                      <span><i class="fa-solid fa-paperclip text-slate-400 mr-0.5"></i> 2</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-3 font-medium text-slate-700">Website Redesign</td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-rose-50 text-rose-600 border border-rose-200">High</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-blue-50 text-blue-600 border border-blue-200">In Progress</span>
+                  </td>
+                  <td class="py-3 px-3 text-slate-600 font-medium">30/05/2026</td>
+                  <td class="py-3 px-3 text-right font-semibold text-slate-900">4.5h</td>
+                  <td class="py-3 px-4">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-blue-600 h-1.5 rounded-full" style="width: 60%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500 mt-0.5 inline-block">60%</span>
+                  </td>
+                  <td class="py-3 px-4 text-center">
+                    <a href="preview_employee_my_tasks.html" class="inline-flex items-center space-x-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded text-xs transition">
+                      <i class="fa-solid fa-play text-[10px]"></i>
+                      <span>Continue</span>
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- ROW 2 -->
+                <tr class="hover:bg-slate-50/60 transition">
+                  <td class="py-3 px-4">
+                    <p class="font-bold text-slate-900">API Integration</p>
+                    <div class="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                      <span><i class="fa-solid fa-comment text-slate-400 mr-0.5"></i> 1</span>
+                      <span><i class="fa-solid fa-paperclip text-slate-400 mr-0.5"></i> 1</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-3 font-medium text-slate-700">Website Redesign</td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-rose-50 text-rose-600 border border-rose-200">High</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-blue-50 text-blue-600 border border-blue-200">In Progress</span>
+                  </td>
+                  <td class="py-3 px-3 text-slate-600 font-medium">02/06/2026</td>
+                  <td class="py-3 px-3 text-right font-semibold text-slate-900">3.0h</td>
+                  <td class="py-3 px-4">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-blue-600 h-1.5 rounded-full" style="width: 40%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500 mt-0.5 inline-block">40%</span>
+                  </td>
+                  <td class="py-3 px-4 text-center">
+                    <a href="preview_employee_my_tasks.html" class="inline-flex items-center space-x-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded text-xs transition">
+                      <i class="fa-solid fa-play text-[10px]"></i>
+                      <span>Continue</span>
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- ROW 3 -->
+                <tr class="hover:bg-slate-50/60 transition">
+                  <td class="py-3 px-4">
+                    <p class="font-bold text-slate-900">Fix Login Bug</p>
+                    <div class="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                      <span><i class="fa-solid fa-comment text-slate-400 mr-0.5"></i> 0</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-3 font-medium text-slate-700">Internal Portal</td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-slate-100 text-slate-600 border border-slate-200">To Do</span>
+                  </td>
+                  <td class="py-3 px-3 text-rose-600 font-bold">29/05/2026</td>
+                  <td class="py-3 px-3 text-right font-semibold text-slate-900">0.0h</td>
+                  <td class="py-3 px-4">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-slate-300 h-1.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-400 mt-0.5 inline-block">0%</span>
+                  </td>
+                  <td class="py-3 px-4 text-center">
+                    <a href="preview_employee_my_tasks.html" class="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-semibold px-2.5 py-1 rounded text-xs transition">
+                      <i class="fa-solid fa-play text-[10px]"></i>
+                      <span>Start</span>
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- ROW 4 -->
+                <tr class="hover:bg-slate-50/60 transition">
+                  <td class="py-3 px-4">
+                    <p class="font-bold text-slate-900">Write API Documentation</p>
+                    <div class="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                      <span><i class="fa-solid fa-comment text-slate-400 mr-0.5"></i> 2</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-3 font-medium text-slate-700">Mobile App</td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-slate-100 text-slate-600 border border-slate-200">To Do</span>
+                  </td>
+                  <td class="py-3 px-3 text-slate-600 font-medium">31/05/2026</td>
+                  <td class="py-3 px-3 text-right font-semibold text-slate-900">0.0h</td>
+                  <td class="py-3 px-4">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-slate-300 h-1.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-400 mt-0.5 inline-block">0%</span>
+                  </td>
+                  <td class="py-3 px-4 text-center">
+                    <a href="preview_employee_my_tasks.html" class="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-semibold px-2.5 py-1 rounded text-xs transition">
+                      <i class="fa-solid fa-play text-[10px]"></i>
+                      <span>Start</span>
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- ROW 5 -->
+                <tr class="hover:bg-slate-50/60 transition">
+                  <td class="py-3 px-4">
+                    <p class="font-bold text-slate-900">Test Payment Feature</p>
+                    <div class="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                      <span><i class="fa-solid fa-comment text-slate-400 mr-0.5"></i> 1</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-3 font-medium text-slate-700">Mobile App</td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-rose-50 text-rose-600 border border-rose-200">High</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-purple-50 text-purple-600 border border-purple-200">Reviewing</span>
+                  </td>
+                  <td class="py-3 px-3 text-slate-600 font-medium">28/05/2026</td>
+                  <td class="py-3 px-3 text-right font-semibold text-slate-900">5.0h</td>
+                  <td class="py-3 px-4">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-purple-600 h-1.5 rounded-full" style="width: 90%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500 mt-0.5 inline-block">90%</span>
+                  </td>
+                  <td class="py-3 px-4 text-center">
+                    <a href="preview_employee_my_tasks.html" class="inline-flex items-center space-x-1 bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold px-2.5 py-1 rounded text-xs transition">
+                      <i class="fa-solid fa-folder-open text-[10px]"></i>
+                      <span>Open</span>
+                    </a>
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+
+          <!-- PAGINATION -->
+          <div class="p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Showing 1 to 5 of 8 tasks</span>
+            <div class="flex items-center space-x-1">
+              <button class="px-2 py-1 rounded border border-slate-200 text-slate-400 cursor-not-allowed">&lt;</button>
+              <button class="px-2.5 py-1 rounded bg-blue-600 text-white font-semibold">1</button>
+              <button class="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100">2</button>
+              <button class="px-2 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-100">&gt;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 2: MY WORK SUMMARY -->
+        <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 class="text-base font-bold text-slate-900">My Work Summary</h2>
+            <span class="text-xs text-slate-500">Week 22 (25/05 - 31/05)</span>
+          </div>
+
+          <div class="grid grid-cols-12 gap-6 items-center">
+            
+            <!-- LEFT COLUMN METRICS (3 COLS) -->
+            <div class="col-span-4 space-y-3 border-r border-slate-100 pr-4">
+              <div>
+                <p class="text-xs text-slate-500 font-medium">Hours Today</p>
+                <p class="text-xl font-extrabold text-slate-900">2.5h</p>
+              </div>
+
+              <div>
+                <p class="text-xs text-slate-500 font-medium">Hours This Week</p>
+                <p class="text-xl font-extrabold text-blue-600">18.5h <span class="text-xs text-slate-400 font-normal">/ 40h</span></p>
+              </div>
+
+              <div>
+                <p class="text-xs text-slate-500 font-medium">Hours This Month</p>
+                <p class="text-xl font-extrabold text-slate-900">76.5h</p>
+              </div>
+
+              <div class="pt-2">
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-slate-600">Daily Limit</span>
+                  <span class="text-slate-900">6.5h / 24h</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div class="bg-emerald-500 h-2 rounded-full" style="width: 27%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MIDDLE COLUMN SVG HOURS LINE CHART (5 COLS) -->
+            <div class="col-span-5 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800">Hours Logged This Week</span>
+                <div class="flex items-center space-x-3 text-[10px]">
+                  <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-blue-500 mr-1"></span> Logged</span>
+                  <span class="flex items-center"><span class="w-2 h-0.5 bg-slate-300 mr-1"></span> Target</span>
+                </div>
+              </div>
+
+              <!-- SVG LINE CHART -->
+              <div class="h-36 w-full relative">
+                <svg class="w-full h-full overflow-visible" viewBox="0 0 200 100" preserveAspectRatio="none">
+                  <!-- Gridlines -->
+                  <line x1="0" y1="20" x2="200" y2="20" stroke="#f1f5f9" stroke-dasharray="3,3" />
+                  <line x1="0" y1="50" x2="200" y2="50" stroke="#f1f5f9" stroke-dasharray="3,3" />
+                  <line x1="0" y1="80" x2="200" y2="80" stroke="#e2e8f0" />
+                  
+                  <!-- Target Line (Grey dashed line for 8h target) -->
+                  <line x1="0" y1="30" x2="200" y2="30" stroke="#cbd5e1" stroke-dasharray="4,4" stroke-width="1.5" />
+
+                  <!-- Gradient area fill -->
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+                      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  <path fill="url(#chartGrad)" d="M0,80 L0,50 L33,35 L66,60 L100,30 L133,40 L166,80 L200,80 L200,80 Z" />
+
+                  <!-- Smooth Curve Line -->
+                  <path fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" d="M0,50 L33,35 L66,60 L100,30 L133,40 L166,80 L200,80" />
+
+                  <!-- Data Nodes -->
+                  <circle cx="0" cy="50" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                  <circle cx="33" cy="35" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                  <circle cx="66" cy="60" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                  <circle cx="100" cy="30" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                  <circle cx="133" cy="40" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                  <circle cx="166" cy="80" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                  <circle cx="200" cy="80" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                </svg>
+              </div>
+
+              <!-- Day Labels -->
+              <div class="flex justify-between text-[10px] font-semibold text-slate-400 pt-1">
+                <span>Mon (3h)</span>
+                <span>Tue (4.5h)</span>
+                <span>Wed (2h)</span>
+                <span>Thu (5h)</span>
+                <span>Fri (4h)</span>
+                <span>Sat (0h)</span>
+                <span>Sun (0h)</span>
+              </div>
+            </div>
+
+            <!-- RIGHT COLUMN DONUT GAUGE (3 COLS) -->
+            <div class="col-span-3 text-center border-l border-slate-100 pl-4 space-y-2">
+              <p class="text-xs font-bold text-slate-800">Completion Gauge</p>
+              <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+                <div class="w-24 h-24 donut-chart-dashboard"></div>
+                <div class="absolute w-16 h-16 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
+                  <span class="text-base font-extrabold text-slate-900">72%</span>
+                  <span class="text-[8px] font-bold text-emerald-600">ON TRACK</span>
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-500 font-medium">18 of 25 tasks completed</p>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN (4 COLS / 32%) -->
+      <div class="col-span-4 space-y-6">
+        
+        <!-- CARD 1: QUICK LOG WORK FORM -->
+        <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 class="text-base font-bold text-slate-900">Quick Log Work</h2>
+            <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Period: Open</span>
+          </div>
+
+          <form class="space-y-3" onsubmit="event.preventDefault();">
+            <!-- TASK SELECT -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Select Task *</label>
+              <select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                <option>API Integration (Website Redesign)</option>
+                <option>Design User Interface (Website Redesign)</option>
+                <option>Fix Login Bug (Internal Portal)</option>
+                <option>Write API Documentation (Mobile App)</option>
+              </select>
+            </div>
+
+            <!-- WORK DATE & HOURS SPENT -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Work Date *</label>
+                <input type="date" value="2026-05-31" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Hours Spent *</label>
+                <input type="number" step="0.5" value="1.5" placeholder="e.g. 2.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+              </div>
+            </div>
+
+            <!-- DESCRIPTION -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Description *</label>
+              <textarea rows="2" placeholder="What did you work on?" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">Implemented OAuth token refresh logic and tested endpoint.</textarea>
+            </div>
+
+            <!-- DAILY TOTAL CAP INDICATOR -->
+            <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200 space-y-1">
+              <div class="flex justify-between text-[11px] font-semibold">
+                <span class="text-slate-600">Daily total:</span>
+                <span class="text-emerald-600 font-bold">6.5h / 24h</span>
+              </div>
+              <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 27%"></div>
+              </div>
+              <p class="text-[10px] text-slate-400">ⓘ Max 24.0h per day allowed.</p>
+            </div>
+
+            <!-- SUBMIT BUTTON -->
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-xs shadow-md shadow-blue-600/30 transition flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-plus"></i>
+              <span>Save Log</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- CARD 2: UPCOMING DEADLINES -->
+        <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h2 class="text-sm font-bold text-slate-900">Upcoming Deadlines</h2>
+            <a href="preview_employee_my_tasks.html" class="text-xs font-semibold text-blue-600 hover:underline">View calendar →</a>
+          </div>
+
+          <div class="space-y-2">
+            
+            <div class="p-2.5 rounded-lg bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-900">API Integration</p>
+                <p class="text-[11px] text-slate-500">Website Redesign • 02/06/2026</p>
+              </div>
+              <span class="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                3 days left
+              </span>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-900">Write API Documentation</p>
+                <p class="text-[11px] text-slate-500">Mobile App • 31/05/2026</p>
+              </div>
+              <span class="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                1 day left
+              </span>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-900">Database Optimization</p>
+                <p class="text-[11px] text-slate-500">Internal Portal • 05/06/2026</p>
+              </div>
+              <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                6 days left
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- CARD 3: RECENT NOTIFICATIONS -->
+        <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h2 class="text-sm font-bold text-slate-900">Recent Notifications</h2>
+            <a href="preview_employee_notifications.html" class="text-xs font-semibold text-blue-600 hover:underline">View all →</a>
+          </div>
+
+          <div class="space-y-2.5">
+            
+            <div class="flex items-start space-x-3 text-xs">
+              <div class="w-7 h-7 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                <i class="fa-solid fa-comment text-xs"></i>
+              </div>
+              <div class="flex-1">
+                <p class="font-semibold text-slate-900">New comment on "API Integration"</p>
+                <p class="text-[11px] text-slate-500 truncate">Le Van C: Please verify response format...</p>
+                <span class="text-[10px] text-slate-400">15 mins ago</span>
+              </div>
+            </div>
+
+            <div class="flex items-start space-x-3 text-xs">
+              <div class="w-7 h-7 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                <i class="fa-solid fa-rotate-left text-xs"></i>
+              </div>
+              <div class="flex-1">
+                <p class="font-semibold text-slate-900">Task returned for revision</p>
+                <p class="text-[11px] text-slate-500 truncate">"Fix Login Bug" was sent back...</p>
+                <span class="text-[10px] text-slate-400">1 hour ago</span>
+              </div>
+            </div>
+
+            <div class="flex items-start space-x-3 text-xs">
+              <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <i class="fa-solid fa-clipboard-check text-xs"></i>
+              </div>
+              <div class="flex-1">
+                <p class="font-semibold text-slate-900">New task assigned</p>
+                <p class="text-[11px] text-slate-500 truncate">You were assigned to "Fix Login Bug"</p>
+                <span class="text-[10px] text-slate-400">2 hours ago</span>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="pt-2 border-t border-slate-100 text-center">
+            <a href="preview_employee_notifications.html" class="text-xs font-bold text-blue-600 hover:underline">5 unread notifications</a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</body>
+</html>

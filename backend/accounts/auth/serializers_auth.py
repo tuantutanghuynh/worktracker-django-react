@@ -107,7 +107,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     # Generates a secure token, persists a PasswordReset record, and returns it (or None if email unknown).
-    def creat_reset_token(self):
+    def create_reset_token(self):
         email = self.validated_data["email"]
         user = User.objects.filter(email=email).first()
 
