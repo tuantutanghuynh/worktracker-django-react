@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Board - ERP System Implementation - WorkTracker Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+
+    /* Task Status Donut Chart */
+    .kanban-status-donut {
+      background: conic-gradient(
+        #2563eb 0% 20.8%,     /* To Do 20.8% */
+        #8b5cf6 20.8% 50.0%,  /* In Progress 29.2% */
+        #f97316 50.0% 66.7%,  /* In Review 16.7% */
+        #10b981 66.7% 91.7%,  /* Completed 25.0% */
+        #94a3b8 91.7% 100%    /* Cancelled 8.3% */
+      );
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen overflow-hidden flex">
+
+  <!-- ============================================================ -->
+  <!-- LEFT SIDEBAR (STANDARDIZED 100% MATCHING ALL OTHER PAGES)    -->
+  <!-- ============================================================ -->
+  <aside class="w-64 bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0">
+    <div class="space-y-3.5">
+      
+      <!-- LOGO -->
+      <div class="flex items-center space-x-3 px-2 py-0.5">
+        <svg class="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#60A5FA" />
+              <stop offset="40%" stop-color="#3B82F6" />
+              <stop offset="80%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#1D4ED8" />
+            </linearGradient>
+          </defs>
+          <path d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26" 
+                stroke="url(#wBlueGradient)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+
+        <span class="text-xl font-bold tracking-tight text-white leading-none">WorkTracker <span class="text-xs font-semibold text-blue-400">Pro</span></span>
+      </div>
+
+      <!-- MANAGER PORTAL MENU -->
+      <div class="space-y-1">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Manager Portal</p>
+        
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-border-all w-5 text-center"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <!-- ACTIVE: My Jobs -->
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30 transition">
+          <i class="fa-solid fa-briefcase w-5 text-center"></i>
+          <span>My Jobs</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-users w-5 text-center"></i>
+          <span>Team Members</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-clock w-5 text-center"></i>
+          <span>Timesheets</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-lock w-5 text-center"></i>
+          <span>Time Lock</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+          <span>Reports</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-gear w-5 text-center"></i>
+          <span>Settings</span>
+        </a>
+      </div>
+
+      <!-- QUICK ACCESS -->
+      <div class="space-y-0.5 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Quick Access</p>
+        <a href="#" class="flex items-center justify-between px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bell w-5 text-center"></i>
+            <span>Notifications</span>
+          </div>
+          <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">12</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-magnifying-glass w-5 text-center"></i>
+          <span>Search (Ctrl + K)</span>
+        </a>
+      </div>
+
+      <!-- RECENTLY VIEWED JOBS -->
+      <div class="space-y-1 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">Recently Viewed Jobs</p>
+        
+        <div class="px-3 py-1 rounded-lg bg-slate-800/60 cursor-pointer flex items-center space-x-2.5 border-l-2 border-blue-500">
+          <div class="w-2.5 h-2.5 rounded bg-emerald-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-white truncate">ERP System Implementation</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-amber-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Mobile App Development</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-blue-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Website Redesign</p>
+            <span class="text-[9px] font-bold text-blue-400">ON HOLD</span>
+          </div>
+        </div>
+
+        <a href="#" class="inline-block px-3 pt-0.5 text-[11px] font-medium text-blue-400 hover:underline">View all jobs →</a>
+      </div>
+    </div>
+
+    <!-- USER PROFILE -->
+    <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="relative">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-700">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-white leading-tight">Nguyen Van A</p>
+          <p class="text-[10px] text-slate-400">Manager</p>
+        </div>
+      </div>
+      <i class="fa-solid fa-angles-left text-slate-500 text-xs hover:text-slate-300 cursor-pointer"></i>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- MAIN WORKSPACE (INDEPENDENT SCROLLING CONTAINER)              -->
+  <!-- ============================================================ -->
+  <main class="flex-1 bg-slate-50 text-slate-800 p-6 space-y-5 h-screen overflow-y-auto">
+
+    <!-- BREADCRUMB & TOPBAR -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+      <!-- Breadcrumb -->
+      <div class="flex items-center space-x-2 text-xs text-slate-500 font-medium">
+        <a href="#" class="hover:text-blue-600">Dashboard</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <a href="#" class="hover:text-blue-600">My Jobs</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <a href="#" class="hover:text-blue-600">ERP-2024-068</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <span class="text-slate-900 font-semibold">Kanban Board</span>
+      </div>
+
+      <!-- Right Topbar Controls -->
+      <div class="flex items-center space-x-4">
+        <!-- Search Bar -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" placeholder="Search tasks..." class="w-64 pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm">
+        </div>
+
+        <!-- Notification Bell -->
+        <div class="relative cursor-pointer">
+          <i class="fa-regular fa-bell text-slate-600 text-base"></i>
+          <span class="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full">12</span>
+        </div>
+
+        <!-- Profile Pill -->
+        <div class="flex items-center space-x-2 border-l border-slate-200 pl-4 cursor-pointer">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+          <div>
+            <p class="text-xs font-bold text-slate-900 leading-tight">Nguyen Van A</p>
+            <p class="text-[10px] text-slate-400">Manager</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOB HEADER & KANBAN CONTROLS -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
+      <div class="space-y-1.5">
+        <div class="flex items-center space-x-3">
+          <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">ERP System Implementation</h1>
+          <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-bold uppercase">ACTIVE</span>
+          <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 text-xs font-bold uppercase">HIGH PRIORITY</span>
+        </div>
+        <p class="text-xs text-slate-500">
+          <i class="fa-solid fa-building text-slate-400 mr-1"></i> Client: <strong class="text-slate-700">ABC Corporation</strong> (IT & Telecom)
+          <span class="mx-2">•</span>
+          <i class="fa-solid fa-user-tie text-slate-400 mr-1"></i> Manager: <strong class="text-slate-700">Nguyen Van A</strong>
+          <span class="mx-2">•</span>
+          <i class="fa-regular fa-calendar text-slate-400 mr-1"></i> Start: <strong class="text-slate-700">Jun 1, 2026</strong>
+          <span class="mx-2">•</span>
+          <i class="fa-regular fa-clock text-slate-400 mr-1"></i> Deadline: <strong class="text-amber-600">Sep 30, 2026 (61 days left)</strong>
+        </p>
+      </div>
+
+      <div class="flex items-center space-x-3 shrink-0">
+        <select class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">
+          <option>View: Kanban ▾</option>
+          <option>View: List</option>
+          <option>View: Gantt</option>
+        </select>
+        <button class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-download text-slate-400"></i>
+          <span>Export</span>
+        </button>
+        <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-2 shadow-md shadow-blue-500/20 transition">
+          <i class="fa-solid fa-plus"></i>
+          <span>Create Task</span>
+        </button>
+        <button class="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 shadow-sm transition">
+          <i class="fa-solid fa-ellipsis"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 6 SUMMARY KPI STAT CARDS (TOP ROW) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
+      <!-- Stat 1: Total Tasks -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs"><i class="fa-solid fa-list-check"></i></div>
+        <p class="text-xs text-slate-500 font-medium">Total Tasks</p>
+        <h3 class="text-xl font-bold text-slate-900">120</h3>
+        <p class="text-[10px] text-slate-400">All tasks in this job</p>
+      </div>
+
+      <!-- Stat 2: To Do -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs"><i class="fa-solid fa-folder-open"></i></div>
+        <p class="text-xs text-slate-500 font-medium">To Do</p>
+        <h3 class="text-xl font-bold text-slate-900">25</h3>
+        <p class="text-[10px] text-blue-600 font-semibold">20.8% of total</p>
+      </div>
+
+      <!-- Stat 3: In Progress -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs"><i class="fa-solid fa-spinner"></i></div>
+        <p class="text-xs text-slate-500 font-medium">In Progress</p>
+        <h3 class="text-xl font-bold text-slate-900">35</h3>
+        <p class="text-[10px] text-purple-600 font-semibold">29.2% of total</p>
+      </div>
+
+      <!-- Stat 4: Review -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs"><i class="fa-solid fa-eye"></i></div>
+        <p class="text-xs text-slate-500 font-medium">Review</p>
+        <h3 class="text-xl font-bold text-slate-900">20</h3>
+        <p class="text-[10px] text-amber-600 font-semibold">16.7% of total</p>
+      </div>
+
+      <!-- Stat 5: Completed -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs"><i class="fa-solid fa-circle-check"></i></div>
+        <p class="text-xs text-slate-500 font-medium">Completed</p>
+        <h3 class="text-xl font-bold text-slate-900">30</h3>
+        <p class="text-[10px] text-emerald-600 font-semibold">25.0% of total</p>
+      </div>
+
+      <!-- Stat 6: Overdue -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-xs"><i class="fa-solid fa-bell font-bold"></i></div>
+        <p class="text-xs text-slate-500 font-medium">Overdue</p>
+        <h3 class="text-xl font-bold text-slate-900">10</h3>
+        <p class="text-[10px] text-rose-600 font-semibold">8.3% of total</p>
+      </div>
+    </div>
+
+    <!-- FILTER & SEARCH BAR -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+      <div class="flex flex-1 items-center space-x-3 w-full">
+        <!-- Search Input -->
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" placeholder="Search tasks by title, job code, client..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+        </div>
+
+        <!-- Filter Dropdowns -->
+        <select class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium"><option>Assignee: All Members ▾</option></select>
+        <select class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium"><option>Status: All Status ▾</option></select>
+        <select class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium"><option>Priority: All Priority ▾</option></select>
+      </div>
+
+      <!-- Toggle Switch: My Tasks Only -->
+      <div class="flex items-center space-x-2 shrink-0">
+        <span class="text-slate-600 font-medium">My Tasks Only</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" class="sr-only peer">
+          <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- MAIN KANBAN BOARD GRID + RIGHT SUMMARY PANEL -->
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-5 items-start">
+
+      <!-- KANBAN 5-COLUMN BOARD CONTAINER (3 COLUMNS SPAN) -->
+      <div class="xl:col-span-3 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 items-start">
+        
+        <!-- COLUMN 1: TO DO -->
+        <div class="bg-slate-100/80 rounded-xl p-3 space-y-3 border border-slate-200/60">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+              <h3 class="text-xs font-bold text-slate-800">To Do</h3>
+              <span class="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">25</span>
+            </div>
+            <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600 cursor-pointer text-xs"></i>
+          </div>
+
+          <!-- Task Cards in To Do -->
+          <div class="space-y-2.5">
+            <!-- Task 1 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-120</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">Database Schema Design</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-50 text-rose-600 border border-rose-200">High</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Le Van C</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-rose-600 font-semibold"><i class="fa-regular fa-calendar mr-0.5"></i>Jul 05</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>2</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>3</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Task 2 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-119</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">User Interface Mockup</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Pham Thi D</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-amber-600 font-semibold"><i class="fa-regular fa-calendar mr-0.5"></i>Jul 07</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>1</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>2</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Task 3 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-118</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">API Documentation</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Tran Thi Binh</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span><i class="fa-regular fa-calendar mr-0.5"></i>Jul 08</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>0</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Task Button -->
+          <button class="w-full py-2 bg-white hover:bg-slate-50 border border-dashed border-slate-300 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center space-x-1 transition">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Add Task</span>
+          </button>
+        </div>
+
+        <!-- COLUMN 2: IN PROGRESS -->
+        <div class="bg-slate-100/80 rounded-xl p-3 space-y-3 border border-slate-200/60">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+              <h3 class="text-xs font-bold text-slate-800">In Progress</h3>
+              <span class="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">35</span>
+            </div>
+            <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600 cursor-pointer text-xs"></i>
+          </div>
+
+          <!-- Task Cards in In Progress -->
+          <div class="space-y-2.5">
+            <!-- Task 1 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-116</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">API Integration Module</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-50 text-rose-600 border border-rose-200">High</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Hoang Van E</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-rose-600 font-semibold"><i class="fa-regular fa-calendar mr-0.5"></i>Jul 01</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>3</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>2</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Task 2 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-115</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">Authentication System</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Le Van C</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span><i class="fa-regular fa-calendar mr-0.5"></i>Jun 30</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>2</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Task Button -->
+          <button class="w-full py-2 bg-white hover:bg-slate-50 border border-dashed border-slate-300 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center space-x-1 transition">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Add Task</span>
+          </button>
+        </div>
+
+        <!-- COLUMN 3: IN REVIEW -->
+        <div class="bg-slate-100/80 rounded-xl p-3 space-y-3 border border-slate-200/60">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <h3 class="text-xs font-bold text-slate-800">In Review</h3>
+              <span class="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">20</span>
+            </div>
+            <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600 cursor-pointer text-xs"></i>
+          </div>
+
+          <!-- Task Cards in Review -->
+          <div class="space-y-2.5">
+            <!-- Task 1 (Overdue) -->
+            <div class="bg-white p-3 rounded-lg border-2 border-rose-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-112</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">Performance Testing</h4>
+              <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-50 text-rose-600 border border-rose-200">High</span>
+                <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-500 text-white">OVERDUE</span>
+              </div>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Pham Thi D</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-rose-600 font-semibold"><i class="fa-regular fa-calendar mr-0.5"></i>Jun 28</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>4</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>2</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Task 2 (Overdue) -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-111</span>
+                <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900">Security Vulnerability Scan</h4>
+              <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-500 text-white">OVERDUE</span>
+              </div>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Hoang Van E</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-rose-600 font-semibold"><i class="fa-regular fa-calendar mr-0.5"></i>Jun 27</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>2</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Task Button -->
+          <button class="w-full py-2 bg-white hover:bg-slate-50 border border-dashed border-slate-300 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center space-x-1 transition">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Add Task</span>
+          </button>
+        </div>
+
+        <!-- COLUMN 4: COMPLETED -->
+        <div class="bg-slate-100/80 rounded-xl p-3 space-y-3 border border-slate-200/60">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <h3 class="text-xs font-bold text-slate-800">Completed</h3>
+              <span class="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">30</span>
+            </div>
+            <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600 cursor-pointer text-xs"></i>
+          </div>
+
+          <!-- Task Cards in Completed -->
+          <div class="space-y-2.5">
+            <!-- Task 1 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2 opacity-90">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-108</span>
+                <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900 line-through">Project Planning</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Nguyen Van A</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span><i class="fa-regular fa-calendar mr-0.5"></i>May 25</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>0</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>1</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Task 2 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2 opacity-90">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-107</span>
+                <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900 line-through">Requirement Analysis</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Tran Thi Binh</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span><i class="fa-regular fa-calendar mr-0.5"></i>May 27</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>1</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>2</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Task Button -->
+          <button class="w-full py-2 bg-white hover:bg-slate-50 border border-dashed border-slate-300 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center space-x-1 transition">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Add Task</span>
+          </button>
+        </div>
+
+        <!-- COLUMN 5: CANCELLED -->
+        <div class="bg-slate-100/80 rounded-xl p-3 space-y-3 border border-slate-200/60">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <h3 class="text-xs font-bold text-slate-800">Cancelled</h3>
+              <span class="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">10</span>
+            </div>
+            <i class="fa-solid fa-ellipsis text-slate-400 hover:text-slate-600 cursor-pointer text-xs"></i>
+          </div>
+
+          <!-- Task Cards in Cancelled -->
+          <div class="space-y-2.5">
+            <!-- Task 1 -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer space-y-2 opacity-75">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span class="font-bold text-slate-500">TASK-2024-104</span>
+                <i class="fa-solid fa-ban text-slate-400 text-sm"></i>
+              </div>
+              <h4 class="text-xs font-bold text-slate-700 line-through">Deprecated Feature Removal</h4>
+              <span class="inline-block px-1.5 py-0.2 font-bold text-[9px] rounded bg-slate-100 text-slate-600 border border-slate-200">Low</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+                <div class="flex items-center space-x-1.5">
+                  <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" class="w-4 h-4 rounded-full object-cover">
+                  <span class="text-slate-600 font-medium">Le Van C</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span><i class="fa-regular fa-calendar mr-0.5"></i>May 20</span>
+                  <span><i class="fa-regular fa-comment mr-0.5"></i>0</span>
+                  <span><i class="fa-solid fa-paperclip mr-0.5"></i>1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Task Button -->
+          <button class="w-full py-2 bg-white hover:bg-slate-50 border border-dashed border-slate-300 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center space-x-1 transition">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Add Task</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDEBAR SUMMARY PANEL (1 COLUMN SPAN) -->
+      <div class="space-y-4">
+        
+        <!-- Task Status Summary Donut Card -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-4">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Task Status Summary</h3>
+
+          <div class="flex flex-col items-center space-y-4">
+            <!-- Donut Chart -->
+            <div class="relative w-36 h-36 flex items-center justify-center">
+              <div class="kanban-status-donut w-full h-full"></div>
+              <div class="w-24 h-24 bg-white rounded-full absolute flex flex-col items-center justify-center shadow-inner">
+                <span class="text-xl font-extrabold text-slate-900">120</span>
+                <span class="text-[9px] font-medium text-slate-400 uppercase text-center">Total Tasks</span>
+              </div>
+            </div>
+
+            <!-- Legend List -->
+            <div class="w-full space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                  <span class="text-slate-600 font-medium">To Do</span>
+                </div>
+                <span class="font-bold text-slate-800">25 (20.8%)</span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                  <span class="text-slate-600 font-medium">In Progress</span>
+                </div>
+                <span class="font-bold text-slate-800">35 (29.2%)</span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <span class="text-slate-600 font-medium">In Review</span>
+                </div>
+                <span class="font-bold text-slate-800">20 (16.7%)</span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span class="text-slate-600 font-medium">Completed</span>
+                </div>
+                <span class="font-bold text-slate-800">30 (25.0%)</span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                  <span class="text-slate-600 font-medium">Cancelled</span>
+                </div>
+                <span class="font-bold text-slate-800">10 (8.3%)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Overdue Alert Notice Box -->
+          <div class="p-3 bg-rose-50 rounded-xl border border-rose-200 flex items-center justify-between text-xs cursor-pointer hover:bg-rose-100/60 transition">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-exclamation"></i></div>
+              <div>
+                <p class="font-bold text-rose-900">10 tasks are overdue</p>
+                <p class="text-[10px] text-rose-600">Please review and take action.</p>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-xs text-rose-400"></i>
+          </div>
+        </div>
+
+        <!-- Drag & Drop Guide Card -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Drag & Drop Guide</h3>
+
+          <!-- Visual Illustration Mockup -->
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200/80 flex items-center justify-center space-x-3 text-slate-400">
+            <div class="w-12 h-14 bg-white rounded border border-slate-200 p-1 space-y-1">
+              <div class="w-full h-1.5 bg-blue-500 rounded"></div>
+              <div class="w-3/4 h-1 bg-slate-200 rounded"></div>
+            </div>
+            <i class="fa-solid fa-arrow-right-long text-blue-500 text-sm animate-pulse"></i>
+            <div class="w-12 h-14 bg-white rounded border-2 border-blue-500 p-1 space-y-1 shadow-md">
+              <div class="w-full h-1.5 bg-purple-500 rounded"></div>
+              <div class="w-3/4 h-1 bg-slate-200 rounded"></div>
+            </div>
+          </div>
+
+          <p class="text-[11px] text-slate-500 text-center leading-relaxed">
+            Drag tasks between columns to update their status.
+          </p>
+
+          <ul class="space-y-1.5 text-[11px] text-slate-600 pt-1">
+            <li class="flex items-center space-x-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              <span>Changes are saved automatically</span>
+            </li>
+            <li class="flex items-center space-x-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              <span>Only authorized members can move tasks</span>
+            </li>
+            <li class="flex items-center space-x-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              <span>Task history will be tracked</span>
+            </li>
+          </ul>
+
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+            <div class="flex items-center space-x-2 text-slate-700 font-semibold">
+              <i class="fa-solid fa-book-open text-blue-600"></i>
+              <span>Need Help?</span>
+            </div>
+            <a href="#" class="text-[11px] font-semibold text-blue-600 hover:underline">View Kanban guide ›</a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-slate-200 text-xs text-slate-400">
+      <p>© 2026 WorkTracker. All rights reserved.</p>
+      <p>Version 1.0.0 • Manager Portal</p>
+    </div>
+  </main>
+
+</body>
+</html>

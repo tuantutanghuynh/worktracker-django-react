@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timesheet Control - WorkTracker Pro</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome 6 Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen overflow-hidden flex">
+
+  <!-- ============================================================ -->
+  <!-- FIXED LEFT SIDEBAR (ADMIN PORTAL) -->
+  <!-- ============================================================ -->
+  <aside class="w-64 bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0">
+    <div class="space-y-3.5">
+      
+      <!-- 1. BRAND LOGO -->
+      <div class="flex items-center space-x-3 px-2 py-0.5">
+        <svg class="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#60A5FA" />
+              <stop offset="40%" stop-color="#3B82F6" />
+              <stop offset="80%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#1D4ED8" />
+            </linearGradient>
+          </defs>
+          <path d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26" 
+                stroke="url(#wBlueGradient)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="text-xl font-bold tracking-tight text-white leading-none">
+          WorkTracker <span class="text-xs font-semibold text-blue-400">Pro</span>
+        </span>
+      </div>
+
+      <!-- 2. NAVIGATION MENU (ADMIN) -->
+      <div class="space-y-1">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Admin Portal</p>
+        
+        <!-- Dashboard -->
+        <a href="preview_admin_dashboard.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-border-all w-5 text-center"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <!-- Clients -->
+        <a href="preview_admin_clients.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-building w-5 text-center"></i>
+          <span>Clients</span>
+        </a>
+
+        <!-- Jobs -->
+        <a href="preview_admin_jobs.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-briefcase w-5 text-center"></i>
+          <span>Jobs</span>
+        </a>
+
+        <!-- Employees -->
+        <a href="preview_admin_employees.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-users w-5 text-center"></i>
+          <span>Employees</span>
+        </a>
+
+        <!-- Timesheet Control (Active) -->
+        <a href="preview_admin_timesheet_control.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30 transition">
+          <i class="fa-solid fa-clock w-5 text-center"></i>
+          <span>Timesheet Control</span>
+        </a>
+
+        <!-- Audit Logs -->
+        <a href="preview_admin_audit_logs.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-shield-halved w-5 text-center"></i>
+          <span>Audit Logs</span>
+        </a>
+
+        <!-- Reports -->
+        <a href="preview_admin_reports.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+          <span>Reports</span>
+        </a>
+
+        <!-- Settings -->
+        <a href="preview_admin_settings.html" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-gear w-5 text-center"></i>
+          <span>Settings</span>
+        </a>
+      </div>
+
+      <!-- 3. QUICK ACCESS BLOCK -->
+      <div class="space-y-0.5 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Quick Access</p>
+        <a href="#" class="flex items-center justify-between px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bell w-5 text-center"></i>
+            <span>Notifications</span>
+          </div>
+          <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">12</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-magnifying-glass w-5 text-center"></i>
+          <span>Search (Ctrl + K)</span>
+        </a>
+      </div>
+
+      <!-- 4. RECENTLY VIEWED JOBS BLOCK -->
+      <div class="space-y-1 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">Recently Viewed Jobs</p>
+        
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-rose-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">ERP System Implementation</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-amber-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Mobile App Development</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-blue-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Website Redesign</p>
+            <span class="text-[9px] font-bold text-blue-400">ON HOLD</span>
+          </div>
+        </div>
+
+        <a href="preview_admin_jobs.html" class="inline-block px-3 pt-0.5 text-[11px] font-medium text-blue-400 hover:underline">View all jobs →</a>
+      </div>
+    </div>
+
+    <!-- 5. USER PROFILE FOOTER -->
+    <div class="pt-2.5 border-t border-slate-800/80 space-y-2 shrink-0">
+      <div class="flex items-center space-x-2 px-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-[10px] font-semibold text-slate-400">All Systems Operational</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="relative">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-700">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+          </div>
+          <div>
+            <p class="text-xs font-bold text-white leading-tight">Admin User</p>
+            <p class="text-[10px] text-slate-400">Super Admin</p>
+          </div>
+        </div>
+        <i class="fa-solid fa-chevron-down text-slate-500 text-xs hover:text-slate-300 cursor-pointer"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- INDEPENDENT SCROLLING MAIN WORKSPACE -->
+  <!-- ============================================================ -->
+  <main class="flex-1 bg-slate-50 text-slate-800 p-6 space-y-5 h-screen overflow-y-auto">
+    
+    <!-- TOP HEADER BAR -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center space-x-2 text-xs text-slate-500 font-medium mb-1">
+          <span>Employees</span>
+          <i class="fa-solid fa-chevron-right text-[9px]"></i>
+          <span class="text-slate-800 font-semibold">Timesheet Control</span>
+        </div>
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Timesheet Control</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Monitor, audit, and lock company-wide employee timesheets.</p>
+      </div>
+
+      <div class="flex items-center space-x-2 self-start sm:self-auto">
+        <button class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-download text-slate-400"></i>
+          <span>Export Report</span>
+        </button>
+        <button class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md shadow-rose-600/20 flex items-center space-x-2 transition">
+          <i class="fa-solid fa-lock"></i>
+          <span>Lock / Unlock Period</span>
+          <i class="fa-solid fa-chevron-down text-[10px] ml-1"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 1. KPI SUMMARY CARDS (5 CARDS WITH SPARKLINES) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      
+      <!-- Card 1: Total Logged Hours -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center">
+            <i class="fa-solid fa-arrow-up text-[9px] mr-1"></i> 5.2%
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Total Logged Hours</p>
+          <h3 class="text-2xl font-extrabold text-slate-900 mt-0.5">8,524h</h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">May 2026 Period</p>
+        </div>
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-ts-1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-ts-1)" d="M0,35 L0,22 C20,15 40,28 60,18 L100,10 L100,35 Z" />
+            <path fill="none" stroke="#3b82f6" stroke-width="2" d="M0,22 C20,15 40,28 60,18 L100,10" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Card 2: Active Employees -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center">
+            <i class="fa-solid fa-arrow-up text-[9px] mr-1"></i> 100%
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Active Employees</p>
+          <h3 class="text-2xl font-extrabold text-slate-900 mt-0.5">36</h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">Logging work entries</p>
+        </div>
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-ts-2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-ts-2)" d="M0,35 L0,20 C30,22 60,15 80,10 L100,8 L100,35 Z" />
+            <path fill="none" stroke="#10b981" stroke-width="2" d="M0,20 C30,22 60,15 80,10 L100,8" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Card 3: Locked Periods -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-lock"></i>
+          </div>
+          <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+            Historical
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Locked Periods</p>
+          <h3 class="text-2xl font-extrabold text-slate-900 mt-0.5">5</h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">Immutable records</p>
+        </div>
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-ts-3" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-ts-3)" d="M0,35 L0,15 C25,18 50,12 75,20 L100,18 L100,35 Z" />
+            <path fill="none" stroke="#8b5cf6" stroke-width="2" d="M0,15 C25,18 50,12 75,20 L100,18" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Card 4: Timesheet Violations -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full flex items-center">
+            <i class="fa-solid fa-arrow-up text-[9px] mr-1"></i> 7 Alerts
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Timesheet Violations</p>
+          <h3 class="text-2xl font-extrabold text-slate-900 mt-0.5">7</h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">Daily limit breaches</p>
+        </div>
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-ts-4" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-ts-4)" d="M0,35 L0,25 C30,12 60,30 80,10 L100,15 L100,35 Z" />
+            <path fill="none" stroke="#f43f5e" stroke-width="2" d="M0,25 C30,12 60,30 80,10 L100,15" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Card 5: Missing Timesheets -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-file-circle-exclamation"></i>
+          </div>
+          <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex items-center">
+            Pending
+          </span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Missing Timesheets</p>
+          <h3 class="text-2xl font-extrabold text-slate-900 mt-0.5">12</h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">Days unlogged</p>
+        </div>
+        <div class="h-8 w-full pt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 100 35" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-ts-5" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#grad-ts-5)" d="M0,35 L0,18 C20,25 50,10 75,22 L100,20 L100,35 Z" />
+            <path fill="none" stroke="#f59e0b" stroke-width="2" d="M0,18 C20,25 50,10 75,22 L100,20" />
+          </svg>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 2. FILTER TOOLBAR -->
+    <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <div class="relative flex-1">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" placeholder="Search employee name, ID..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition">
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <select class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700">
+          <option>All Departments</option>
+          <option>Engineering</option>
+          <option>Product & Design</option>
+        </select>
+
+        <select class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700">
+          <option>All Managers</option>
+          <option>Tran Van B</option>
+          <option>Le Thi C</option>
+        </select>
+
+        <select class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 font-bold text-blue-600">
+          <option>May 2026</option>
+          <option>April 2026</option>
+          <option>March 2026</option>
+        </select>
+
+        <select class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700">
+          <option>All Status</option>
+          <option>Normal</option>
+          <option>Warning</option>
+          <option>Missing</option>
+          <option>Over Limit</option>
+        </select>
+
+        <button class="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-filter"></i>
+          <span>Filter</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. MAIN WORKSPACE: TABLE + RIGHT SIDE DRAWER PANEL -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      
+      <!-- Table Container (2 Cols) -->
+      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3 text-center"><input type="checkbox" class="rounded border-slate-300"></th>
+                <th class="py-3 px-4">Employee</th>
+                <th class="py-3 px-4">Department</th>
+                <th class="py-3 px-4 w-36">Month Hours</th>
+                <th class="py-3 px-4 text-center">Avg / Day</th>
+                <th class="py-3 px-4 text-center">Violations</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Last Entry</th>
+                <th class="py-3 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+              
+              <!-- Row 1 (Selected) -->
+              <tr class="bg-blue-50/50 hover:bg-blue-50/80 transition cursor-pointer border-l-4 border-l-blue-600">
+                <td class="py-3.5 px-3 text-center"><input type="checkbox" checked class="rounded border-slate-300"></td>
+                <td class="py-3.5 px-4">
+                  <div class="flex items-center space-x-3">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                    <div>
+                      <p class="font-bold text-slate-900">Nguyen Van A</p>
+                      <p class="text-[10px] text-slate-400">EMP-2024-001</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 font-semibold text-slate-700">Engineering</td>
+                <td class="py-3.5 px-4">
+                  <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold text-slate-800">
+                      <span>176h 00m</span>
+                      <span class="text-slate-400">Target 176h</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 100%;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 text-center font-bold text-slate-800">8.0h</td>
+                <td class="py-3.5 px-4 text-center">
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-slate-100 text-slate-600">0</span>
+                </td>
+                <td class="py-3.5 px-4">
+                  <span class="px-2.5 py-0.5 font-bold text-[10px] rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    Normal
+                  </span>
+                </td>
+                <td class="py-3.5 px-4 text-slate-500">30/05/2026</td>
+                <td class="py-3.5 px-4 text-center space-x-1">
+                  <button class="p-1 text-blue-600 font-bold" title="View Audit Details"><i class="fa-solid fa-chevron-right"></i></button>
+                </td>
+              </tr>
+
+              <!-- Row 2 -->
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer">
+                <td class="py-3.5 px-3 text-center"><input type="checkbox" class="rounded border-slate-300"></td>
+                <td class="py-3.5 px-4">
+                  <div class="flex items-center space-x-3">
+                    <img src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                    <div>
+                      <p class="font-bold text-slate-900">Tran Van B</p>
+                      <p class="text-[10px] text-slate-400">EMP-2024-002</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 font-semibold text-slate-700">Engineering</td>
+                <td class="py-3.5 px-4">
+                  <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold text-slate-800">
+                      <span>192h 30m</span>
+                      <span class="text-rose-500">+16.5h</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-rose-500 h-1.5 rounded-full" style="width: 100%;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 text-center font-bold text-rose-600">8.75h</td>
+                <td class="py-3.5 px-4 text-center">
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-rose-50 text-rose-600 border border-rose-200">3</span>
+                </td>
+                <td class="py-3.5 px-4">
+                  <span class="px-2.5 py-0.5 font-bold text-[10px] rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                    Over Limit
+                  </span>
+                </td>
+                <td class="py-3.5 px-4 text-slate-500">30/05/2026</td>
+                <td class="py-3.5 px-4 text-center space-x-1">
+                  <button class="p-1 text-slate-400 hover:text-blue-600"><i class="fa-solid fa-chevron-right"></i></button>
+                </td>
+              </tr>
+
+              <!-- Row 3 -->
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer bg-amber-50/20">
+                <td class="py-3.5 px-3 text-center"><input type="checkbox" class="rounded border-slate-300"></td>
+                <td class="py-3.5 px-4">
+                  <div class="flex items-center space-x-3">
+                    <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                    <div>
+                      <p class="font-bold text-slate-900">Le Thi C</p>
+                      <p class="text-[10px] text-slate-400">EMP-2024-003</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 font-semibold text-slate-700">Product & Design</td>
+                <td class="py-3.5 px-4">
+                  <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold text-slate-800">
+                      <span>152h 00m</span>
+                      <span class="text-amber-500">-24h</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-amber-500 h-1.5 rounded-full" style="width: 86%;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 text-center font-bold text-amber-600">6.9h</td>
+                <td class="py-3.5 px-4 text-center">
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">2</span>
+                </td>
+                <td class="py-3.5 px-4">
+                  <span class="px-2.5 py-0.5 font-bold text-[10px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+                    Missing
+                  </span>
+                </td>
+                <td class="py-3.5 px-4 text-slate-500">27/05/2026</td>
+                <td class="py-3.5 px-4 text-center space-x-1">
+                  <button class="p-1 text-slate-400 hover:text-blue-600"><i class="fa-solid fa-chevron-right"></i></button>
+                </td>
+              </tr>
+
+              <!-- Row 4 -->
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer">
+                <td class="py-3.5 px-3 text-center"><input type="checkbox" class="rounded border-slate-300"></td>
+                <td class="py-3.5 px-4">
+                  <div class="flex items-center space-x-3">
+                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                    <div>
+                      <p class="font-bold text-slate-900">Pham Minh Tuan</p>
+                      <p class="text-[10px] text-slate-400">EMP-2024-004</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 font-semibold text-slate-700">Quality Assurance</td>
+                <td class="py-3.5 px-4">
+                  <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold text-slate-800">
+                      <span>168h 00m</span>
+                      <span class="text-slate-400">Target 176h</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 95%;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3.5 px-4 text-center font-bold text-slate-800">7.6h</td>
+                <td class="py-3.5 px-4 text-center">
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">1</span>
+                </td>
+                <td class="py-3.5 px-4">
+                  <span class="px-2.5 py-0.5 font-bold text-[10px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+                    Warning
+                  </span>
+                </td>
+                <td class="py-3.5 px-4 text-slate-500">29/05/2026</td>
+                <td class="py-3.5 px-4 text-center space-x-1">
+                  <button class="p-1 text-slate-400 hover:text-blue-600"><i class="fa-solid fa-chevron-right"></i></button>
+                </td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between p-3.5 border-t border-slate-100 text-xs text-slate-500 font-medium">
+          <span>Showing 4 of 36 employees</span>
+          <div class="flex items-center space-x-1">
+            <button class="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-400"><i class="fa-solid fa-chevron-left text-[10px]"></i></button>
+            <button class="px-3 py-1 rounded bg-blue-600 text-white font-bold">1</button>
+            <button class="px-3 py-1 rounded border border-slate-200 hover:bg-slate-50">2</button>
+            <button class="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-600"><i class="fa-solid fa-chevron-right text-[10px]"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Drawer Panel: Employee Compliance Overview -->
+      <div class="bg-white rounded-xl border border-slate-200/80 shadow-md p-5 flex flex-col justify-between space-y-4">
+        
+        <div class="space-y-4">
+          <!-- Header -->
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-sm font-bold text-slate-900">Compliance Overview</h3>
+            <span class="px-2 py-0.5 font-bold text-[10px] rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+              Normal Status
+            </span>
+          </div>
+
+          <!-- Employee Card -->
+          <div class="flex items-center space-x-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-10 h-10 rounded-full object-cover border border-slate-200">
+            <div>
+              <h4 class="font-bold text-slate-900 text-xs">Nguyen Van A</h4>
+              <p class="text-[11px] text-slate-500">Engineering • EMP-2024-001</p>
+            </div>
+          </div>
+
+          <!-- Metrics 4-Grid -->
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <span class="text-slate-400 text-[10px] block">Monthly Hours</span>
+              <span class="font-extrabold text-slate-900 text-sm">176h 00m</span>
+            </div>
+            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <span class="text-slate-400 text-[10px] block">Working Days</span>
+              <span class="font-extrabold text-slate-900 text-sm">22 Days</span>
+            </div>
+            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <span class="text-slate-400 text-[10px] block">Average / Day</span>
+              <span class="font-extrabold text-slate-900 text-sm">8.0 Hours</span>
+            </div>
+            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <span class="text-slate-400 text-[10px] block">Edited Records</span>
+              <span class="font-extrabold text-amber-600 text-sm">1 Record</span>
+            </div>
+          </div>
+
+          <!-- Section 1: Compliance & Risk -->
+          <div class="space-y-2">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Compliance Checks</h5>
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center justify-between p-2 rounded bg-slate-50">
+                <span class="text-slate-600 font-medium">Daily Limit &gt; 10h</span>
+                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> Passed (0)</span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded bg-slate-50">
+                <span class="text-slate-600 font-medium">Daily Limit &gt; 12h Hard Limit</span>
+                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> Passed (0)</span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded bg-slate-50">
+                <span class="text-slate-600 font-medium">Locked Period Edits</span>
+                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> None</span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded bg-slate-50">
+                <span class="text-slate-600 font-medium">Missing Working Days</span>
+                <span class="text-amber-600 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 1 Day</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Period Lock Status Card -->
+          <div class="p-3 bg-purple-50/60 border border-purple-100 rounded-xl space-y-1.5 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-purple-900">Period Lock Status</span>
+              <span class="px-2 py-0.5 rounded-full bg-purple-600 text-white font-bold text-[10px]">LOCKED</span>
+            </div>
+            <p class="text-[11px] text-purple-700">Month of May 2026 locked by Admin Le Van C on 30/05/2026 09:15 AM.</p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <button class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-semibold transition">
+              Export Report
+            </button>
+            <button class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-semibold transition">
+              Export All Logs
+            </button>
+          </div>
+          <button class="w-full bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 py-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition">
+            <i class="fa-solid fa-paper-plane text-amber-500"></i>
+            <span>Notify Manager</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</body>
+</html>

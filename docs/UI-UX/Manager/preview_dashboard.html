@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Dashboard - WorkTracker Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    
+    /* Donut Chart Conic Gradient CSS */
+    .donut-chart {
+      background: conic-gradient(
+        #2563eb 0% 30%,      /* To Do: 30% (Blue) */
+        #10b981 30% 55%,     /* In Progress: 25% (Emerald) */
+        #8b5cf6 55% 75%,     /* Reviewing: 20% (Purple) */
+        #f97316 75% 90%,     /* Completed: 15% (Orange) */
+        #ef4444 90% 100%     /* Cancelled: 10% (Red) */
+      );
+      border-radius: 50%;
+    }
+
+    /* Heatmap Square Colors */
+    .hm-0h { background-color: #f1f5f9; }
+    .hm-1-2h { background-color: #fef08a; }
+    .hm-2-4h { background-color: #86efac; }
+    .hm-4-6h { background-color: #22c55e; }
+    .hm-6h { background-color: #15803d; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen overflow-hidden flex">
+
+  <!-- ============================================================ -->
+  <!-- LEFT SIDEBAR (EXACT SIZE & PROFILE ALIGNMENT FROM preview_profile.html) -->
+  <!-- ============================================================ -->
+  <aside class="w-64 bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0">
+    <div class="space-y-3.5">
+      
+      <!-- LOGO (EXACT INLINE ALIGNMENT FOR WorkTracker Pro) -->
+      <div class="flex items-center space-x-3 px-2 py-0.5">
+        <svg class="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#60A5FA" />
+              <stop offset="40%" stop-color="#3B82F6" />
+              <stop offset="80%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#1D4ED8" />
+            </linearGradient>
+          </defs>
+          <path d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26" 
+                stroke="url(#wBlueGradient)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+
+        <span class="text-xl font-bold tracking-tight text-white leading-none">WorkTracker <span class="text-xs font-semibold text-blue-400">Pro</span></span>
+      </div>
+
+      <!-- MANAGER PORTAL MENU -->
+      <div class="space-y-1">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Manager Portal</p>
+        
+        <!-- ACTIVE: Dashboard -->
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30 transition">
+          <i class="fa-solid fa-border-all w-5 text-center"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-briefcase w-5 text-center"></i>
+          <span>My Jobs</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-users w-5 text-center"></i>
+          <span>Team Members</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-clock w-5 text-center"></i>
+          <span>Timesheets</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-lock w-5 text-center"></i>
+          <span>Time Lock</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+          <span>Reports</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-gear w-5 text-center"></i>
+          <span>Settings</span>
+        </a>
+      </div>
+
+      <!-- QUICK ACCESS -->
+      <div class="space-y-0.5 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Quick Access</p>
+        <a href="#" class="flex items-center justify-between px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bell w-5 text-center"></i>
+            <span>Notifications</span>
+          </div>
+          <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">12</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-magnifying-glass w-5 text-center"></i>
+          <span>Search (Ctrl + K)</span>
+        </a>
+      </div>
+
+      <!-- RECENTLY VIEWED JOBS (EXACTLY 3 ITEMS + VIEW ALL JOBS LINK) -->
+      <div class="space-y-1 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">Recently Viewed Jobs</p>
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-rose-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">ERP System Implementation</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-amber-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Mobile App Development</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-blue-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Website Redesign</p>
+            <span class="text-[9px] font-bold text-blue-400">ON HOLD</span>
+          </div>
+        </div>
+        <a href="#" class="inline-block px-3 pt-0.5 text-[11px] font-medium text-blue-400 hover:underline">View all jobs →</a>
+      </div>
+    </div>
+
+    <!-- USER PROFILE (ALWAYS VISIBLE AT BOTTOM) -->
+    <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="relative">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-700">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-white leading-tight">Nguyen Van A</p>
+          <p class="text-[10px] text-slate-400">Manager</p>
+        </div>
+      </div>
+      <i class="fa-solid fa-angles-left text-slate-500 text-xs hover:text-slate-300 cursor-pointer"></i>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- MAIN WORKSPACE (INDEPENDENT SCROLLING CONTAINER)              -->
+  <!-- ============================================================ -->
+  <main class="flex-1 bg-slate-50 text-slate-800 p-6 space-y-5 h-screen overflow-y-auto">
+
+    <!-- BREADCRUMB & SEARCH TOPBAR -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Welcome back, Nguyen Van A 👋</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Here's what's happening with your projects today.</p>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <!-- Search Bar -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" placeholder="Search jobs, tasks, employees..." class="w-72 pl-9 pr-12 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm">
+          <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Ctrl K</span>
+        </div>
+
+        <!-- Notification Bell -->
+        <div class="relative cursor-pointer">
+          <i class="fa-regular fa-bell text-slate-600 text-base"></i>
+          <span class="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full">12</span>
+        </div>
+
+        <!-- Profile Pill -->
+        <div class="flex items-center space-x-2 border-l border-slate-200 pl-4 cursor-pointer">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+          <div>
+            <p class="text-xs font-bold text-slate-900 leading-tight">Nguyen Van A</p>
+            <p class="text-[10px] text-slate-400">Manager</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATE RANGE SELECTOR -->
+    <div class="flex justify-end">
+      <div class="flex items-center space-x-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 shadow-sm cursor-pointer">
+        <i class="fa-regular fa-calendar text-slate-400"></i>
+        <span>Jun 1 – Jun 30, 2026</span>
+        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
+      </div>
+    </div>
+
+    <!-- 4 QUICK ACTION LAUNCH CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Action 1: Create Task -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm flex items-center space-x-3.5 hover:border-blue-300 transition cursor-pointer">
+        <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm shrink-0 shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold text-slate-900">Create Task</h4>
+          <p class="text-[10px] text-slate-400">Add new task</p>
+        </div>
+      </div>
+
+      <!-- Action 2: Create Job -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm flex items-center space-x-3.5 hover:border-emerald-300 transition cursor-pointer">
+        <div class="w-9 h-9 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-sm shrink-0 shadow-md shadow-emerald-500/20">
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold text-slate-900">Create Job</h4>
+          <p class="text-[10px] text-slate-400">Add new job / project</p>
+        </div>
+      </div>
+
+      <!-- Action 3: Review Timesheets -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm flex items-center space-x-3.5 hover:border-amber-300 transition cursor-pointer">
+        <div class="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center text-sm shrink-0 shadow-md shadow-amber-500/20">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold text-slate-900">Review Timesheets</h4>
+          <p class="text-[10px] text-slate-400">Approve pending logs</p>
+        </div>
+      </div>
+
+      <!-- Action 4: Go to Kanban -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm flex items-center space-x-3.5 hover:border-purple-300 transition cursor-pointer">
+        <div class="w-9 h-9 rounded-lg bg-slate-800 text-white flex items-center justify-center text-sm shrink-0 shadow-md shadow-slate-700/20">
+          <i class="fa-solid fa-square-poll-vertical"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold text-slate-900">Go to Kanban</h4>
+          <p class="text-[10px] text-slate-400">Open board view</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 KPI STAT CARDS (2 ROWS OF 3 CARDS) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
+      
+      <!-- KPI 1: Managed Jobs -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 text-xs">
+            <i class="fa-solid fa-folder"></i>
+          </div>
+          <span class="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded-full">JOB Scope</span>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Managed Jobs</p>
+          <h3 class="text-xl font-bold text-slate-900">12</h3>
+          <p class="text-[10px] text-slate-400">8 Active • 2 Planning • 2 On Hold</p>
+        </div>
+        <p class="text-[10px] font-bold text-emerald-600 pt-0.5">↑ 20% <span class="text-slate-400 font-normal">vs last month</span></p>
+      </div>
+
+      <!-- KPI 2: Overdue Task Rate -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 text-xs">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Overdue Task Rate</p>
+          <h3 class="text-xl font-bold text-slate-900">8.7%</h3>
+          <p class="text-[10px] text-slate-400">7 overdue of 80 total</p>
+        </div>
+        <p class="text-[10px] font-bold text-emerald-600 pt-0.5">↓ 3.2% <span class="text-slate-400 font-normal">vs last month</span></p>
+      </div>
+
+      <!-- KPI 3: Pending Timesheets -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 text-xs">
+            <i class="fa-solid fa-hourglass-half"></i>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Pending Timesheets</p>
+          <h3 class="text-xl font-bold text-slate-900">18</h3>
+          <p class="text-[10px] text-slate-400">18 logs waiting approval</p>
+        </div>
+        <p class="text-[10px] font-bold text-amber-600 pt-0.5">↑ 12 <span class="text-slate-400 font-normal">vs last week</span></p>
+      </div>
+
+      <!-- KPI 4: Team Work Hours -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 text-xs">
+            <i class="fa-solid fa-hourglass-start"></i>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Team Work Hours</p>
+          <h3 class="text-xl font-bold text-slate-900">542.5h</h3>
+          <p class="text-[10px] text-slate-400">This month</p>
+        </div>
+        <p class="text-[10px] font-bold text-emerald-600 pt-0.5">↑ 15.2% <span class="text-slate-400 font-normal">vs last month</span></p>
+      </div>
+
+      <!-- KPI 5: Team Members -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 text-xs">
+            <i class="fa-solid fa-users"></i>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Team Members</p>
+          <h3 class="text-xl font-bold text-slate-900">18</h3>
+          <p class="text-[10px] text-slate-400">15 active today</p>
+        </div>
+        <p class="text-[10px] font-bold text-rose-500 pt-0.5">↓ 1 <span class="text-slate-400 font-normal">on leave</span></p>
+      </div>
+
+      <!-- KPI 6: Today's Logged Hours -->
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 text-xs">
+            <i class="fa-regular fa-clock"></i>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Today's Logged Hours</p>
+          <h3 class="text-xl font-bold text-slate-900">32.8h</h3>
+          <p class="text-[10px] text-slate-400">As of now</p>
+        </div>
+        <p class="text-[10px] font-bold text-emerald-600 pt-0.5">↑ 8.3h <span class="text-slate-400 font-normal">yesterday</span></p>
+      </div>
+
+    </div>
+
+    <!-- MIDDLE ROW: 3 VISUALIZATION WIDGETS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+      <!-- Widget 1: Task Status Summary (Donut Chart) -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900">Task Status Summary</h3>
+          <select class="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-xs"><option>This Month</option></select>
+        </div>
+
+        <div class="flex items-center space-x-5">
+          <!-- Conic Gradient Donut -->
+          <div class="relative w-32 h-32 shrink-0 flex items-center justify-center">
+            <div class="donut-chart w-full h-full"></div>
+            <div class="w-20 h-20 bg-white rounded-full absolute flex flex-col items-center justify-center shadow-inner">
+              <span class="text-lg font-extrabold text-slate-900">172</span>
+              <span class="text-[9px] font-medium text-slate-400 uppercase">Total Tasks</span>
+            </div>
+          </div>
+
+          <!-- Donut Legend -->
+          <div class="space-y-1.5 text-xs flex-1">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                <span class="text-slate-600 font-medium">To Do</span>
+              </div>
+              <span class="font-bold text-slate-800">52 (30%)</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span class="text-slate-600 font-medium">In Progress</span>
+              </div>
+              <span class="font-bold text-slate-800">43 (25%)</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span class="text-slate-600 font-medium">Reviewing</span>
+              </div>
+              <span class="font-bold text-slate-800">34 (20%)</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                <span class="text-slate-600 font-medium">Completed</span>
+              </div>
+              <span class="font-bold text-slate-800">26 (15%)</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span class="text-slate-600 font-medium">Cancelled</span>
+              </div>
+              <span class="font-bold text-slate-800">17 (10%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Widget 2: Workload per Employee (Grouped Bar Chart) -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900">Workload per Employee</h3>
+          <div class="flex items-center space-x-3 text-[10px]">
+            <div class="flex items-center space-x-1">
+              <span class="w-2 h-2 rounded-xs bg-blue-600"></span>
+              <span class="text-slate-600">Open Tasks</span>
+            </div>
+            <div class="flex items-center space-x-1">
+              <span class="w-2 h-2 rounded-xs bg-emerald-500"></span>
+              <span class="text-slate-600">Work Hours</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bar Chart Plot Area -->
+        <div class="h-36 flex items-end justify-between px-2 pt-2 border-b border-slate-200 relative">
+          <!-- Grid lines -->
+          <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+            <div class="border-b border-slate-400 w-full"></div>
+            <div class="border-b border-slate-400 w-full"></div>
+            <div class="border-b border-slate-400 w-full"></div>
+          </div>
+
+          <!-- Employee 1: Nguyen A -->
+          <div class="flex flex-col items-center space-y-1 z-10">
+            <div class="flex items-end space-x-1">
+              <div class="w-2.5 bg-blue-600 rounded-t h-28 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">18</span></div>
+              <div class="w-2.5 bg-emerald-500 rounded-t h-24 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">72h</span></div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-5 h-5 rounded-full object-cover border border-slate-200">
+            <span class="text-[9px] font-semibold text-slate-600">Nguyen A.</span>
+          </div>
+
+          <!-- Employee 2: Tran B -->
+          <div class="flex flex-col items-center space-y-1 z-10">
+            <div class="flex items-end space-x-1">
+              <div class="w-2.5 bg-blue-600 rounded-t h-20 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">14</span></div>
+              <div class="w-2.5 bg-emerald-500 rounded-t h-16 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">50h</span></div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" class="w-5 h-5 rounded-full object-cover border border-slate-200">
+            <span class="text-[9px] font-semibold text-slate-600">Tran B.</span>
+          </div>
+
+          <!-- Employee 3: Hoang C -->
+          <div class="flex flex-col items-center space-y-1 z-10">
+            <div class="flex items-end space-x-1">
+              <div class="w-2.5 bg-blue-600 rounded-t h-16 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">10</span></div>
+              <div class="w-2.5 bg-emerald-500 rounded-t h-14 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">46h</span></div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" class="w-5 h-5 rounded-full object-cover border border-slate-200">
+            <span class="text-[9px] font-semibold text-slate-600">Hoang C.</span>
+          </div>
+
+          <!-- Employee 4: Le D -->
+          <div class="flex flex-col items-center space-y-1 z-10">
+            <div class="flex items-end space-x-1">
+              <div class="w-2.5 bg-blue-600 rounded-t h-12 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">8</span></div>
+              <div class="w-2.5 bg-emerald-500 rounded-t h-10 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">38h</span></div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" class="w-5 h-5 rounded-full object-cover border border-slate-200">
+            <span class="text-[9px] font-semibold text-slate-600">Le D.</span>
+          </div>
+
+          <!-- Employee 5: Pham E -->
+          <div class="flex flex-col items-center space-y-1 z-10">
+            <div class="flex items-end space-x-1">
+              <div class="w-2.5 bg-blue-600 rounded-t h-8 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">6</span></div>
+              <div class="w-2.5 bg-emerald-500 rounded-t h-6 relative group"><span class="opacity-0 group-hover:opacity-100 absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-slate-900 text-white px-1 rounded">22h</span></div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-5 h-5 rounded-full object-cover border border-slate-200">
+            <span class="text-[9px] font-semibold text-slate-600">Pham E.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Widget 3: Productivity Heatmap (Work Hours) -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900">Productivity Heatmap <span class="text-[10px] font-normal text-slate-400">(Work Hours)</span></h3>
+          <select class="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-xs"><option>This Month</option></select>
+        </div>
+
+        <!-- Heatmap Grid -->
+        <div class="space-y-1.5 text-xs">
+          <!-- Row 1 -->
+          <div class="flex items-center space-x-2">
+            <span class="w-14 text-[9px] font-semibold text-slate-600 truncate">Nguyen A.</span>
+            <div class="flex space-x-0.5">
+              <span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+            </div>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="flex items-center space-x-2">
+            <span class="w-14 text-[9px] font-semibold text-slate-600 truncate">Tran B.</span>
+            <div class="flex space-x-0.5">
+              <span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+            </div>
+          </div>
+
+          <!-- Row 3 -->
+          <div class="flex items-center space-x-2">
+            <span class="w-14 text-[9px] font-semibold text-slate-600 truncate">Hoang C.</span>
+            <div class="flex space-x-0.5">
+              <span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-4-6h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+            </div>
+          </div>
+
+          <!-- Row 4 -->
+          <div class="flex items-center space-x-2">
+            <span class="w-14 text-[9px] font-semibold text-slate-600 truncate">Le D.</span>
+            <div class="flex space-x-0.5">
+              <span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+              <span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-2-4h"></span><span class="w-2 h-3.5 rounded-xs hm-1-2h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span><span class="w-2 h-3.5 rounded-xs hm-0h"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heatmap Legend -->
+        <div class="flex items-center justify-between text-[9px] text-slate-400 pt-1.5 border-t border-slate-100">
+          <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-xs hm-0h border border-slate-300"></span><span>0h</span></div>
+          <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-xs hm-1-2h"></span><span>1-2h</span></div>
+          <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-xs hm-2-4h"></span><span>2-4h</span></div>
+          <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-xs hm-4-6h"></span><span>4-6h</span></div>
+          <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-xs hm-6h"></span><span>6h+</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM ROW: 4 DETAIL CARDS -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
+
+      <!-- Card 1: Risk Summary -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Risk Summary</h3>
+          <a href="#" class="text-[10px] font-semibold text-blue-600 hover:underline">View all</a>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-start space-x-2.5 p-2 bg-rose-50/50 rounded-lg border border-rose-100">
+            <div class="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5"><i class="fa-solid fa-exclamation"></i></div>
+            <div>
+              <p class="font-bold text-slate-800 text-xs">2 Jobs At Risk</p>
+              <p class="text-[9px] text-slate-400">Jobs have overdue tasks or low progress</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-2.5 p-2 bg-amber-50/50 rounded-lg border border-amber-100">
+            <div class="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div>
+              <p class="font-bold text-slate-800 text-xs">5 Overdue Tasks</p>
+              <p class="text-[9px] text-slate-400">Require immediate attention</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-2.5 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
+            <div class="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 mt-0.5"><i class="fa-solid fa-user-xmark"></i></div>
+            <div>
+              <p class="font-bold text-slate-800 text-xs">1 Employee Overloaded</p>
+              <p class="text-[9px] text-slate-400">Workload > 100% capacity</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Tasks Need Review -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Tasks Need Review</h3>
+          <a href="#" class="text-[10px] font-semibold text-blue-600 hover:underline">View all</a>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
+            <div class="flex items-center space-x-2">
+              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" class="w-6 h-6 rounded-full object-cover">
+              <div>
+                <p class="font-semibold text-slate-800 text-[11px]">Design Database Schema</p>
+                <p class="text-[9px] text-slate-400">ERP System Implementation</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span class="px-1.5 py-0.2 font-bold text-[8px] rounded bg-rose-50 text-rose-600 border border-rose-200">High</span>
+              <button class="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px]">Review</button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
+            <div class="flex items-center space-x-2">
+              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" class="w-6 h-6 rounded-full object-cover">
+              <div>
+                <p class="font-semibold text-slate-800 text-[11px]">API Integration Module</p>
+                <p class="text-[9px] text-slate-400">Mobile App Development</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span class="px-1.5 py-0.2 font-bold text-[8px] rounded bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+              <button class="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px]">Review</button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
+            <div class="flex items-center space-x-2">
+              <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-6 h-6 rounded-full object-cover">
+              <div>
+                <p class="font-semibold text-slate-800 text-[11px]">User Interface Mockup</p>
+                <p class="text-[9px] text-slate-400">Website Redesign</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span class="px-1.5 py-0.2 font-bold text-[8px] rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+              <button class="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px]">Review</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Upcoming Deadlines -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Upcoming Deadlines</h3>
+          <a href="#" class="text-[10px] font-semibold text-blue-600 hover:underline">View all</a>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-[10px]"><i class="fa-regular fa-calendar font-bold"></i></div>
+              <div>
+                <p class="font-semibold text-slate-800 text-[11px]">ERP System Implementation</p>
+                <p class="text-[9px] text-slate-400">Deadline: Jun 5, 2026</p>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 font-bold text-[8px] rounded-full bg-rose-50 text-rose-600 border border-rose-200">2 days left</span>
+          </div>
+
+          <div class="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-[10px]"><i class="fa-regular fa-calendar font-bold"></i></div>
+              <div>
+                <p class="font-semibold text-slate-800 text-[11px]">Mobile App Development</p>
+                <p class="text-[9px] text-slate-400">Deadline: Jun 12, 2026</p>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 font-bold text-[8px] rounded-full bg-amber-50 text-amber-600 border border-amber-200">9 days left</span>
+          </div>
+
+          <div class="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-[10px]"><i class="fa-regular fa-calendar font-bold"></i></div>
+              <div>
+                <p class="font-semibold text-slate-800 text-[11px]">Website Redesign</p>
+                <p class="text-[9px] text-slate-400">Deadline: Jun 20, 2026</p>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 font-bold text-[8px] rounded-full bg-blue-50 text-blue-600 border border-blue-200">17 days left</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Recent Activities -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Recent Activities</h3>
+          <a href="#" class="text-[10px] font-semibold text-blue-600 hover:underline">View all</a>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-start space-x-2">
+            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" class="w-5 h-5 rounded-full object-cover mt-0.5">
+            <div class="flex-1">
+              <p class="text-slate-800 font-medium text-[11px]"><strong>Tran Thi Binh</strong> submitted task</p>
+              <p class="text-[9px] text-slate-400">API Integration Module • 10m ago</p>
+            </div>
+          </div>
+
+          <div class="flex items-start space-x-2">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" class="w-5 h-5 rounded-full object-cover mt-0.5">
+            <div class="flex-1">
+              <p class="text-slate-800 font-medium text-[11px]"><strong>Hoang Van E</strong> approved task</p>
+              <p class="text-[9px] text-slate-400">Database Design v2 • 1h ago</p>
+            </div>
+          </div>
+
+          <div class="flex items-start space-x-2">
+            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" class="w-5 h-5 rounded-full object-cover mt-0.5">
+            <div class="flex-1">
+              <p class="text-slate-800 font-medium text-[11px]"><strong>Le Van C</strong> commented on task</p>
+              <p class="text-[9px] text-slate-400">UI Mockup Design • 2h ago</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-slate-200 text-xs text-slate-400">
+      <p>© 2026 WorkTracker. All rights reserved.</p>
+      <p>Version 1.0.0 • Manager Portal</p>
+    </div>
+  </main>
+
+</body>
+</html>
