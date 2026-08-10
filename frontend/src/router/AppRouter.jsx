@@ -1,16 +1,34 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { ProtectedRoute } from "./ProtectedRoute"
+import { LoginPage } from "../pages/auth/LoginPage"
+import { ForgotPasswordPage } from "../pages/auth/ForgotPasswordPage"
+import { ResetPasswordPage } from "../pages/auth/ResetPasswordPage"
+import { ChangePasswordPage } from "../pages/auth/ChangePasswordPage"
+import { EmployeeLayout } from "../layouts/EmployeeLayout"
+import { ProfilePage } from "../pages/employee/ProfilePage"
 
+// Single place declaring every route in the app. Public routes (login,
+// forgot/reset password) sit outside ProtectedRoute; everything else —
+// including change-password, which needs an authenticated request — is
+// nested inside it so unauthenticated users get redirected automatically.
+
+// Builds the full route tree for the app.
 export function AppRouter() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* TODO Phase 1: thay bằng LoginPage thật */}
-                <Route path="/login" element={<div>Login page (Phase 1)</div>} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                 <Route element={<ProtectedRoute />}>
-                    {/* TODO Phase 3: thay bằng Dashboard/My Tasks/Timesheet... thật */}
-                    <Route path="/" element={<div>Employee Dashboard (Phase 3)</div>} />
+                    <Route path="/change-password" element={<ChangePasswordPage />} />
+
+                    <Route element={<EmployeeLayout />}>
+                        {/* TODO Phase 3: thay bằng Dashboard/My Tasks/Timesheet... thật */}
+                        <Route path="/" element={<div>Employee Dashboard (Phase 3)</div>} />
+                        <Route path="/profile" element={<ProfilePage />} />
+                    </Route>
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -160,9 +160,15 @@ SPECTACULAR_SETTINGS = {
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
-# Dev: in email ra console thay vì gửi thật. Đổi sang SMTP khi deploy production.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'no-reply@worktracker.com'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
@@ -170,6 +176,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',   # Vite dev server
 ]
 
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 CACHES = {
     "default": {

@@ -8,6 +8,7 @@ from django.core.cache import caches
 from django.core.mail import send_mail
 from system.utils import log_audit_event
 from .serializers_auth import LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer, ChangePasswordSerializer
+from django.conf import settings
 
 blacklist_cache = caches["blacklist"]
 
@@ -67,9 +68,10 @@ class ForgotPasswordView(APIView):
         reset = serializer.create_reset_token()
 
         if reset is not None:
+            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset.token}"
             send_mail(
                 subject="Reset Password WorkTracker",
-                message=f"Use this token to reset password: {reset.token}",
+                message=f"Click the link below to reset your password:\n{reset_link}",
                 from_email=None,
                 recipient_list=[reset.email],
             )
