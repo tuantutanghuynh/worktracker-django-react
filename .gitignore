@@ -36,6 +36,9 @@ TuDocs/
 .claude/*
 !.vscode/extensions.json
 .idea/
+
+# Spec Kit (local-only, not shared with team)
+.specify/
 *.suo
 *.ntvs*
 *.njsproj

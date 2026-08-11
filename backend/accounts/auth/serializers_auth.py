@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
 import secrets
+import re
 from datetime import timedelta
 from django.utils import timezone
 from accounts.models import PasswordReset, RolePermission
@@ -16,6 +17,23 @@ User = get_user_model()
 # password, not a token). Each serializer here does double duty: validating
 # the incoming data AND running the business logic needed to turn valid
 # input into a result (tokens, a reset token, or a changed password).
+
+def validate_password_strength(value):
+    """Mirrors the 5 rules in ChangePasswordPage.jsx's Zod schema.
+    Returns every rule the password fails (not just the first), so the
+    client can show all problems at once instead of one at a time."""
+    errors = []
+    if len(value) < 8:
+        errors.append("At least 8 characters")
+    if not re.search(r"[a-z]", value):
+        errors.append("Must contain a lowercase letter")
+    if not re.search(r"[A-Z]", value):
+        errors.append("Must contain an uppercase letter")
+    if not re.search(r"[0-9]", value):
+        errors.append("Must contain a number")
+    if not re.search(r"[^A-Za-z0-9]", value):
+        errors.append("Must contain a special symbol")
+    return errors
 
 
 # Validates email/password and issues JWT access/refresh tokens on success.
@@ -131,6 +149,13 @@ class ResetPasswordSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
         self.reset_record = None
 
+    def validate_new_password(self, value):
+        errors = validate_password_strength(value)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
+
+
     # Verifies the token exists, hasn't been used, and hasn't expired; stores the record for apply_new_password.
     def validate(self, attrs):
         reset = PasswordReset.objects.filter(token=attrs["token"]).first()
@@ -171,6 +196,12 @@ class ResetPasswordSerializer(serializers.Serializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)
+
+    def validate_new_password(self, value):
+        errors = validate_password_strength(value)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
 
     # Confirms the current password is correct before allowing the change.
     def validate(self, attrs):
