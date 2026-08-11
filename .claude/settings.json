@@ -33,7 +33,12 @@
       "Bash(git rm *)",
       "Bash(./.venv/Scripts/python.exe -c \"import django; print\\(django.get_version\\(\\)\\)\")",
       "Bash(./.venv/Scripts/python.exe -m pytest accounts/ projects/ system/ -q)",
-      "Bash(powershell -Command \"Get-Service -Name '*postgres*' -ErrorAction SilentlyContinue | Select-Object Name, Status; Get-Process -Name '*postgres*' -ErrorAction SilentlyContinue | Select-Object ProcessName, Id\")"
+      "Bash(powershell -Command \"Get-Service -Name '*postgres*' -ErrorAction SilentlyContinue | Select-Object Name, Status; Get-Process -Name '*postgres*' -ErrorAction SilentlyContinue | Select-Object ProcessName, Id\")",
+      "Bash(timeout 15 npm run dev)",
+      "Bash(CI=true timeout 12 npm run dev)",
+      "Bash(CI=true timeout 15 npm run dev)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(npm run *)"
     ]
   }
 }
