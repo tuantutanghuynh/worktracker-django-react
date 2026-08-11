@@ -13,8 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import { formatDistanceToNow, format } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { formatDistanceToNow } from 'date-fns';
 
 /**
  * ActivityFeedTimeline - System Activity & Event Stream Timeline Component
@@ -45,10 +44,10 @@ export default function ActivityFeedTimeline({
   const [selectedCategory, setSelectedCategory] = useState(filterType);
 
   const categories = [
-    { key: 'ALL', label: 'Tất cả hoạt động' },
-    { key: 'TASKS', label: 'Công việc' },
-    { key: 'TIMESHEET', label: 'Giờ làm & Khóa kỳ' },
-    { key: 'SYSTEM', label: 'Hệ thống' },
+    { key: 'ALL', label: 'All Activities' },
+    { key: 'TASKS', label: 'Tasks' },
+    { key: 'TIMESHEET', label: 'Timesheet & Lock' },
+    { key: 'SYSTEM', label: 'System' },
   ];
 
   const handleCategoryClick = (key) => {
@@ -91,10 +90,10 @@ export default function ActivityFeedTimeline({
         <div>
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-400" />
-            Nhật ký Hoạt động (Activity Feed)
+            Activity Feed Stream
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Dòng thời gian ghi nhận thay đổi realtime toàn hệ thống
+            Real-time system-wide activity timeline stream
           </p>
         </div>
 
@@ -106,7 +105,7 @@ export default function ActivityFeedTimeline({
               type="button"
               onClick={() => handleCategoryClick(cat.key)}
               className={cn(
-                "px-3 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap",
+                "px-3 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer",
                 selectedCategory === cat.key
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -122,11 +121,11 @@ export default function ActivityFeedTimeline({
       {isLoading ? (
         <div className="py-12 text-center text-xs text-slate-400 space-y-2">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p>Đang tải dòng thời gian...</p>
+          <p>Loading activity stream...</p>
         </div>
       ) : filteredActivities.length === 0 ? (
         <div className="py-12 text-center text-xs text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800/80">
-          Chưa có hoạt động nào được ghi nhận cho bộ lọc này.
+          No activities recorded for this filter.
         </div>
       ) : (
         <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
@@ -134,8 +133,8 @@ export default function ActivityFeedTimeline({
             const config = getEventConfig(item.eventType);
             const Icon = config.icon;
             const formattedTime = item.timestamp
-              ? formatDistanceToNow(new Date(item.timestamp), { addSuffix: true, locale: vi })
-              : 'Gần đây';
+              ? formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })
+              : 'Recently';
 
             return (
               <div
@@ -169,7 +168,7 @@ export default function ActivityFeedTimeline({
                       </div>
                     )}
                     <span className="text-xs font-bold text-slate-200">
-                      {item.user?.full_name || 'Người dùng'}
+                      {item.user?.full_name || 'System User'}
                     </span>
                     {item.user?.role && (
                       <span className="px-1.5 py-0.2 text-[10px] bg-slate-800 text-slate-400 rounded border border-slate-700 font-mono">

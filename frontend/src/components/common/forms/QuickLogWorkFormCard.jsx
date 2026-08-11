@@ -44,8 +44,8 @@ export default function QuickLogWorkFormCard({
   const taskOptions = tasks.map(t => ({
     value: String(t.id),
     label: t.title,
-    badge: t.job_name || 'Dự án',
-    description: `Hạn: ${t.deadline || 'Chưa có'}`
+    badge: t.job_name || 'Project',
+    description: `Deadline: ${t.deadline || 'None'}`
   }));
 
   const handleQuickAddHours = (addedHours) => {
@@ -55,16 +55,16 @@ export default function QuickLogWorkFormCard({
 
   const validate = () => {
     const newErrors = {};
-    if (!taskId) newErrors.taskId = 'Vui lòng chọn công việc';
-    if (!workDate) newErrors.workDate = 'Vui lòng chọn ngày làm việc';
+    if (!taskId) newErrors.taskId = 'Please select a task';
+    if (!workDate) newErrors.workDate = 'Please select a work date';
     
     const h = Number(hoursSpent);
     if (isNaN(h) || h <= 0) {
-      newErrors.hoursSpent = 'Số giờ làm phải lớn hơn 0';
+      newErrors.hoursSpent = 'Hours spent must be greater than 0';
     } else if (h > 24) {
-      newErrors.hoursSpent = 'Số giờ trong 1 lần khai không quá 24h';
+      newErrors.hoursSpent = 'Single log entry cannot exceed 24 hours';
     } else if (isOverLimit) {
-      newErrors.hoursSpent = `Tổng giờ trong ngày không được vượt quá 24h (Hiện tại: ${currentTotal.toFixed(2)}h)`;
+      newErrors.hoursSpent = `Total daily hours cannot exceed 24 hours (Current: ${currentTotal.toFixed(2)}h)`;
     }
 
     setErrors(newErrors);
@@ -96,8 +96,8 @@ export default function QuickLogWorkFormCard({
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100">Khai báo Giờ làm nhanh</h3>
-            <p className="text-xs text-slate-400">Ghi nhận nhật ký công việc theo ngày</p>
+            <h3 className="text-sm font-bold text-slate-100">Quick Log Work Entry</h3>
+            <p className="text-xs text-slate-400">Record daily work log entries</p>
           </div>
         </div>
 
@@ -108,7 +108,7 @@ export default function QuickLogWorkFormCard({
             ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
             : "bg-slate-800 text-slate-300 border-slate-700"
         )}>
-          <span>Đã ghi hôm nay:</span>
+          <span>Logged Today:</span>
           <strong className={isOverLimit ? "text-rose-400" : "text-emerald-400"}>
             {dailyHoursLogged}h / 24h
           </strong>
@@ -119,14 +119,14 @@ export default function QuickLogWorkFormCard({
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Task Selection Dropdown */}
         <SelectDropdown
-          label="Chọn Công việc (Task)"
+          label="Select Task"
           options={taskOptions}
           value={taskId}
           onChange={(val) => {
             setTaskId(val);
             setErrors(prev => ({ ...prev, taskId: null }));
           }}
-          placeholder="-- Chọn task cần báo cáo --"
+          placeholder="-- Select task to report --"
           error={errors.taskId}
           leftIcon={Briefcase}
           required
@@ -136,7 +136,7 @@ export default function QuickLogWorkFormCard({
         {/* Date and Hours Input Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <InputField
-            label="Ngày thực hiện"
+            label="Work Date"
             type="date"
             value={workDate}
             onChange={(e) => setWorkDate(e.target.value)}
@@ -147,7 +147,7 @@ export default function QuickLogWorkFormCard({
 
           <div className="space-y-1.5">
             <InputField
-              label="Số giờ làm (Hours)"
+              label="Hours Spent"
               type="number"
               step="0.25"
               min="0.25"
@@ -164,13 +164,13 @@ export default function QuickLogWorkFormCard({
 
             {/* Quick Add Presets Buttons */}
             <div className="flex items-center gap-1.5 pt-1">
-              <span className="text-[11px] text-slate-400 mr-1">Cộng nhanh:</span>
+              <span className="text-[11px] text-slate-400 mr-1">Quick Add:</span>
               {[1, 2, 4, 8].map((h) => (
                 <button
                   key={h}
                   type="button"
                   onClick={() => handleQuickAddHours(h)}
-                  className="px-2 py-0.5 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
+                  className="px-2 py-0.5 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition cursor-pointer"
                 >
                   +{h}h
                 </button>
@@ -182,13 +182,13 @@ export default function QuickLogWorkFormCard({
         {/* Work Description Textarea */}
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-slate-300">
-            Mô tả chi tiết công việc
+            Work Log Description
           </label>
           <textarea
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Mô tả công việc đã hoàn thành trong khoảng thời gian này..."
+            placeholder="Describe work completed during this period..."
             className="w-full bg-slate-900 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
           />
         </div>
@@ -198,7 +198,7 @@ export default function QuickLogWorkFormCard({
           <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
-              Cảnh báo: Tổng số giờ trong ngày sẽ vượt quá 24h ({currentTotal.toFixed(2)}h)!
+              Warning: Total daily hours will exceed 24 hours ({currentTotal.toFixed(2)}h)!
             </span>
           </div>
         )}
@@ -209,7 +209,7 @@ export default function QuickLogWorkFormCard({
             type="submit"
             disabled={isLoading || isOverLimit}
             className={cn(
-              "px-5 py-2.5 text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2",
+              "px-5 py-2.5 text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2 cursor-pointer",
               isLoading || isOverLimit
                 ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
                 : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30 active:scale-[0.98]"
@@ -218,12 +218,12 @@ export default function QuickLogWorkFormCard({
             {isLoading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Đang lưu...
+                Saving...
               </>
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Gửi nhật ký công việc
+                Submit Work Log
               </>
             )}
           </button>

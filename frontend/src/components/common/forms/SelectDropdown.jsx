@@ -22,7 +22,7 @@ export default function SelectDropdown({
   options = [],
   value,
   onChange,
-  placeholder = '-- Chọn tùy chọn --',
+  placeholder = '-- Select option --',
   error,
   searchable = false,
   disabled = false,
@@ -75,7 +75,7 @@ export default function SelectDropdown({
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full bg-slate-900 border text-slate-100 rounded-lg text-xs font-medium px-3.5 py-2.5 flex items-center justify-between transition-all duration-150",
+          "w-full bg-slate-900 border text-slate-100 rounded-lg text-xs font-medium px-3.5 py-2.5 flex items-center justify-between transition-all duration-150 cursor-pointer",
           "focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500",
           disabled ? "bg-slate-800/60 text-slate-500 border-slate-800 cursor-not-allowed" : "border-slate-700/80 hover:border-slate-600",
           error && "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500/20",
@@ -105,7 +105,7 @@ export default function SelectDropdown({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm kiếm..."
+                  placeholder="Search..."
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
                   autoFocus
                 />
@@ -113,7 +113,7 @@ export default function SelectDropdown({
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2 text-slate-400 hover:text-slate-200"
+                    className="absolute right-2 text-slate-400 hover:text-slate-200 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -126,7 +126,7 @@ export default function SelectDropdown({
           <div className="max-h-56 overflow-y-auto divide-y divide-slate-800/40 p-1 custom-scrollbar">
             {filteredOptions.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-500">
-                Không tìm thấy tùy chọn nào
+                No options found
               </div>
             ) : (
               filteredOptions.map((opt) => {
@@ -139,7 +139,7 @@ export default function SelectDropdown({
                     disabled={opt.disabled}
                     onClick={() => handleSelect(opt.value)}
                     className={cn(
-                      "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-between group",
+                      "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-between group cursor-pointer",
                       isSelected ? "bg-blue-600/15 text-blue-400 font-bold" : "text-slate-200 hover:bg-slate-800/80",
                       opt.disabled && "opacity-40 cursor-not-allowed hover:bg-transparent"
                     )}

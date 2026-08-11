@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
 
 /**
  * NotificationListTable - System Notifications Table / List Component
@@ -39,7 +38,7 @@ export default function NotificationListTable({
   isLoading = false,
   className
 }) {
-  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'UNREAD' | 'TASKS' | 'TIMESHEETS'
+  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'UNREAD' | 'TASKS' | 'TIMESHEET'
   const [selectedIds, setSelectedIds] = useState([]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -68,17 +67,17 @@ export default function NotificationListTable({
   const getEventBadge = (eventType) => {
     switch (eventType) {
       case 'TASK_ASSIGNED':
-        return { label: 'Giao việc', bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20' };
+        return { label: 'Task Assigned', bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20' };
       case 'TASK_STATUS_CHANGED':
-        return { label: 'Đổi trạng thái', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+        return { label: 'Status Changed', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
       case 'TASK_REJECTED':
-        return { label: 'Từ chối task', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
+        return { label: 'Task Rejected', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
       case 'TIMESHEET_LOCK':
-        return { label: 'Khóa kỳ công', bg: 'bg-purple-500/10 text-purple-400 border-purple-500/20' };
+        return { label: 'Timesheet Lock', bg: 'bg-purple-500/10 text-purple-400 border-purple-500/20' };
       case 'TIMESHEET_UNLOCK':
-        return { label: 'Mở khóa kỳ', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
+        return { label: 'Timesheet Unlock', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
       default:
-        return { label: 'Hệ thống', bg: 'bg-slate-800 text-slate-400 border-slate-700' };
+        return { label: 'System', bg: 'bg-slate-800 text-slate-400 border-slate-700' };
     }
   };
 
@@ -95,10 +94,10 @@ export default function NotificationListTable({
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              Danh sách Thông báo
+              Notifications Center
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 text-xs font-bold bg-rose-500/10 text-rose-400 rounded-full border border-rose-500/20">
-                  {unreadCount} chưa đọc
+                  {unreadCount} unread
                 </span>
               )}
             </h3>
@@ -111,10 +110,10 @@ export default function NotificationListTable({
             <button
               type="button"
               onClick={() => onMarkAsRead && onMarkAsRead(selectedIds)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600/90 hover:bg-indigo-600 text-white transition flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600/90 hover:bg-indigo-600 text-white transition flex items-center gap-1.5 cursor-pointer"
             >
               <CheckCheck className="w-3.5 h-3.5" />
-              Đánh dấu đọc ({selectedIds.length})
+              Mark as Read ({selectedIds.length})
             </button>
           )}
 
@@ -122,10 +121,10 @@ export default function NotificationListTable({
             <button
               type="button"
               onClick={() => onMarkAllRead && onMarkAllRead()}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
             >
               <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-              Đọc tất cả
+              Mark All as Read
             </button>
           )}
         </div>
@@ -134,19 +133,19 @@ export default function NotificationListTable({
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
         {[
-          { key: 'ALL', label: 'Tất cả' },
-          { key: 'UNREAD', label: `Chưa đọc (${unreadCount})` },
-          { key: 'TASKS', label: 'Công việc' },
-          { key: 'TIMESHEET', label: 'Báo cáo & Giờ làm' },
+          { key: 'ALL', label: 'All' },
+          { key: 'UNREAD', label: `Unread (${unreadCount})` },
+          { key: 'TASKS', label: 'Tasks' },
+          { key: 'TIMESHEET', label: 'Timesheets' },
         ].map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              "px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap",
+              "px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer",
               activeTab === tab.key
-                ? "bg-slate-800 text-blue-400 border border-slate-700"
+                ? "bg-slate-800 text-blue-400 border border-slate-700 font-bold"
                 : "text-slate-400 hover:text-slate-200"
             )}
           >
@@ -159,11 +158,11 @@ export default function NotificationListTable({
       {isLoading ? (
         <div className="py-12 text-center text-xs text-slate-400 space-y-2">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p>Đang tải thông báo...</p>
+          <p>Loading notifications...</p>
         </div>
       ) : filteredNotifications.length === 0 ? (
         <div className="py-12 text-center text-xs text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800/80">
-          Không tìm thấy thông báo nào phù hợp.
+          No matching notifications found.
         </div>
       ) : (
         <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40 divide-y divide-slate-800/70">
@@ -185,7 +184,7 @@ export default function NotificationListTable({
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => handleSelectRow(item.id)}
-                  className="mt-1 rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-blue-500/20"
+                  className="mt-1 rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
                 />
 
                 {/* Read Indicator Dot */}
@@ -224,12 +223,12 @@ export default function NotificationListTable({
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {item.created_at
-                        ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: vi })
-                        : 'Vừa xong'}
+                        ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true })
+                        : 'Just now'}
                     </span>
                     {item.related_url && (
                       <span className="text-blue-400 hover:underline flex items-center gap-1 font-mono text-[10px]">
-                        <ExternalLink className="w-3 h-3" /> Chi tiết
+                        <ExternalLink className="w-3 h-3" /> Details
                       </span>
                     )}
                   </div>
@@ -241,8 +240,8 @@ export default function NotificationListTable({
                     <button
                       type="button"
                       onClick={() => onMarkAsRead && onMarkAsRead(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition"
-                      title="Đánh dấu đã đọc"
+                      className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                      title="Mark as read"
                     >
                       <CheckCheck className="w-4 h-4" />
                     </button>
@@ -251,8 +250,8 @@ export default function NotificationListTable({
                     <button
                       type="button"
                       onClick={() => onDelete(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
-                      title="Xóa thông báo"
+                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                      title="Delete notification"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

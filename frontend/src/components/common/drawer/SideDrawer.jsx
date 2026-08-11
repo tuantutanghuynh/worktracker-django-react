@@ -95,7 +95,7 @@ export default function SideDrawer({
                   type="button"
                   onClick={onClose}
                   className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-slate-700"
-                  aria-label="Đóng cửa sổ"
+                  aria-label="Close drawer"
                 >
                   <X className="w-5 h-5" />
                 </button>

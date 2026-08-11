@@ -15,22 +15,21 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
 
 /**
  * AuditDiffViewer - Audit Log Snapshot Comparison Component
  * 
  * Props:
- * - oldValues (Object | string): Dữ liệu trước khi thay đổi (JSON or Object)
- * - newValues (Object | string): Dữ liệu sau khi thay đổi (JSON or Object)
- * - action (string): Tên hành động (vd: 'UPDATE_TASK', 'LOCK_TIMESHEET')
- * - tableName (string): Tên bảng DB (vd: 'tasks', 'log_works')
- * - recordId (string | number): ID của bản ghi
- * - timestamp (string | Date): Thời gian ghi log
+ * - oldValues (Object | string): Data before change (JSON or Object)
+ * - newValues (Object | string): Data after change (JSON or Object)
+ * - action (string): Action name (e.g. 'UPDATE_TASK', 'LOCK_TIMESHEET')
+ * - tableName (string): DB Table name (e.g. 'tasks', 'log_works')
+ * - recordId (string | number): Record ID
+ * - timestamp (string | Date): Log timestamp
  * - user (Object): { full_name, email, avatar_url }
- * - severity ('CRITICAL' | 'WARNING' | 'NORMAL'): Mức độ nghiêm trọng
- * - ipAddress (string): Địa chỉ IP thực hiện
- * - summary (string): Tóm tắt hành động
+ * - severity ('CRITICAL' | 'WARNING' | 'NORMAL'): Severity level
+ * - ipAddress (string): Client request IP address
+ * - summary (string): Action summary description
  */
 export default function AuditDiffViewer({
   oldValues = {},
@@ -82,9 +81,9 @@ export default function AuditDiffViewer({
   const filteredItems = diffItems.filter(item => showUnchanged || item.status !== 'unchanged');
 
   const severityConfigs = {
-    CRITICAL: { label: 'Nghiêm trọng', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', icon: AlertTriangle },
-    WARNING: { label: 'Cảnh báo', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30', icon: Info },
-    NORMAL: { label: 'Thông thường', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', icon: CheckCircle2 },
+    CRITICAL: { label: 'Critical', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', icon: AlertTriangle },
+    WARNING: { label: 'Warning', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30', icon: Info },
+    NORMAL: { label: 'Normal', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', icon: CheckCircle2 },
   };
 
   const currentSeverity = severityConfigs[severity] || severityConfigs.NORMAL;
@@ -124,9 +123,9 @@ export default function AuditDiffViewer({
           <button
             type="button"
             onClick={() => setShowUnchanged(!showUnchanged)}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
           >
-            {showUnchanged ? 'Ẩn trường không đổi' : 'Hiện tất cả trường'}
+            {showUnchanged ? 'Hide Unchanged Fields' : 'Show All Fields'}
           </button>
         </div>
       </div>
@@ -135,15 +134,15 @@ export default function AuditDiffViewer({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 text-xs">
         <div className="space-y-1">
           <span className="text-slate-400 font-medium flex items-center gap-1">
-            <User className="w-3.5 h-3.5 text-slate-500" /> Thực hiện:
+            <User className="w-3.5 h-3.5 text-slate-500" /> Performed by:
           </span>
           <p className="font-semibold text-slate-200 truncate">
-            {user?.full_name || user?.email || 'Hệ thống'}
+            {user?.full_name || user?.email || 'System User'}
           </p>
         </div>
         <div className="space-y-1">
           <span className="text-slate-400 font-medium flex items-center gap-1">
-            <Database className="w-3.5 h-3.5 text-slate-500" /> Bảng DB (ID):
+            <Database className="w-3.5 h-3.5 text-slate-500" /> DB Table (ID):
           </span>
           <p className="font-mono text-indigo-400">
             {tableName} (#{recordId})
@@ -151,10 +150,10 @@ export default function AuditDiffViewer({
         </div>
         <div className="space-y-1">
           <span className="text-slate-400 font-medium flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5 text-slate-500" /> Thời gian:
+            <Calendar className="w-3.5 h-3.5 text-slate-500" /> Timestamp:
           </span>
           <p className="text-slate-300">
-            {timestamp ? format(new Date(timestamp), 'HH:mm - dd/MM/yyyy', { locale: vi }) : 'N/A'}
+            {timestamp ? format(new Date(timestamp), 'HH:mm - yyyy-MM-dd') : 'N/A'}
           </p>
         </div>
         <div className="space-y-1">
@@ -170,17 +169,17 @@ export default function AuditDiffViewer({
       {/* Diff Table */}
       <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/40">
         <div className="bg-slate-800/80 px-4 py-2.5 flex items-center justify-between border-b border-slate-800 text-xs font-semibold text-slate-300">
-          <span>Tên thuộc tính (Field)</span>
+          <span>Attribute Name (Field)</span>
           <div className="flex items-center gap-8">
-            <span className="text-rose-400">Giá trị trước (Old)</span>
+            <span className="text-rose-400">Previous Value (Old)</span>
             <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-emerald-400">Giá trị sau (New)</span>
+            <span className="text-emerald-400">Updated Value (New)</span>
           </div>
         </div>
 
         {filteredItems.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
-            Không có thay đổi dữ liệu hoặc tất cả các trường giống nhau.
+            No data changes recorded or all fields are identical.
           </div>
         ) : (
           <div className="divide-y divide-slate-800/60 font-mono text-xs">
@@ -197,9 +196,9 @@ export default function AuditDiffViewer({
                   {/* Key Column */}
                   <div className="md:col-span-4 flex items-center gap-2 font-sans">
                     <span className="font-semibold text-slate-200 break-all">{key}</span>
-                    {status === 'modified' && <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 rounded">Sửa</span>}
-                    {status === 'added' && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 rounded">Mới</span>}
-                    {status === 'removed' && <span className="px-1.5 py-0.5 text-[10px] bg-rose-500/20 text-rose-300 rounded">Xóa</span>}
+                    {status === 'modified' && <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 rounded">Modified</span>}
+                    {status === 'added' && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 rounded">Added</span>}
+                    {status === 'removed' && <span className="px-1.5 py-0.5 text-[10px] bg-rose-500/20 text-rose-300 rounded">Removed</span>}
                   </div>
 
                   {/* Old Value */}
