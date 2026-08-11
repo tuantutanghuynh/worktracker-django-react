@@ -13,11 +13,38 @@ import {
   AlertCircle, 
   UserX
 } from 'lucide-react';
+import { format } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
 import DonutChartCard from '../../components/common/charts/DonutChartCard';
 import HorizontalBarChartCard from '../../components/common/charts/HorizontalBarChartCard';
 import ProductivityHeatmap from '../../components/common/charts/ProductivityHeatmap';
 import managerReportService from '../../services/manager/managerReportService';
+
+// Hàm tự động gom nhóm & dùng thư viện date-fns định dạng ngày tháng sang { label, cells: [...] }
+const formatHeatmapForComponent = (rawList) => {
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return [];
+  }
+
+  const grouped = {};
+  rawList.forEach((item) => {
+    const name = item.full_name || item.email || 'Member';
+    if (!grouped[name]) {
+      grouped[name] = { label: name, cells: [] };
+    }
+
+    const formattedDate = item.work_date
+      ? format(new Date(item.work_date), 'EEE MM/dd')
+      : 'Date';
+
+    grouped[name].cells.push({
+      date: formattedDate,
+      hours: item.total_hours || 0,
+    });
+  });
+
+  return Object.values(grouped);
+};
 
 export default function ManagerDashboardPage() {
   const navigate = useNavigate();
@@ -44,6 +71,10 @@ export default function ManagerDashboardPage() {
 
   const [totalTaskCount, setTotalTaskCount] = useState(172);
 
+  // State cho Biểu đồ Cột Ngang Workload và Heatmap Năng suất
+  const [workloadData, setWorkloadData] = useState([]);
+  const [heatmapData, setHeatmapData] = useState([]);
+
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
@@ -60,22 +91,38 @@ export default function ManagerDashboardPage() {
             team_work_hours: data.team_total_hours ? `${data.team_total_hours}h` : prev.team_work_hours,
           }));
 
+          // Nạp dữ liệu thật cho Biểu đồ Cột Ngang Workload Nhân sự từ API
+          if (data.workload_per_employee && Array.isArray(data.workload_per_employee)) {
+            setWorkloadData(
+              data.workload_per_employee.map((emp) => ({
+                name: emp.full_name || emp.email || 'Employee',
+                value: emp.total_hours || 0,
+              }))
+            );
+          }
+
+          // Nạp dữ liệu thật cho Biểu đồ Heatmap Năng suất từ API
+          if (data.productivity_heatmap) {
+            setHeatmapData(formatHeatmapForComponent(data.productivity_heatmap));
+          }
+
+          // Nạp dữ liệu thật cho Biểu đồ Donut Chart từ API
           if (data.task_status_summary) {
             const summary = data.task_status_summary;
             const total = summary.total || 172;
             setTotalTaskCount(total);
 
             setDonutItems([
-              { label: 'To Do', count: summary.TODO || 0, percentage: Math.round(((summary.TODO || 0) / total) * 100), color: 'bg-blue-600' },
-              { label: 'In Progress', count: summary.IN_PROGRESS || 0, percentage: Math.round(((summary.IN_PROGRESS || 0) / total) * 100), color: 'bg-emerald-500' },
-              { label: 'Reviewing', count: summary.REVIEWING || 0, percentage: Math.round(((summary.REVIEWING || 0) / total) * 100), color: 'bg-purple-500' },
-              { label: 'Completed', count: summary.COMPLETED || 0, percentage: Math.round(((summary.COMPLETED || 0) / total) * 100), color: 'bg-orange-500' },
-              { label: 'Cancelled', count: summary.CANCELLED || 0, percentage: Math.round(((summary.CANCELLED || 0) / total) * 100), color: 'bg-rose-500' },
+              { label: 'To Do', count: summary.TODO || 0, color: 'bg-blue-600' },
+              { label: 'In Progress', count: summary.IN_PROGRESS || 0, color: 'bg-emerald-500' },
+              { label: 'Reviewing', count: summary.REVIEWING || 0, color: 'bg-purple-500' },
+              { label: 'Completed', count: summary.COMPLETED || 0, color: 'bg-orange-500' },
+              { label: 'Cancelled', count: summary.CANCELLED || 0, color: 'bg-rose-500' },
             ]);
           }
         }
       } catch (err) {
-        console.warn('Dashboard fallback triggered:', err);
+        console.warn('Dashboard API fallback:', err);
       } finally {
         setLoading(false);
       }
@@ -240,9 +287,22 @@ export default function ManagerDashboardPage() {
 
       {/* MIDDLE ROW CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <DonutChartCard totalCount={totalTaskCount} items={donutItems} />
-        <HorizontalBarChartCard />
-        <ProductivityHeatmap />
+        <DonutChartCard
+          title="Task Status Distribution"
+          data={donutItems.map((item) => ({ name: item.label, value: item.count }))}
+          centerValue={totalTaskCount}
+          centerLabel="TASKS"
+        />
+        <HorizontalBarChartCard
+          title="Team Workload Distribution"
+          data={workloadData}
+          dataKey="value"
+          barColor="#2563eb"
+        />
+        <ProductivityHeatmap
+          title="Team Weekly Productivity"
+          data={heatmapData}
+        />
       </div>
 
       {/* BOTTOM ROW DETAIL CARDS */}
@@ -254,21 +314,27 @@ export default function ManagerDashboardPage() {
           </div>
           <div className="space-y-2 text-xs">
             <div className="flex items-start space-x-2.5 p-2 bg-rose-50/50 rounded-lg border border-rose-100">
-              <div className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5"><AlertCircle className="w-3.5 h-3.5" /></div>
+              <div className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                <AlertCircle className="w-3.5 h-3.5" />
+              </div>
               <div>
                 <p className="font-bold text-slate-800 text-xs">2 Jobs At Risk</p>
                 <p className="text-[9px] text-slate-400">Jobs have overdue tasks or low progress</p>
               </div>
             </div>
             <div className="flex items-start space-x-2.5 p-2 bg-amber-50/50 rounded-lg border border-amber-100">
-              <div className="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5"><TriangleAlert className="w-3.5 h-3.5" /></div>
+              <div className="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                <TriangleAlert className="w-3.5 h-3.5" />
+              </div>
               <div>
                 <p className="font-bold text-slate-800 text-xs">5 Overdue Tasks</p>
                 <p className="text-[9px] text-slate-400">Require immediate attention</p>
               </div>
             </div>
             <div className="flex items-start space-x-2.5 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
-              <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 mt-0.5"><UserX className="w-3.5 h-3.5" /></div>
+              <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                <UserX className="w-3.5 h-3.5" />
+              </div>
               <div>
                 <p className="font-bold text-slate-800 text-xs">1 Employee Overloaded</p>
                 <p className="text-[9px] text-slate-400">Workload &gt; 100% capacity</p>
@@ -280,7 +346,9 @@ export default function ManagerDashboardPage() {
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Tasks Need Review</h3>
-            <span onClick={() => navigate('/manager/kanban')} className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer">View all</span>
+            <span onClick={() => navigate('/manager/kanban')} className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer">
+              View all
+            </span>
           </div>
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
@@ -293,7 +361,11 @@ export default function ManagerDashboardPage() {
               </div>
               <div className="flex items-center space-x-1.5 shrink-0">
                 <span className="px-1.5 py-0.2 font-bold text-[8px] rounded bg-rose-50 text-rose-600 border border-rose-200">High</span>
-                <button onClick={() => navigate('/manager/timesheet')} className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px] transition-colors">Review</button>
+                <button
+                  onClick={() => navigate('/manager/timesheet')}
+                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px] transition-colors cursor-pointer">
+                  Review
+                </button>
               </div>
             </div>
 
@@ -307,7 +379,11 @@ export default function ManagerDashboardPage() {
               </div>
               <div className="flex items-center space-x-1.5 shrink-0">
                 <span className="px-1.5 py-0.2 font-bold text-[8px] rounded bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
-                <button onClick={() => navigate('/manager/timesheet')} className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px] transition-colors">Review</button>
+                <button
+                  onClick={() => navigate('/manager/timesheet')}
+                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px] transition-colors cursor-pointer">
+                  Review
+                </button>
               </div>
             </div>
 
@@ -321,7 +397,11 @@ export default function ManagerDashboardPage() {
               </div>
               <div className="flex items-center space-x-1.5 shrink-0">
                 <span className="px-1.5 py-0.2 font-bold text-[8px] rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
-                <button onClick={() => navigate('/manager/timesheet')} className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px] transition-colors">Review</button>
+                <button
+                  onClick={() => navigate('/manager/timesheet')}
+                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded text-[9px] transition-colors cursor-pointer">
+                  Review
+                </button>
               </div>
             </div>
           </div>
@@ -330,12 +410,16 @@ export default function ManagerDashboardPage() {
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Upcoming Deadlines</h3>
-            <span onClick={() => navigate('/manager/jobs')} className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer">View all</span>
+            <span onClick={() => navigate('/manager/jobs')} className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer">
+              View all
+            </span>
           </div>
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
               <div className="flex items-center space-x-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-[10px] shrink-0"><Calendar className="w-3.5 h-3.5" /></div>
+                <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-[10px] shrink-0">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
                 <div className="truncate">
                   <p className="font-semibold text-slate-800 text-[11px] truncate">ERP System Implementation</p>
                   <p className="text-[9px] text-slate-400 truncate">Deadline: Jun 5, 2026</p>
@@ -346,7 +430,9 @@ export default function ManagerDashboardPage() {
 
             <div className="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
               <div className="flex items-center space-x-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-[10px] shrink-0"><Calendar className="w-3.5 h-3.5" /></div>
+                <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-[10px] shrink-0">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
                 <div className="truncate">
                   <p className="font-semibold text-slate-800 text-[11px] truncate">Mobile App Development</p>
                   <p className="text-[9px] text-slate-400 truncate">Deadline: Jun 12, 2026</p>
@@ -357,7 +443,9 @@ export default function ManagerDashboardPage() {
 
             <div className="flex items-center justify-between p-1.5 hover:bg-slate-50 rounded-lg transition">
               <div className="flex items-center space-x-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] shrink-0"><Calendar className="w-3.5 h-3.5" /></div>
+                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] shrink-0">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
                 <div className="truncate">
                   <p className="font-semibold text-slate-800 text-[11px] truncate">Website Redesign</p>
                   <p className="text-[9px] text-slate-400 truncate">Deadline: Jun 20, 2026</p>
@@ -370,37 +458,33 @@ export default function ManagerDashboardPage() {
 
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Recent Activities</h3>
-            <span onClick={() => navigate('/manager/notifications')} className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer">View all</span>
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Quick Actions &amp; Links</h3>
           </div>
           <div className="space-y-2 text-xs">
-            <div className="flex items-start space-x-2">
-              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" alt="Avatar" className="w-5 h-5 rounded-full object-cover mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-800 font-medium text-[11px] truncate"><strong>Tran Thi Binh</strong> submitted task</p>
-                <p className="text-[9px] text-slate-400 truncate">API Integration Module • 10m ago</p>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-2">
-              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" alt="Avatar" className="w-5 h-5 rounded-full object-cover mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-800 font-medium text-[11px] truncate"><strong>Hoang Van E</strong> approved task</p>
-                <p className="text-[9px] text-slate-400 truncate">Database Design v2 • 1h ago</p>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-2">
-              <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" alt="Avatar" className="w-5 h-5 rounded-full object-cover mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-800 font-medium text-[11px] truncate"><strong>Le Van C</strong> commented on task</p>
-                <p className="text-[9px] text-slate-400 truncate">UI Mockup Design • 2h ago</p>
-              </div>
-            </div>
+            <button
+              onClick={() => navigate('/manager/jobs')}
+              className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between cursor-pointer"
+            >
+              <span className="font-semibold text-slate-700">View All My Jobs</span>
+              <Folder className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+            <button
+              onClick={() => navigate('/manager/timesheet')}
+              className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between cursor-pointer"
+            >
+              <span className="font-semibold text-slate-700">Approve Logworks</span>
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+            <button
+              onClick={() => navigate('/manager/reports')}
+              className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between cursor-pointer"
+            >
+              <span className="font-semibold text-slate-700">Export System Reports</span>
+              <Kanban className="w-3.5 h-3.5 text-slate-400" />
+            </button>
           </div>
         </div>
       </div>
-
     </div>
   );
 }
