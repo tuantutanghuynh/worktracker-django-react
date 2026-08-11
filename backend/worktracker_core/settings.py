@@ -155,9 +155,6 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-# Redis & Cache Configuration
-REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 # Dev: in email ra console thay vì gửi thật. Đổi sang SMTP khi deploy production.
@@ -181,17 +178,21 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 
+# Redis & Cache Configuration
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2?protocol=2",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     },
     "blacklist": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1?protocol=2", 
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }

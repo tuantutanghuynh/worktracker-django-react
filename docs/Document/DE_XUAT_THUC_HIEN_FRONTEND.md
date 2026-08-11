@@ -81,6 +81,10 @@ Dưới đây là cấu trúc thư mục chuẩn được sắp xếp khoa học
 
 ```text
 frontend/src/
+├── api/                       # 🌐 API CLIENT CHỦ CHỐT (AXIOS & CORE APIS)
+│   ├── axiosClient.js         # Instance Axios trung tâm (Timeout 15s + Queue 401)
+│   ├── authApi.js             # API Auth (Login, Forgot/Reset/Change password)
+│   └── profileApi.js          # API Profile & Upload Avatar
 ├── assets/                    # Hình ảnh, logo WorkTracker, icon tĩnh
 ├── components/
 │   ├── common/                # 🟩 COMPONENT DÙNG CHUNG TOÀN HỆ THỐNG (3 ROLES)
@@ -103,14 +107,23 @@ frontend/src/
 │   └── employee/              # 🟪 Component riêng của phân hệ Employee
 │       └── EmployeeTaskCard.jsx
 │
+├── hooks/                     # ⚓ CUSTOM REACT HOOKS (.JS)
+│   ├── useAuth.js             # Interface đọc Zustand Auth Store
+│   ├── useLogin.js            # Hook form đăng nhập
+│   ├── useChangePassword.js   # Hook đổi mật khẩu
+│   ├── useForgotPassword.js   # Hook quên mật khẩu
+│   ├── useResetPassword.js    # Hook đặt lại mật khẩu
+│   ├── useProfile.js         # Hook quản lý hồ sơ cá nhân
+│   ├── useWebSocket.js        # Hook kết nối WebSocket thời gian thực
+│   └── useDebounce.js         # Hook hoãn tìm kiếm (Debounce Search)
+│
 ├── layouts/                   # Khung Router Layout bọc giao diện
-│   ├── MainLayout.jsx
 │   ├── AdminLayout.jsx
 │   ├── ManagerLayout.jsx
 │   └── EmployeeLayout.jsx
 │
 ├── pages/                     # Màn hình trang chính (Pages)
-│   ├── auth/                  # LoginPage.jsx, ForgotPasswordPage.jsx
+│   ├── auth/                  # LoginPage.jsx, ForgotPasswordPage.jsx, ResetPasswordPage.jsx, ChangePasswordPage.jsx
 │   ├── admin/                 # GlobalDashboard, Clients, Jobs, Employees, TimesheetControl, AuditLogs, Reports, Settings
 │   ├── manager/               # TRANG GIAO DIỆN PHÂN HỆ MANAGER (12 TRANG)
 │   │   ├── ManagerDashboardPage.jsx # ✅ Trang 1: Dashboard tổng quan
@@ -127,40 +140,32 @@ frontend/src/
 │   │   └── ManagerSettingsPage.jsx  # ⏳ Trang 12: Settings
 │   └── employee/              # EmployeeDashboard, MyTasks, EmployeeTimesheet, Notifications, MyPerformance, Profile
 │
-├── services/                  # Gọi API Backend qua Axios (.js)
-│   ├── apiClient.js           # [CHUNG] Instance Axios + Interceptors (JWT + Token Revocation)
-│   ├── authService.js         # [CHUNG] Login, Refresh token, Logout, Get User Profile
-│   ├── manager/               # 🛡️ Services Phân hệ Manager (Job, Task, Timesheet, Report, Team, System)
+├── router/                    # 🗺️ QUẢN LÝ ĐỊNH TUYẾN ROUTER SPA
+│   ├── AppRouter.jsx          # Bản đồ tuyến đường toàn hệ thống
+│   ├── ProtectedRoute.jsx     # Auth Guard bảo vệ đường dẫn
+│   └── RoleRoute.jsx          # Phân quyền vai trò (Admin/Manager/Employee)
+│
+├── services/                  # Gọi API Backend phân hệ qua Axios (.js)
+│   ├── manager/               # 🛡️ Services Phân hệ Manager
 │   │   ├── managerJobService.js
 │   │   ├── managerTaskService.js
 │   │   ├── managerTimesheetService.js
 │   │   ├── managerReportService.js
-│   │   ├── managerTeamService.js
-│   │   └── managerSystemService.js
-│   ├── employee/              # 👤 Services Phân hệ Employee (Phát triển sau)
-│   │   ├── employeeTaskService.js
-│   │   └── employeeTimesheetService.js
-│   └── admin/                 # ⚙️ Services Phân hệ Admin (Phát triển sau)
-│       └── adminClientService.js
+│   │   └── managerTeamService.js
+│   ├── employee/              # 👤 Services Phân hệ Employee
+│   └── admin/                 # ⚙️ Services Phân hệ Admin
 │
-├── store/                     # Zustand Global Stores (.js)
-│   ├── useAuthStore.js        # User profile, Access/Refresh Token, Role
+├── stores/                    # 🏪 ZUSTAND GLOBAL STORES (.JS)
+│   ├── authStore.js           # User profile, Access/Refresh Token, Role
 │   ├── useNotificationStore.js# Danh sách thông báo & đếm số tin chưa đọc
 │   └── useUIStore.js          # Sidebar collapse state, Theme, Modals
 │
-├── hooks/                     # Custom React Hooks (.js)
-│   ├── useWebSocket.js        # Hook kết nối WebSocket thời gian thực
-│   ├── useDebounce.js         # Hook hoãn tìm kiếm (Debounce Search)
-│   └── usePermissions.js      # Hook kiểm tra quyền nút bấm (Action-level check)
-│
 ├── utils/                     # Tiện ích dùng chung (.js)
-│   ├── cn.js                  # Tailwind class merger (clsx + twMerge)
-│   ├── formatters.js          # Format tiền tệ, số giờ (2,450h), định dạng ngày
-│   └── constants.js           # Job status, Task status, Priority ENUMs
+│   └── cn.js                  # Tailwind class merger (clsx + twMerge)
 │
-├── App.jsx                    # Root Router & Providers
+├── App.jsx                    # Root App Entry
 ├── main.jsx                   # React Entry Point
-└── index.css                  # Tailwind CSS Global Imports
+└── index.css                  # Tailwind CSS v4 Global Imports
 ```
 
 ---
@@ -230,7 +235,7 @@ Dựa trên việc phân tích toàn bộ 16 bức ảnh giao diện từ cả 3
 
 - [ ] **Bước 1:** Thực thi cài đặt toàn bộ các thư viện NPM trong mục 3 vào `frontend/package.json`.
 - [ ] **Bước 2:** Tạo khung cấu trúc thư mục trong `frontend/src/` theo sơ đồ mục 4.
-- [ ] **Bước 3:** Cấu hình Tailwind CSS, Axios Interceptor (`apiClient.js`) và Zustand Auth Store (`useAuthStore.js`).
+- [ ] **Bước 3:** Cấu hình Tailwind CSS, Axios Interceptor (`axiosClient.js`) và Zustand Auth Store (`useAuthStore.js`).
 - [ ] **Bước 4:** Xây dựng bộ **Shared Components dùng chung** tại `src/components/common/` (`Sidebar`, `Header`, `StatCard`, `DataTable`, `StatusBadge`, `SideDrawer`).
 - [ ] **Bước 5:** Ghép nối các trang giao diện cụ thể theo từng phân hệ (**Manager** ➔ **Employee** ➔ **Admin**).
 

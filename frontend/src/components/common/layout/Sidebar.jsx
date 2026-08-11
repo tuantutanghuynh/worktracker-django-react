@@ -1,3 +1,231 @@
+import React from 'react';
+import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
+import {
+  LayoutGrid,
+  Briefcase,
+  Users,
+  Clock,
+  Lock,
+  BarChart3,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  ListChecks,
+  TrendingUp,
+  Bell,
+  User,
+  Kanban
+} from 'lucide-react';
+import { useUIStore } from '../../../stores/useUIStore';
+import { useAuth } from '../../../hooks/useAuth';
+import { useNotificationStore } from '../../../stores/useNotificationStore';
+import { cn } from '../../../utils/cn';
+
+// 1. BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
+const MENU_CONFIG = {
+  // Cấu hình Menu dành cho MANAGER
+  MANAGER: {
+    portalLabel: 'Manager Portal',
+    navItems: [
+      { path: '/manager/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/manager/jobs', label: 'My Jobs', icon: Briefcase },
+      { path: '/manager/kanban', label: 'Kanban Board', icon: Kanban },
+      { path: '/manager/team', label: 'Team Members', icon: Users },
+      { path: '/manager/timesheet', altPath: '/manager/timesheets/review', label: 'Timesheets', icon: Clock },
+      { path: '/manager/timelock', altPath: '/manager/timelocks', label: 'Time Lock', icon: Lock },
+      { path: '/manager/reports', label: 'Reports', icon: BarChart3 },
+      { path: '/manager/settings', label: 'Settings', icon: Settings },
+    ],
+    showRecentJobs: true,
+  },
+
+  // Cấu hình Menu dành cho EMPLOYEE
+  EMPLOYEE: {
+    portalLabel: 'Employee Portal',
+    navItems: [
+      { path: '/employee/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks },
+      { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
+      { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp },
+      { path: '/employee/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
+      { path: '/employee/profile', label: 'Profile', icon: User },
+    ],
+    showRecentJobs: false,
+  },
+
+  // Cấu hình Menu dành cho ADMIN
+  ADMIN: {
+    portalLabel: 'Admin Portal',
+    navItems: [
+      { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/admin/users', label: 'User Management', icon: Users },
+      { path: '/admin/settings', label: 'System Settings', icon: Settings },
+    ],
+    showRecentJobs: false,
+  },
+};
+
+// Danh sách Job vừa xem dành cho Manager
+const RECENT_JOBS = [
+  { id: 1, title: 'ERP System Implementation', status: 'ACTIVE', color: 'bg-rose-500', statusColor: 'text-emerald-400' },
+  { id: 2, title: 'Mobile App Development', status: 'ACTIVE', color: 'bg-amber-500', statusColor: 'text-emerald-400' },
+  { id: 3, title: 'Website Redesign', status: 'ON HOLD', color: 'bg-blue-500', statusColor: 'text-blue-400' },
+];
+
 export default function Sidebar() {
-  return null;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const { unreadCount } = useNotificationStore();
+
+  const { user, logout } = useAuth();
+  const displayUser = user || { full_name: 'Manager User', role: 'MANAGER' };
+
+  const userRole = (displayUser.role || 'MANAGER').toUpperCase();
+  const currentConfig = MENU_CONFIG[userRole] || MENU_CONFIG.MANAGER;
+
+  return (
+    <aside
+      className={cn(
+        'bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0 transition-all duration-300 ease-in-out z-20 shadow-xl select-none',
+        isSidebarCollapsed ? 'w-20' : 'w-64'
+      )}
+    >
+      <div className="space-y-3.5 flex-1 overflow-y-auto custom-scrollbar pr-1">
+
+        {/* LOGO */}
+        <div className={cn('flex items-center space-x-3 px-2 py-0.5', isSidebarCollapsed && 'justify-center space-x-0')}>
+          <svg className="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#60A5FA" />
+                <stop offset="40%" stopColor="#3B82F6" />
+                <stop offset="80%" stopColor="#2563EB" />
+                <stop offset="100%" stopColor="#1D4ED8" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26"
+              stroke="url(#wBlueGradient)"
+              strokeWidth="13"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+
+          {!isSidebarCollapsed && (
+            <span className="text-xl font-bold tracking-tight text-white leading-none">
+              WorkTracker <span className="text-xs font-semibold text-blue-400">Pro</span>
+            </span>
+          )}
+        </div>
+
+        {/* MENU NHÓM THEO ROLE */}
+        <div className="space-y-1">
+          {!isSidebarCollapsed && (
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">
+              {currentConfig.portalLabel}
+            </p>
+          )}
+
+          {currentConfig.navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              location.pathname === item.path ||
+              (item.altPath && location.pathname.startsWith(item.altPath));
+
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition font-medium',
+                  isActive
+                    ? 'font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60',
+                  isSidebarCollapsed && 'justify-center space-x-0'
+                )}
+                title={isSidebarCollapsed ? item.label : undefined}
+              >
+                <Icon className="w-5 h-5 text-center shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1">{item.label}</span>}
+
+                {item.hasBadge && unreadCount > 0 && (
+                  <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
+        </div>
+
+        {/* RECENTLY VIEWED JOBS */}
+        {!isSidebarCollapsed && currentConfig.showRecentJobs && (
+          <div className="space-y-1 pt-2.5 border-t border-slate-800/80">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">
+              Recently Viewed Jobs
+            </p>
+            {RECENT_JOBS.map((job) => (
+              <div
+                key={job.id}
+                onClick={() => navigate(`/manager/jobs/${job.id}`)}
+                className="px-3 py-1.5 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5 transition-colors"
+              >
+                <div className={cn('w-2.5 h-2.5 rounded shrink-0', job.color)}></div>
+                <div className="overflow-hidden">
+                  <p className="text-xs font-semibold text-slate-200 truncate leading-tight">
+                    {job.title}
+                  </p>
+                  <span className={cn('text-[9px] font-bold tracking-wider', job.statusColor)}>
+                    {job.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            <Link
+              to="/manager/jobs"
+              className="inline-block px-3 pt-1 text-[11px] font-medium text-blue-400 hover:underline"
+            >
+              View all jobs →
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* USER PROFILE FOOTER */}
+      <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="relative shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-xs border border-slate-700">
+              {displayUser.full_name ? displayUser.full_name.substring(0, 2).toUpperCase() : (displayUser.email ? displayUser.email.substring(0, 2).toUpperCase() : 'US')}
+            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+          </div>
+
+          {!isSidebarCollapsed && (
+            <div className="truncate">
+              <p className="text-xs font-bold text-white leading-tight truncate">
+                {displayUser.full_name || displayUser.email || 'User'}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {displayUser.role || 'MANAGER'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={toggleSidebar}
+          className="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          {isSidebarCollapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+    </aside>
+  );
 }

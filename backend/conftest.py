@@ -1,9 +1,9 @@
 import pytest
 from django.db import transaction
-from rest_framework.test import APIClient
+from rest_framework.test import axiosClient
 from accounts.models import CustomUser, Role, Permission, RolePermission
 
-#APIClient là HTTP client giả lập của Django REST Framework — dùng để gọi API trong test mà không cần server thật chạy.
+#axiosClient là HTTP client giả lập của Django REST Framework — dùng để gọi API trong test mà không cần server thật chạy.
 
 #tắt redis khi test
 @pytest.fixture(autouse=True) #autouse=True — fixture này tự chạy cho MỌI test, không cần gọi tay. Thay Redis bằng DummyCache để test không cần Redis đang chạy.
@@ -12,10 +12,10 @@ def use_dummy_cache(settings):
         'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'}
     }
     
-#tạo APICLient
+#tạo axiosClient
 @pytest.fixture
 def api_client():
-    return APIClient()
+    return axiosClient()
 
 #tạo role Admin đầy đủ permissions
 @pytest.fixture

@@ -1,7 +1,7 @@
 import pytest
 from django.core.cache import cache
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.test import axiosClient
 from model_bakery import baker
 from accounts.models import Permission
 from system.security.permissions_manager import MANAGER_ROLE_CODE
@@ -34,7 +34,7 @@ class TestManagerTimeLockCRUD:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager_A = make_manager_with_perms(
@@ -131,7 +131,7 @@ class TestManagerTimeLockUnlock:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager_A = make_manager_with_perms(
@@ -202,7 +202,7 @@ class TestManagerLogWork:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -345,7 +345,7 @@ class TestManagerTimesheetFilters:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -494,7 +494,7 @@ class TestTimeLockServiceEdgeCases:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")

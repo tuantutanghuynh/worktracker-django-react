@@ -2,7 +2,7 @@ import datetime
 import pytest
 from django.core.cache import cache
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.test import axiosClient
 from model_bakery import baker
 from accounts.models import Permission
 from system.security.permissions_manager import MANAGER_ROLE_CODE
@@ -34,7 +34,7 @@ class TestManagerDashboard:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager = make_manager_with_perms(self.role_manager, "report:view")
@@ -122,7 +122,7 @@ class TestManagerTaskSummaryReport:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -203,7 +203,7 @@ class TestManagerTimesheetDetailReport:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -306,7 +306,7 @@ class TestManagerReportExport:
 
     def setup_method(self):
         cache.clear()
-        self.client = APIClient()
+        self.client = axiosClient()
 
         # Manager có đủ quyền export
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)

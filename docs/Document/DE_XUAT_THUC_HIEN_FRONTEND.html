@@ -609,7 +609,7 @@ npm install react<span class="hljs-literal">-hook-form</span> zod @hookform/reso
 │   └── employee/              # EmployeeDashboard, MyTasks, EmployeeTimesheet, Notifications, MyPerformance, Profile
 │
 ├── services/                  # Gọi API Backend qua Axios (.js)
-│   ├── apiClient.js           # Axios instance + Interceptor (JWT + Token Revocation)
+│   ├── axiosClient.js           # Axios instance + Interceptor (JWT + Token Revocation)
 │   ├── authService.js         # Login, Refresh token, Logout
 │   ├── jobService.js          # CRUD Job, Change status, List active clients
 │   ├── taskService.js         # CRUD Task, Kanban Move, Transition, Comments, Uploads
@@ -810,7 +810,7 @@ npm install react<span class="hljs-literal">-hook-form</span> zod @hookform/reso
 <ul>
 <li><input type="checkbox" id="checkbox0"><label for="checkbox0"><strong>Bước 1:</strong> Thực thi cài đặt toàn bộ các thư viện NPM trong mục 3 vào <code>frontend/package.json</code>.</label></li>
 <li><input type="checkbox" id="checkbox1"><label for="checkbox1"><strong>Bước 2:</strong> Tạo khung cấu trúc thư mục trong <code>frontend/src/</code> theo sơ đồ mục 4.</label></li>
-<li><input type="checkbox" id="checkbox2"><label for="checkbox2"><strong>Bước 3:</strong> Cấu hình Tailwind CSS, Axios Interceptor (<code>apiClient.js</code>) và Zustand Auth Store (<code>useAuthStore.js</code>).</label></li>
+<li><input type="checkbox" id="checkbox2"><label for="checkbox2"><strong>Bước 3:</strong> Cấu hình Tailwind CSS, Axios Interceptor (<code>axiosClient.js</code>) và Zustand Auth Store (<code>useAuthStore.js</code>).</label></li>
 <li><input type="checkbox" id="checkbox3"><label for="checkbox3"><strong>Bước 4:</strong> Xây dựng bộ <strong>Shared Components dùng chung</strong> tại <code>src/components/common/</code> (<code>Sidebar</code>, <code>Header</code>, <code>StatCard</code>, <code>DataTable</code>, <code>StatusBadge</code>, <code>SideDrawer</code>).</label></li>
 <li><input type="checkbox" id="checkbox4"><label for="checkbox4"><strong>Bước 5:</strong> Ghép nối các trang giao diện cụ thể theo từng phân hệ (<strong>Manager</strong> ➔ <strong>Employee</strong> ➔ <strong>Admin</strong>).</label></li>
 </ul>
