@@ -3,33 +3,19 @@ import {
   FileDiff, 
   ArrowRight, 
   User, 
-  Calendar, 
   Globe, 
-  Database, 
-  Tag, 
   AlertTriangle, 
   CheckCircle2, 
   Info,
-  ChevronDown,
-  ChevronUp
+  Clock,
+  Layers
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { format } from 'date-fns';
 
 /**
  * AuditDiffViewer - Audit Log Snapshot Comparison Component
- * 
- * Props:
- * - oldValues (Object | string): Data before change (JSON or Object)
- * - newValues (Object | string): Data after change (JSON or Object)
- * - action (string): Action name (e.g. 'UPDATE_TASK', 'LOCK_TIMESHEET')
- * - tableName (string): DB Table name (e.g. 'tasks', 'log_works')
- * - recordId (string | number): Record ID
- * - timestamp (string | Date): Log timestamp
- * - user (Object): { full_name, email, avatar_url }
- * - severity ('CRITICAL' | 'WARNING' | 'NORMAL'): Severity level
- * - ipAddress (string): Client request IP address
- * - summary (string): Action summary description
+ * Perfectly aligned 12-column grid layout for enterprise audit trail logs
  */
 export default function AuditDiffViewer({
   oldValues = {},
@@ -44,7 +30,6 @@ export default function AuditDiffViewer({
   summary,
   className
 }) {
-  const [viewMode, setViewMode] = useState('side-by-side'); // 'side-by-side' | 'unified'
   const [showUnchanged, setShowUnchanged] = useState(false);
 
   // Parse JSON string if necessary
@@ -96,87 +81,100 @@ export default function AuditDiffViewer({
     return String(val);
   };
 
+  const formattedDate = timestamp 
+    ? format(new Date(timestamp), 'HH:mm - yyyy-MM-dd')
+    : 'Recently';
+
   return (
     <div className={cn("bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5 text-slate-100", className)}>
-      {/* Header Info */}
+      {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <FileDiff className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-base font-bold text-slate-100 tracking-tight">
-              {action}
-            </h3>
-            <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full border", currentSeverity.bg)}>
-              <SeverityIcon className="w-3.5 h-3.5" />
-              {currentSeverity.label}
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-400">
+              <FileDiff className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-100 tracking-tight">
+                  {action}
+                </h3>
+                <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full border", currentSeverity.bg)}>
+                  <SeverityIcon className="w-3.5 h-3.5" />
+                  {currentSeverity.label}
+                </span>
+              </div>
+              {summary && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {summary}
+                </p>
+              )}
+            </div>
           </div>
-          {summary && (
-            <p className="text-xs text-slate-400">
-              {summary}
-            </p>
-          )}
         </div>
 
-        {/* View mode toggle */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <button
             type="button"
             onClick={() => setShowUnchanged(!showUnchanged)}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+            className="text-xs px-3.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-semibold transition-colors cursor-pointer"
           >
             {showUnchanged ? 'Hide Unchanged Fields' : 'Show All Fields'}
           </button>
         </div>
       </div>
 
-      {/* Metadata Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 text-xs">
+      {/* 4 Metadata Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80 text-xs">
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1">
-            <User className="w-3.5 h-3.5 text-slate-500" /> Performed by:
+          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+            <User className="w-3.5 h-3.5 text-indigo-400" /> Changed By
           </span>
-          <p className="font-semibold text-slate-200 truncate">
+          <p className="font-bold text-slate-100 truncate">
             {user?.full_name || user?.email || 'System User'}
           </p>
         </div>
+
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1">
-            <Database className="w-3.5 h-3.5 text-slate-500" /> DB Table (ID):
+          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+            <Layers className="w-3.5 h-3.5 text-blue-400" /> Target Object
           </span>
-          <p className="font-mono text-indigo-400">
-            {tableName} (#{recordId})
+          <p className="font-bold font-mono text-blue-400 truncate">
+            {tableName} {recordId !== 'N/A' ? `(#${recordId})` : ''}
           </p>
         </div>
+
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5 text-slate-500" /> Timestamp:
+          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+            <Clock className="w-3.5 h-3.5 text-emerald-400" /> Date &amp; Time
           </span>
-          <p className="text-slate-300">
-            {timestamp ? format(new Date(timestamp), 'HH:mm - yyyy-MM-dd') : 'N/A'}
+          <p className="font-semibold text-slate-200">
+            {formattedDate}
           </p>
         </div>
+
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1">
-            <Globe className="w-3.5 h-3.5 text-slate-500" /> IP Request:
+          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+            <Globe className="w-3.5 h-3.5 text-purple-400" /> Access IP
           </span>
-          <p className="font-mono text-slate-300">
+          <p className="font-mono text-slate-300 truncate">
             {ipAddress || 'Internal / Celery'}
           </p>
         </div>
       </div>
 
-      {/* Diff Table */}
-      <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/40">
-        <div className="bg-slate-800/80 px-4 py-2.5 flex items-center justify-between border-b border-slate-800 text-xs font-semibold text-slate-300">
-          <span>Attribute Name (Field)</span>
-          <div className="flex items-center gap-8">
-            <span className="text-rose-400">Previous Value (Old)</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-emerald-400">Updated Value (New)</span>
-          </div>
+      {/* Comparison Diff Table (Synchronized 12-Column Grid Header & Body) */}
+      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40">
+        {/* Table Header: Exactly matching 12-column grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-800/90 px-3.5 py-3 border-b border-slate-800 text-xs font-bold items-center">
+          <div className="md:col-span-4 text-slate-200">Field Changed</div>
+          <div className="md:col-span-4 text-rose-400">Before Change (Old)</div>
+          <div className="hidden md:block md:col-span-1 text-center text-slate-500">➔</div>
+          <div className="md:col-span-3 text-emerald-400">After Change (New)</div>
         </div>
 
+        {/* Table Body: Exactly matching 12-column grid */}
         {filteredItems.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
             No data changes recorded or all fields are identical.
@@ -192,27 +190,27 @@ export default function AuditDiffViewer({
               }[status];
 
               return (
-                <div key={key} className={cn("grid grid-cols-1 md:grid-cols-12 gap-2 p-3 items-baseline transition-colors", statusBg)}>
-                  {/* Key Column */}
+                <div key={key} className={cn("grid grid-cols-1 md:grid-cols-12 gap-3 p-3.5 items-center transition-colors", statusBg)}>
+                  {/* Key Name Column (col-span-4) */}
                   <div className="md:col-span-4 flex items-center gap-2 font-sans">
-                    <span className="font-semibold text-slate-200 break-all">{key}</span>
-                    {status === 'modified' && <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 rounded">Modified</span>}
-                    {status === 'added' && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 rounded">Added</span>}
-                    {status === 'removed' && <span className="px-1.5 py-0.5 text-[10px] bg-rose-500/20 text-rose-300 rounded">Removed</span>}
+                    <span className="font-bold text-slate-200 break-all">{key}</span>
+                    {status === 'modified' && <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 font-bold rounded">Modified</span>}
+                    {status === 'added' && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 font-bold rounded">Added</span>}
+                    {status === 'removed' && <span className="px-1.5 py-0.5 text-[10px] bg-rose-500/20 text-rose-300 font-bold rounded">Removed</span>}
                   </div>
 
-                  {/* Old Value */}
-                  <div className="md:col-span-4 text-rose-300/90 line-through bg-rose-950/20 p-1.5 rounded border border-rose-900/30 break-all">
+                  {/* Old Value Column (col-span-4) */}
+                  <div className="md:col-span-4 text-rose-300/90 line-through bg-rose-950/30 p-2 rounded-lg border border-rose-900/40 break-all font-semibold">
                     {renderValue(oldVal)}
                   </div>
 
-                  {/* Arrow Indicator */}
+                  {/* Arrow Column (col-span-1) */}
                   <div className="hidden md:flex md:col-span-1 justify-center text-slate-500">
-                    <ArrowRight className="w-4 h-4 self-center" />
+                    <ArrowRight className="w-4 h-4 text-slate-400" />
                   </div>
 
-                  {/* New Value */}
-                  <div className="md:col-span-3 text-emerald-300 bg-emerald-950/20 p-1.5 rounded border border-emerald-900/30 break-all">
+                  {/* New Value Column (col-span-3) */}
+                  <div className="md:col-span-3 text-emerald-300 bg-emerald-950/30 p-2 rounded-lg border border-emerald-900/40 break-all font-semibold">
                     {renderValue(newVal)}
                   </div>
                 </div>
