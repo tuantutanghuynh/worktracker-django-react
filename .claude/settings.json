@@ -38,7 +38,9 @@
       "Bash(CI=true timeout 12 npm run dev)",
       "Bash(CI=true timeout 15 npm run dev)",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit:$?\")"
     ]
   }
 }
