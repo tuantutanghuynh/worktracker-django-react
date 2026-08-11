@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 
 /**
  * AuditDiffViewer - Audit Log Snapshot Comparison Component
- * Perfectly aligned 12-column grid layout for enterprise audit trail logs
+ * Perfectly aligned 12-column grid layout with automatic date-fns ISO string formatting
  */
 export default function AuditDiffViewer({
   oldValues = {},
@@ -74,10 +74,21 @@ export default function AuditDiffViewer({
   const currentSeverity = severityConfigs[severity] || severityConfigs.NORMAL;
   const SeverityIcon = currentSeverity.icon;
 
+  // Render value with automatic date-fns ISO string formatting
   const renderValue = (val) => {
     if (val === null || val === undefined) return <span className="text-slate-500 italic">null</span>;
     if (typeof val === 'boolean') return <span className="font-semibold text-purple-400">{val ? 'true' : 'false'}</span>;
     if (typeof val === 'object') return <pre className="text-xs font-mono whitespace-pre-wrap">{JSON.stringify(val, null, 2)}</pre>;
+    
+    // ISO date string detection & formatting using date-fns (e.g. "2026-08-11T16:36:25.836Z")
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+      try {
+        return format(new Date(val), 'HH:mm - yyyy-MM-dd');
+      } catch (e) {
+        return String(val);
+      }
+    }
+
     return String(val);
   };
 
