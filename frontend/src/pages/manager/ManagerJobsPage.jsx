@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -13,7 +13,6 @@ import {
   Building2,
   Layers,
 } from 'lucide-react';
-import managerJobService from '../../services/manager/managerJobService';
 import FilterToolbar from '../../components/common/table/FilterToolbar';
 import DataTable from '../../components/common/table/DataTable';
 import PaginationBar from '../../components/common/table/PaginationBar';
@@ -21,8 +20,9 @@ import SideDrawer from '../../components/common/drawer/SideDrawer';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import { cn } from '../../utils/cn';
+import { useManagerJobs, useCreateJob } from '../../hooks/queries/manager/useManagerJobs';
 
-// Địng nghĩa danh sách Trạng thái Job (English UI)
+// Định nghĩa danh sách Trạng thái Job (English UI)
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'PLANNING', label: 'Planning' },
@@ -42,15 +42,10 @@ const PRIORITY_OPTIONS = [
 
 export default function ManagerJobsPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
-  // State Quản lý Dữ liệu
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [totalItems, setTotalItems] = useState(0);
+  // State cho Bộ lọc, Chế độ xem & Phân trang
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
-
-  // State cho Bộ lọc & Phân trang
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
@@ -59,7 +54,6 @@ export default function ManagerJobsPage() {
 
   // State cho Drawer Tạo Job Mới
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     job_name: '',
     description: '',
@@ -68,67 +62,50 @@ export default function ManagerJobsPage() {
     priority: 'MEDIUM',
   });
 
-  // 1. Hàm nạp danh sách Jobs từ Backend API
-  const fetchJobs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = {
-        page: currentPage,
-        page_size: pageSize,
-        search: searchQuery || undefined,
-        status: selectedStatus || undefined,
-        priority: selectedPriority || undefined,
-      };
-      const response = await managerJobService.getJobs(params);
+  // 🚀 TANSTACK REACT QUERY: Nạp danh sách Jobs tự động theo bộ lọc & phân trang
+  const queryParams = useMemo(() => ({
+    page: currentPage,
+    page_size: pageSize,
+    search: searchQuery || undefined,
+    status: selectedStatus || undefined,
+    priority: selectedPriority || undefined,
+  }), [currentPage, pageSize, searchQuery, selectedStatus, selectedPriority]);
 
-      // Xử lý dữ liệu trả về theo chuẩn DRF Paginated Response
-      if (response && Array.isArray(response.results)) {
-        setJobs(response.results);
-        setTotalItems(response.count || response.results.length);
-      } else if (Array.isArray(response)) {
-        setJobs(response);
-        setTotalItems(response.length);
-      } else {
-        setJobs([]);
-        setTotalItems(0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err);
-      setJobs([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, pageSize, searchQuery, selectedStatus, selectedPriority]);
+  const { data: response, isLoading } = useManagerJobs(queryParams);
+  const createJobMutation = useCreateJob();
 
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+  // Chuẩn hóa dữ liệu trả về từ TanStack Query
+  const jobs = useMemo(() => {
+    if (response && Array.isArray(response.results)) return response.results;
+    if (Array.isArray(response)) return response;
+    return [];
+  }, [response]);
 
-  // 2. Xử lý Tạo Job Mới
-  const handleCreateJob = async (e) => {
+  const totalItems = useMemo(() => {
+    if (response && typeof response.count === 'number') return response.count;
+    return jobs.length;
+  }, [response, jobs]);
+
+  // 🚀 MUTATION: Tạo Job mới với TanStack Query
+  const handleCreateJob = (e) => {
     e.preventDefault();
     if (!formData.job_name.trim()) return;
 
-    setSubmitting(true);
-    try {
-      await managerJobService.createJob(formData);
-      setCreateDrawerOpen(false);
-      setFormData({
-        job_name: '',
-        description: '',
-        client_name: '',
-        deadline: '',
-        priority: 'MEDIUM',
-      });
-      fetchJobs(); // Reload danh sách sau khi tạo thành công
-    } catch (err) {
-      console.error('Failed to create job:', err);
-    } finally {
-      setSubmitting(false);
-    }
+    createJobMutation.mutate(formData, {
+      onSuccess: () => {
+        setCreateDrawerOpen(false);
+        setFormData({
+          job_name: '',
+          description: '',
+          client_name: '',
+          deadline: '',
+          priority: 'MEDIUM',
+        });
+      },
+    });
   };
 
-  // 3. Render Màu Badge cho Trạng thái
+  // Render Màu Badge cho Trạng thái
   const renderStatusBadge = (status) => {
     const config = {
       ACTIVE: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Active' },
@@ -145,7 +122,7 @@ export default function ManagerJobsPage() {
     );
   };
 
-  // 4. Render Màu Badge cho Mức độ Ưu tiên
+  // Render Màu Badge cho Mức độ Ưu tiên
   const renderPriorityBadge = (priority) => {
     const config = {
       HIGH: { bg: 'bg-rose-100 text-rose-800', label: 'High' },
@@ -160,7 +137,7 @@ export default function ManagerJobsPage() {
     );
   };
 
-  // 5. Cấu hình Cột Bảng DataTable
+  // Cấu hình Cột Bảng DataTable
   const columns = [
     {
       header: 'Job Code & Name',
@@ -173,7 +150,7 @@ export default function ManagerJobsPage() {
           <div>
             <button
               onClick={() => navigate(`/manager/jobs/${row.id}`)}
-              className="font-bold text-slate-900 hover:text-blue-600 text-sm text-left transition-colors line-clamp-1"
+              className="font-bold text-slate-900 hover:text-blue-600 text-sm text-left transition-colors line-clamp-1 cursor-pointer"
             >
               {row.job_name}
             </button>
@@ -208,19 +185,20 @@ export default function ManagerJobsPage() {
       cell: (row) => (
         <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-          <span>{row.deadline ? new Date(row.deadline).toLocaleDateString() : 'N/A'}</span>
+          <span>{row.deadline || 'No deadline'}</span>
         </div>
       ),
     },
     {
       header: 'Actions',
-      accessorKey: 'id',
+      accessorKey: 'actions',
+      className: 'text-right',
       cell: (row) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => navigate(`/manager/jobs/${row.id}`)}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-            title="View Details"
+            title="View Job Details"
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -230,123 +208,121 @@ export default function ManagerJobsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 text-slate-800 pb-10">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Projects & Jobs</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Project / Job Management</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage master project pipelines, track progress, and assign team workloads.
+            Manage projects, scope, deadlines, and task allocations.
           </p>
         </div>
+
         <button
           onClick={() => setCreateDrawerOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Create New Job</span>
         </button>
       </div>
 
-      {/* Filter & Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
-        <FilterToolbar
-          searchPlaceholder="Search by Job code, name, client..."
-          searchValue={searchQuery}
-          onSearchChange={(val) => {
-            setSearchQuery(val);
-            setCurrentPage(1);
-          }}
-          currentView={viewMode}
-          onViewChange={setViewMode}
-          viewModes={['table', 'grid']}
-        >
-          {/* Status Dropdown Filter */}
-          <div className="w-44">
-            <SelectDropdown
-              options={STATUS_OPTIONS}
-              value={selectedStatus}
-              onChange={(val) => {
-                setSelectedStatus(val);
-                setCurrentPage(1);
-              }}
-              placeholder="All Statuses"
-            />
-          </div>
+      {/* Filter & Search Toolbar */}
+      <FilterToolbar
+        searchQuery={searchQuery}
+        onSearchChange={(val) => {
+          setSearchQuery(val);
+          setCurrentPage(1);
+        }}
+        searchPlaceholder="Search jobs by name or code..."
+        statusValue={selectedStatus}
+        onStatusChange={(val) => {
+          setSelectedStatus(val);
+          setCurrentPage(1);
+        }}
+        statusOptions={STATUS_OPTIONS}
+        priorityValue={selectedPriority}
+        onPriorityChange={(val) => {
+          setSelectedPriority(val);
+          setCurrentPage(1);
+        }}
+        priorityOptions={PRIORITY_OPTIONS}
+        currentView={viewMode}
+        onViewChange={setViewMode}
+        onClearFilters={() => {
+          setSearchQuery('');
+          setSelectedStatus('');
+          setSelectedPriority('');
+          setCurrentPage(1);
+        }}
+      />
 
-          {/* Priority Dropdown Filter */}
-          <div className="w-44">
-            <SelectDropdown
-              options={PRIORITY_OPTIONS}
-              value={selectedPriority}
-              onChange={(val) => {
-                setSelectedPriority(val);
-                setCurrentPage(1);
-              }}
-              placeholder="All Priorities"
-            />
-          </div>
-        </FilterToolbar>
-      </div>
-
-      {/* Main Content Area: Table View or Grid View */}
+      {/* Primary Display: Table or Grid */}
       {viewMode === 'table' ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-          <DataTable
-            columns={columns}
-            data={jobs}
-            isLoading={loading}
-            emptyMessage="No jobs found matching your filters."
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={jobs}
+          isLoading={isLoading}
+          onRowClick={(row) => navigate(`/manager/jobs/${row.id}`)}
+          emptyMessage="No projects found matching your search criteria."
+        />
       ) : (
         /* Grid Card View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {jobs.map((job) => (
-            <div
-              key={job.id}
-              onClick={() => navigate(`/manager/jobs/${job.id}`)}
-              className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer space-y-4 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="px-2.5 py-0.5 rounded bg-slate-100 font-bold text-slate-600 text-xs">
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="h-44 bg-white rounded-xl border border-slate-200/80 p-4 animate-pulse" />
+            ))
+          ) : jobs.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+              No projects found.
+            </div>
+          ) : (
+            jobs.map((job) => (
+              <div
+                key={job.id}
+                onClick={() => navigate(`/manager/jobs/${job.id}`)}
+                className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs hover:border-blue-300 transition-all cursor-pointer space-y-3"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded">
                     {job.job_code || `JOB-${job.id}`}
                   </span>
                   {renderStatusBadge(job.status)}
                 </div>
+
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base line-clamp-1 hover:text-blue-600 transition-colors">
-                    {job.job_name}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-2 mt-1">
+                  <h3 className="font-bold text-slate-900 text-sm line-clamp-1">{job.job_name}</h3>
+                  <p className="text-xs text-slate-400 line-clamp-2 mt-1">
                     {job.description || 'No description provided.'}
                   </p>
                 </div>
-              </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <div className="flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="truncate max-w-[120px]">
-                    {job.client_name || 'Internal'}
-                  </span>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{job.deadline || 'No deadline'}</span>
+                  </div>
+                  {renderPriorityBadge(job.priority)}
                 </div>
-                {renderPriorityBadge(job.priority)}
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
 
       {/* Pagination Controls */}
       {totalItems > 0 && (
         <PaginationBar
-          currentPage={currentPage}
+          page={currentPage}
           pageSize={pageSize}
           totalItems={totalItems}
+          totalPages={Math.ceil(totalItems / pageSize)}
           onPageChange={setCurrentPage}
-          onPageSizeChange={setPageSize}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
         />
       )}
 
@@ -354,69 +330,68 @@ export default function ManagerJobsPage() {
       <SideDrawer
         isOpen={createDrawerOpen}
         onClose={() => setCreateDrawerOpen(false)}
-        title="Create New Job"
-        subtitle="Fill in project details to initialize a master job pipeline."
-        size="md"
+        title="Create New Project / Job"
       >
-        <form onSubmit={handleCreateJob} className="space-y-5 p-1">
+        <form onSubmit={handleCreateJob} className="space-y-4 text-xs">
           <InputField
-            label="Job Name"
-            placeholder="e.g. ERP System Implementation"
+            label="Job Name *"
             value={formData.job_name}
             onChange={(e) => setFormData({ ...formData, job_name: e.target.value })}
+            placeholder="e.g. ERP System Redesign 2026"
             required
           />
 
           <InputField
             label="Client Name"
-            placeholder="e.g. Acme Corporation"
             value={formData.client_name}
             onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+            placeholder="e.g. VinGroup / Internal"
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Priority</label>
-              <SelectDropdown
-                options={PRIORITY_OPTIONS.filter((o) => o.value !== '')}
-                value={formData.priority}
-                onChange={(val) => setFormData({ ...formData, priority: val })}
-              />
-            </div>
+          <SelectDropdown
+            label="Priority"
+            value={formData.priority}
+            onChange={(val) => setFormData({ ...formData, priority: val })}
+            options={[
+              { value: 'HIGH', label: 'High Priority' },
+              { value: 'MEDIUM', label: 'Medium Priority' },
+              { value: 'LOW', label: 'Low Priority' },
+            ]}
+          />
 
-            <InputField
-              label="Deadline"
-              type="date"
-              value={formData.deadline}
-              onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-            />
-          </div>
+          <InputField
+            label="Deadline Date"
+            type="date"
+            value={formData.deadline}
+            onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+          />
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Description</label>
+            <label className="block font-semibold text-slate-700 mb-1">Description</label>
             <textarea
-              rows={4}
+              rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Enter detailed project scope and objectives..."
-              className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-sans"
+              placeholder="Describe the job goals and deliverables..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setCreateDrawerOpen(false)}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition cursor-pointer"
             >
               Cancel
             </button>
+
             <button
               type="submit"
-              disabled={submitting}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all disabled:opacity-50"
+              disabled={createJobMutation.isPending}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
             >
-              {submitting ? 'Creating...' : 'Create Job'}
+              {createJobMutation.isPending ? 'Creating...' : 'Create Job'}
             </button>
           </div>
         </form>

@@ -16,7 +16,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppRouter />
-      <Toaster position="top-right" richColors />
+      <Toaster position="bottom-right" richColors />
     </QueryClientProvider>
   );
 }

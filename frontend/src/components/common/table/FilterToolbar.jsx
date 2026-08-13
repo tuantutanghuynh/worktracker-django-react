@@ -3,10 +3,27 @@ import { Search, RotateCcw, X } from 'lucide-react';
 import ViewToggle from './ViewToggle';
 import { cn } from '../../../utils/cn';
 
-export default function FilterToolbar({
+/**
+ * Hybrid FilterToolbar Component
+ * 
+ * Supports both:
+ * 1. Tu's Pill-style filter tabs: filters, activeFilter, onChange
+ * 2. Full Search & Dropdown & ViewToggle bar: searchQuery, statusOptions, viewModes, etc.
+ * 
+ * Compatible with both:
+ * import { FilterToolbar } from '...'
+ * import FilterToolbar from '...'
+ */
+export function FilterToolbar({
+  // Props từ nhóm Tú (Pill-style filter tabs)
+  filters = [],
+  activeFilter,
+  onChange,
+
+  // Props từ nhóm bạn (Full toolbar with Search, Selects, Clear, ViewToggle)
   searchQuery = '',
   onSearchChange,
-  searchPlaceholder = 'Tìm kiếm công việc, dự án...',
+  searchPlaceholder = 'Search jobs, tasks...',
   statusValue = '',
   onStatusChange,
   statusOptions = [],
@@ -21,21 +38,44 @@ export default function FilterToolbar({
   className = '',
 }) {
   const hasActiveFilters = Boolean(
-    searchQuery || statusValue || priorityValue
+    searchQuery || statusValue || priorityValue || (activeFilter && activeFilter !== 'ALL')
   );
 
   return (
     <div
       className={cn(
-        'flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs',
+        'flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs',
         className
       )}
     >
-      {/* Left section: Search & Dropdown Filters */}
+      {/* Left section: Pill Filter Tabs, Search & Dropdowns */}
       <div className="flex flex-wrap items-center gap-2.5 flex-1">
-        {/* Search Field */}
+        {/* 1. Pill-style Filter Buttons (Code Nhóm Tú) */}
+        {filters.length > 0 && (
+          <div className="flex items-center space-x-1.5 text-xs mr-2">
+            {filters.map(({ value, label }) => {
+              const isActive = value === activeFilter;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onChange && onChange(value)}
+                  className={
+                    isActive
+                      ? 'px-3 py-1 rounded-full font-semibold bg-blue-600 text-white shadow-sm cursor-pointer transition'
+                      : 'px-3 py-1 rounded-full font-medium text-slate-600 hover:bg-slate-200/60 cursor-pointer transition'
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 2. Search Field */}
         {onSearchChange && (
-          <div className="relative min-w-[220px] flex-1 max-w-md">
+          <div className="relative min-w-[200px] flex-1 max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -46,8 +86,9 @@ export default function FilterToolbar({
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => onSearchChange('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -55,14 +96,14 @@ export default function FilterToolbar({
           </div>
         )}
 
-        {/* Status Dropdown */}
+        {/* 3. Status Dropdown */}
         {onStatusChange && statusOptions.length > 0 && (
           <select
             value={statusValue}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
           >
-            <option value="">Tất cả trạng thái</option>
+            <option value="">All Statuses</option>
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -71,14 +112,14 @@ export default function FilterToolbar({
           </select>
         )}
 
-        {/* Priority Dropdown */}
+        {/* 4. Priority Dropdown */}
         {onPriorityChange && priorityOptions.length > 0 && (
           <select
             value={priorityValue}
             onChange={(e) => onPriorityChange(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
           >
-            <option value="">Tất cả độ ưu tiên</option>
+            <option value="">All Priorities</option>
             {priorityOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -87,17 +128,18 @@ export default function FilterToolbar({
           </select>
         )}
 
-        {/* Extra Children Filters */}
+        {/* Extra slot for custom elements */}
         {children}
 
-        {/* Clear Filters Button */}
+        {/* 5. Clear Filters Button */}
         {onClearFilters && hasActiveFilters && (
           <button
+            type="button"
             onClick={onClearFilters}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Xóa bộ lọc</span>
+            <span>Clear Filters</span>
           </button>
         )}
       </div>
@@ -115,3 +157,5 @@ export default function FilterToolbar({
     </div>
   );
 }
+
+export default FilterToolbar;

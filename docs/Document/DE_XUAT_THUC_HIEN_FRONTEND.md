@@ -1,7 +1,7 @@
 # 📘 HƯỚNG DẪN CHI TIẾT TRIỂN KHAI FRONTEND (REACT VITE)
 **Dự án:** WorkTracker Pro (Django REST Framework + React Vite)  
 **Tài liệu:** Frontend Implementation Master Guide  
-**Ngày lập:** 24/07/2026  
+**Cập nhật lần cuối:** 13/08/2026  
 
 ---
 
@@ -10,23 +10,24 @@
 1. **Kiến trúc:** Single Page Application (SPA) xây dựng trên nền **React (Vite)** kết nối với Backend **Django REST Framework** qua REST API và WebSockets (`ws/notifications/`).
 2. **Quy tắc ngôn ngữ:** **Sử dụng 100% thuần JavaScript (`.js` cho các file logic/service/store/utils và `.jsx` cho các file React Components)**. Không sử dụng TypeScript (`.ts`/`.tsx`).
 3. **Thiết kế Giao diện (Design System):** Thống nhất 100% về giao diện giữa 3 phân hệ (**Admin**, **Manager**, **Employee**), sử dụng màu nền Slate Dark (`#0F172A`) cho Sidebar và tông màu xám sáng nhã nhặn cho nội dung chính.
+4. **Data Management & State:** Sử dụng **`@tanstack/react-query`** cho toàn bộ việc fetch, caching, revalidation và optimistic updates.
 
-### 📌 Trạng thái Thiết kế Giao diện Phân hệ Manager (12 Trang Nâng Cấp):
+### 📌 Trạng thái Thiết kế & Nâng cấp Giao diện Phân hệ Manager (12 Trang):
 
-| Thứ tự | Trang Manager | Luồng truy cập & Lý do | Trạng thái Thiết kế |
+| Thứ tự | Trang Manager | Luồng truy cập & Lý do | Trạng thái Thực tế |
 | :---: | :--- | :--- | :---: |
-| **1** | **Dashboard** | Trang tổng quan chính của Manager | ✅ **Đã chốt** (Có ảnh) |
-| **2** | **My Jobs (Job List)** | Trung tâm điều hướng dự án của Manager | ✅ **Đã chốt** (Có ảnh) |
-| **3** | **Job Detail** | Mở từ danh sách Job List | ✅ **Đã chốt** (Có ảnh) |
-| **4** | **Kanban Board** | Mở từ trang Job Detail | ⏳ Đang thiết kế |
-| **5** | **Task Detail Drawer/Page** | Mở từ bảng Kanban Board | ⏳ Đang thiết kế |
-| **6** | **Team Members** | Xem danh sách nhân sự của Job | ⏳ Đang thiết kế |
-| **7** | **Timesheet Review** | Duyệt nhật ký giờ làm việc | ⏳ Đang thiết kế |
-| **8** | **Time Lock** | Khóa kỳ công chốt sổ | ⏳ Đang thiết kế |
-| **9** | **Reports** | Báo cáo & Trích xuất file | ⏳ Đang thiết kế |
-| **10** | **Notifications** | Trung tâm thông báo | ⏳ Đang thiết kế |
-| **11** | **Profile** | Hồ sơ cá nhân | ⏳ Đang thiết kế |
-| **12** | **Settings** | Cài đặt hệ thống | ⏳ Đang thiết kế |
+| **1** | **Dashboard** | Trang tổng quan chính của Manager | ✅ **Hoàn thành 100%** (TanStack Query + Donut Fix) |
+| **2** | **My Jobs (Job List)** | Trung tâm điều hướng dự án của Manager | ✅ **Hoàn thành 100%** (TanStack Query + Pagination) |
+| **3** | **Job Detail** | Mở từ danh sách Job List | ✅ **Hoàn thành 100%** (TanStack Query 4 Tabs) |
+| **4** | **Kanban Board** | Mở từ trang Job Detail | ✅ **Hoàn thành 100%** (TanStack Query + Optimistic 0.01s + Internal Scroll) |
+| **5** | **Task Detail Drawer/Page** | Mở từ bảng Kanban Board | ⏳ Đang nâng cấp |
+| **6** | **Team Members** | Xem danh sách nhân sự của Job | ⏳ Đang nâng cấp |
+| **7** | **Timesheet Review** | Duyệt nhật ký giờ làm việc | ⏳ Đang nâng cấp |
+| **8** | **Time Lock** | Khóa kỳ công chốt sổ | ⏳ Đang nâng cấp |
+| **9** | **Reports** | Báo cáo & Trích xuất file | ⏳ Đang nâng cấp |
+| **10** | **Notifications** | Trung tâm thông báo | ⏳ Đang nâng cấp |
+| **11** | **Profile** | Hồ sơ cá nhân | ⏳ Đang nâng cấp |
+| **12** | **Settings** | Cài đặt hệ thống | ⏳ Đang nâng cấp |
 
 ---
 
@@ -38,12 +39,12 @@ Dưới đây là danh sách đầy đủ tất cả các thư viện NPM cần 
 | :--- | :--- | :--- |
 | **Lõi App & Routing** | `react-router-dom` | Định tuyến trang SPA và điều hướng Protected Route Guards theo Role |
 | **Quản lý State** | `zustand` | Lưu Global Auth Token, User Info, Notification Badge, Sidebar Collapse State |
-| **Data Fetching & Cache**| `@tanstack/react-query` | Quản lý Cache API, tự động revalidate, polling dữ liệu |
+| **Data Fetching & Cache**| `@tanstack/react-query` | Quản lý Cache API, tự động revalidate, optimistic updates |
 | **Kết nối HTTP Client** | `axios` | Đính kèm Bearer JWT Token, tự động Refresh Token, xử lý lỗi 401/403/404 |
 | **CSS & Styling** | `tailwindcss`, `@tailwindcss/vite`, `clsx`, `tailwind-merge` | Styling giao diện linh hoạt, hàm tiện ích `cn()` ghép class động |
 | **Bộ Icon** | `lucide-react` | Bộ Icon chuẩn SaaS (Folder, Play, Eye, Calendar, Bell, User, Lock,...) |
 | **Bảng dữ liệu (Table)** | `@tanstack/react-table` | Bảng phân trang, sắp xếp cột, lọc dữ liệu dung lượng lớn |
-| **Kéo-thả Kanban** | `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` | Kéo thả Card giữa các cột Kanban (`TODO`, `IN_PROGRESS`, `IN_REVIEW`,...) |
+| **Kéo-thả Kanban** | `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` | Kéo thả Card giữa các cột Kanban (`TODO`, `IN_PROGRESS`, `REVIEWING`,...) |
 | **Biểu đồ Analytics** | `recharts` | Biểu đồ Donut Chart, Grouped Bar Chart, Line Chart, Productivity Heatmap Grid |
 | **Xử lý Form & Validate** | `react-hook-form`, `zod`, `@hookform/resolvers` | Validate dữ liệu Form phía Client trước khi gửi API |
 | **Realtime & Toast** | `react-use-websocket`, `sonner` | Kết nối WebSocket `ws/notifications/` & Toast thông báo nảy góc |
@@ -93,6 +94,7 @@ frontend/src/
 │   │   ├── table/             # DataTable.jsx, PaginationBar.jsx, FilterToolbar.jsx, ViewToggle.jsx
 │   │   ├── badges/            # StatusBadge.jsx, PriorityBadge.jsx, RoleBadge.jsx, SeverityBadge.jsx
 │   │   ├── drawer/            # SideDrawer.jsx, AuditDiffViewer.jsx, ReportDetailDrawer.jsx
+│   │   ├── modal/             # BaseModal.jsx, PromptReasonModal.jsx
 │   │   ├── charts/            # DonutChartCard.jsx, LineChartCard.jsx, HorizontalBarChartCard.jsx, ProductivityHeatmap.jsx
 │   │   ├── forms/             # QuickLogWorkFormCard.jsx, InputField.jsx, SelectDropdown.jsx
 │   │   ├── feeds/             # NotificationListTable.jsx, ActivityFeedTimeline.jsx
@@ -108,6 +110,15 @@ frontend/src/
 │       └── EmployeeTaskCard.jsx
 │
 ├── hooks/                     # ⚓ CUSTOM REACT HOOKS (.JS)
+│   ├── queries/               # 🚀 TANSTACK REACT QUERY HOOKS (NAMESPACED BY ROLE)
+│   │   ├── manager/           # Query hooks cho phân hệ Manager
+│   │   │   ├── useManagerJobs.js
+│   │   │   ├── useManagerTasks.js
+│   │   │   ├── useManagerDashboard.js
+│   │   │   ├── useManagerTimesheets.js
+│   │   │   └── useManagerAuditLogs.js
+│   │   ├── employee/          # Query hooks cho phân hệ Employee
+│   │   └── admin/             # Query hooks cho phân hệ Admin
 │   ├── useAuth.js             # Interface đọc Zustand Auth Store
 │   ├── useLogin.js            # Hook form đăng nhập
 │   ├── useChangePassword.js   # Hook đổi mật khẩu
@@ -129,7 +140,7 @@ frontend/src/
 │   │   ├── ManagerDashboardPage.jsx # ✅ Trang 1: Dashboard tổng quan
 │   │   ├── ManagerJobsPage.jsx      # ✅ Trang 2: My Jobs (Job List)
 │   │   ├── ManagerJobDetailPage.jsx # ✅ Trang 3: Job Detail
-│   │   ├── ManagerKanbanPage.jsx    # ⏳ Trang 4: Kanban Board
+│   │   ├── ManagerKanbanPage.jsx    # ✅ Trang 4: Kanban Board
 │   │   ├── TaskDetailDrawer.jsx     # ⏳ Trang 5: Task Detail Drawer/Page
 │   │   ├── ManagerTeamPage.jsx      # ⏳ Trang 6: Team Members
 │   │   ├── ManagerTimesheetReviewPage.jsx # ⏳ Trang 7: Timesheet Review
@@ -161,7 +172,8 @@ frontend/src/
 │   └── useUIStore.js          # Sidebar collapse state, Theme, Modals
 │
 ├── utils/                     # Tiện ích dùng chung (.js)
-│   └── cn.js                  # Tailwind class merger (clsx + twMerge)
+│   ├── cn.js                  # Tailwind class merger (clsx + twMerge)
+│   └── errorMessages.js       # Từ điển quy đổi mã lỗi Backend (ERROR_DICTIONARY)
 │
 ├── App.jsx                    # Root App Entry
 ├── main.jsx                   # React Entry Point
@@ -199,6 +211,7 @@ Dựa trên việc phân tích toàn bộ 16 bức ảnh giao diện từ cả 3
 - **`SideDrawer.jsx`**: Cửa sổ trượt từ bên phải vào (Slide-over Panel) dùng cho Chi tiết Nhân viên, Chi tiết Task (multi-tab), Chi tiết Thông báo, Chi tiết Audit Log.
 - **`AuditDiffViewer.jsx`**: Khối hiển thị bảng so sánh 2 cột `Before` và `After` cho dữ liệu snapshot trong Audit Log.
 - **`ReportDetailDrawer.jsx`**: Drawer trích xuất báo cáo tích hợp các nút tải xuống `Export PDF`, `Export Excel`, `Export CSV`.
+- **`PromptReasonModal.jsx`**: Modal hộp thoại xác nhận yêu cầu nhập lý do thực hiện hành động (Hủy Task, Từ chối LogWork, Mở khóa kỳ công).
 
 ### 5.6 Khối Biểu đồ Analytics
 - **`DonutChartCard.jsx`**: Biểu đồ tròn có lỗ ở giữa hiển thị tổng số ở tâm (`Task Status Summary`, `Jobs by Status`, `Clients Overview`).
@@ -233,11 +246,11 @@ Dựa trên việc phân tích toàn bộ 16 bức ảnh giao diện từ cả 3
 
 ## 🗺️ 7. LỘ TRÌNH CÁC BƯỚC THỰC THI (EXECUTION ROADMAP)
 
-- [ ] **Bước 1:** Thực thi cài đặt toàn bộ các thư viện NPM trong mục 3 vào `frontend/package.json`.
-- [ ] **Bước 2:** Tạo khung cấu trúc thư mục trong `frontend/src/` theo sơ đồ mục 4.
-- [ ] **Bước 3:** Cấu hình Tailwind CSS, Axios Interceptor (`axiosClient.js`) và Zustand Auth Store (`useAuthStore.js`).
-- [ ] **Bước 4:** Xây dựng bộ **Shared Components dùng chung** tại `src/components/common/` (`Sidebar`, `Header`, `StatCard`, `DataTable`, `StatusBadge`, `SideDrawer`).
-- [ ] **Bước 5:** Ghép nối các trang giao diện cụ thể theo từng phân hệ (**Manager** ➔ **Employee** ➔ **Admin**).
+- [x] **Bước 1:** Thực thi cài đặt toàn bộ các thư viện NPM trong mục 3 vào `frontend/package.json`.
+- [x] **Bước 2:** Tạo khung cấu trúc thư mục trong `frontend/src/` theo sơ đồ mục 4.
+- [x] **Bước 3:** Cấu hình Tailwind CSS, Axios Interceptor (`axiosClient.js`) và Zustand Auth Store (`useAuthStore.js`).
+- [x] **Bước 4:** Xây dựng bộ **Shared Components dùng chung** tại `src/components/common/` (`Sidebar`, `Header`, `StatCard`, `DataTable`, `StatusBadge`, `SideDrawer`).
+- [/] **Bước 5:** Ghép nối các trang giao diện cụ thể theo từng phân hệ (Nâng cấp TanStack React Query + Debounce + WebSockets).
 
 ---
-*Tài liệu này lưu trữ tại `docs/HUONG_DAN_THUC_HIEN_FRONTEND.md` làm kim chỉ nam thực hiện phần Frontend.*
+*Tài liệu này lưu trữ tại `docs/Document/DE_XUAT_THUC_HIEN_FRONTEND.md` làm kim chỉ nam thực hiện phần Frontend.*

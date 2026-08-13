@@ -5,563 +5,109 @@
 <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
 <style>
-/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 body {
-	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
-	font-size: var(--vscode-markdown-font-size, 14px);
-	padding: 0 26px;
-	line-height: var(--vscode-markdown-line-height, 22px);
-	word-wrap: break-word;
-}
-
-#code-csp-warning {
-	position: fixed;
-	top: 0;
-	right: 0;
-	color: white;
-	margin: 16px;
-	text-align: center;
-	font-size: 12px;
-	font-family: sans-serif;
-	background-color:#444444;
-	cursor: pointer;
-	padding: 6px;
-	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
-}
-
-#code-csp-warning:hover {
-	text-decoration: none;
-	background-color:#007acc;
-	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
-}
-
-body.scrollBeyondLastLine {
-	margin-bottom: calc(100vh - 22px);
-}
-
-body.showEditorSelection .code-line {
-	position: relative;
-}
-
-body.showEditorSelection .code-active-line:before,
-body.showEditorSelection .code-line:hover:before {
-	content: "";
-	display: block;
-	position: absolute;
-	top: 0;
-	left: -12px;
-	height: 100%;
-}
-
-body.showEditorSelection li.code-active-line:before,
-body.showEditorSelection li.code-line:hover:before {
-	left: -30px;
-}
-
-.vscode-light.showEditorSelection .code-active-line:before {
-	border-left: 3px solid rgba(0, 0, 0, 0.15);
-}
-
-.vscode-light.showEditorSelection .code-line:hover:before {
-	border-left: 3px solid rgba(0, 0, 0, 0.40);
-}
-
-.vscode-light.showEditorSelection .code-line .code-line:hover:before {
-	border-left: none;
-}
-
-.vscode-dark.showEditorSelection .code-active-line:before {
-	border-left: 3px solid rgba(255, 255, 255, 0.4);
-}
-
-.vscode-dark.showEditorSelection .code-line:hover:before {
-	border-left: 3px solid rgba(255, 255, 255, 0.60);
-}
-
-.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
-	border-left: none;
-}
-
-.vscode-high-contrast.showEditorSelection .code-active-line:before {
-	border-left: 3px solid rgba(255, 160, 0, 0.7);
-}
-
-.vscode-high-contrast.showEditorSelection .code-line:hover:before {
-	border-left: 3px solid rgba(255, 160, 0, 1);
-}
-
-.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
-	border-left: none;
-}
-
-img {
-	max-width: 100%;
-	max-height: 100%;
-}
-
-a {
-	text-decoration: none;
-}
-
-a:hover {
-	text-decoration: underline;
-}
-
-a:focus,
-input:focus,
-select:focus,
-textarea:focus {
-	outline: 1px solid -webkit-focus-ring-color;
-	outline-offset: -1px;
-}
-
-hr {
-	border: 0;
-	height: 2px;
-	border-bottom: 2px solid;
-}
-
-h1 {
-	padding-bottom: 0.3em;
-	line-height: 1.2;
-	border-bottom-width: 1px;
-	border-bottom-style: solid;
-}
-
-h1, h2, h3 {
-	font-weight: normal;
-}
-
-table {
-	border-collapse: collapse;
-}
-
-table > thead > tr > th {
-	text-align: left;
-	border-bottom: 1px solid;
-}
-
-table > thead > tr > th,
-table > thead > tr > td,
-table > tbody > tr > th,
-table > tbody > tr > td {
-	padding: 5px 10px;
-}
-
-table > tbody > tr + tr > td {
-	border-top: 1px solid;
-}
-
-blockquote {
-	margin: 0 7px 0 5px;
-	padding: 0 16px 0 10px;
-	border-left-width: 5px;
-	border-left-style: solid;
-}
-
-code {
-	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
-	font-size: 1em;
-	line-height: 1.357em;
-}
-
-body.wordWrap pre {
-	white-space: pre-wrap;
-}
-
-pre:not(.hljs),
-pre.hljs code > div {
-	padding: 16px;
-	border-radius: 3px;
-	overflow: auto;
-}
-
-pre code {
-	color: var(--vscode-editor-foreground);
-	tab-size: 4;
-}
-
-/** Theming */
-
-.vscode-light pre {
-	background-color: rgba(220, 220, 220, 0.4);
-}
-
-.vscode-dark pre {
-	background-color: rgba(10, 10, 10, 0.4);
-}
-
-.vscode-high-contrast pre {
-	background-color: rgb(0, 0, 0);
-}
-
-.vscode-high-contrast h1 {
-	border-color: rgb(0, 0, 0);
-}
-
-.vscode-light table > thead > tr > th {
-	border-color: rgba(0, 0, 0, 0.69);
-}
-
-.vscode-dark table > thead > tr > th {
-	border-color: rgba(255, 255, 255, 0.69);
-}
-
-.vscode-light h1,
-.vscode-light hr,
-.vscode-light table > tbody > tr + tr > td {
-	border-color: rgba(0, 0, 0, 0.18);
-}
-
-.vscode-dark h1,
-.vscode-dark hr,
-.vscode-dark table > tbody > tr + tr > td {
-	border-color: rgba(255, 255, 255, 0.18);
-}
-
-</style>
-
-<style>
-/* Tomorrow Theme */
-/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
-/* Original theme - https://github.com/chriskempson/tomorrow-theme */
-
-/* Tomorrow Comment */
-.hljs-comment,
-.hljs-quote {
-	color: #8e908c;
-}
-
-/* Tomorrow Red */
-.hljs-variable,
-.hljs-template-variable,
-.hljs-tag,
-.hljs-name,
-.hljs-selector-id,
-.hljs-selector-class,
-.hljs-regexp,
-.hljs-deletion {
-	color: #c82829;
-}
-
-/* Tomorrow Orange */
-.hljs-number,
-.hljs-built_in,
-.hljs-builtin-name,
-.hljs-literal,
-.hljs-type,
-.hljs-params,
-.hljs-meta,
-.hljs-link {
-	color: #f5871f;
-}
-
-/* Tomorrow Yellow */
-.hljs-attribute {
-	color: #eab700;
-}
-
-/* Tomorrow Green */
-.hljs-string,
-.hljs-symbol,
-.hljs-bullet,
-.hljs-addition {
-	color: #718c00;
-}
-
-/* Tomorrow Blue */
-.hljs-title,
-.hljs-section {
-	color: #4271ae;
-}
-
-/* Tomorrow Purple */
-.hljs-keyword,
-.hljs-selector-tag {
-	color: #8959a8;
-}
-
-.hljs {
-	display: block;
-	overflow-x: auto;
-	color: #4d4d4c;
-	padding: 0.5em;
-}
-
-.hljs-emphasis {
-	font-style: italic;
-}
-
-.hljs-strong {
-	font-weight: bold;
-}
-</style>
-
-<style>
-/*
- * Markdown PDF CSS
- */
-
- body {
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
-	padding: 0 12px;
-}
-
-pre {
-	background-color: #f8f8f8;
-	border: 1px solid #cccccc;
-	border-radius: 3px;
-	overflow-x: auto;
-	white-space: pre-wrap;
-	overflow-wrap: break-word;
-}
-
-pre:not(.hljs) {
-	padding: 23px;
-	line-height: 19px;
-}
-
-blockquote {
-	background: rgba(127, 127, 127, 0.1);
-	border-color: rgba(0, 122, 204, 0.5);
-}
-
-.emoji {
-	height: 1.4em;
-}
-
-code {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	font-size: 14px;
-	line-height: 19px;
+	padding: 24px 32px;
+	line-height: 1.6;
+	color: #1e293b;
+	background-color: #ffffff;
+	max-width: 1200px;
+	margin: 0 auto;
 }
-
-/* for inline code */
-:not(pre):not(.hljs) > code {
-	color: #3333ff; /* Change the old color so it seems less like an error */
-	font-size: inherit;
+h1, h2, h3, h4 {
+	color: #0f172a;
+	font-weight: 700;
 }
-
-/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
--------------------------------------------------------- */
-.page {
-	page-break-after: always;
+h1 { font-size: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+h2 { font-size: 18px; margin-top: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 16px 0;
 }
-
+th, td {
+	border: 1px solid #cbd5e1;
+	padding: 8px 12px;
+	text-align: left;
+	font-size: 13px;
+}
+th {
+	background-color: #f8fafc;
+	font-weight: 700;
+}
+code {
+	background-color: #f1f5f9;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-family: monospace;
+	font-size: 12px;
+	color: #0f172a;
+}
+pre {
+	background-color: #0f172a;
+	color: #f8fafc;
+	padding: 16px;
+	border-radius: 8px;
+	overflow-x: auto;
+}
+pre code {
+	background-color: transparent;
+	color: inherit;
+}
 </style>
-
-<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
 </head>
 <body>
-  <script>
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
-          ? 'dark'
-          : 'default'
-    });
-  </script>
-<h1 id="-hướng-dẫn-chi-tiết-triển-khai-frontend-react-vite">📘 HƯỚNG DẪN CHI TIẾT TRIỂN KHAI FRONTEND (REACT VITE)</h1>
+
+<h1>📘 HƯỚNG DẪN CHI TIẾT TRIỂN KHAI FRONTEND (REACT VITE)</h1>
 <p><strong>Dự án:</strong> WorkTracker Pro (Django REST Framework + React Vite)<br>
 <strong>Tài liệu:</strong> Frontend Implementation Master Guide<br>
-<strong>Ngày lập:</strong> 24/07/2026</p>
+<strong>Cập nhật lần cuối:</strong> 13/08/2026</p>
+
 <hr>
-<h2 id="-1-tổng-quan--quy-tắc-công-nghệ-core-principles">🎯 1. TỔNG QUAN &amp; QUY TẮC CÔNG NGHỆ (CORE PRINCIPLES)</h2>
+
+<h2>🎯 1. TỔNG QUAN & QUY TẮC CÔNG NGHỆ (CORE PRINCIPLES)</h2>
 <ol>
-<li><strong>Kiến trúc:</strong> Single Page Application (SPA) xây dựng trên nền <strong>React (Vite)</strong> kết nối với Backend <strong>Django REST Framework</strong> qua REST API và WebSockets (<code>ws/notifications/</code>).</li>
-<li><strong>Quy tắc ngôn ngữ:</strong> <strong>Sử dụng 100% thuần JavaScript (<code>.js</code> cho các file logic/service/store/utils và <code>.jsx</code> cho các file React Components)</strong>. Không sử dụng TypeScript (<code>.ts</code>/<code>.tsx</code>).</li>
-<li><strong>Thiết kế Giao diện (Design System):</strong> Thống nhất 100% về giao diện giữa 3 phân hệ (<strong>Admin</strong>, <strong>Manager</strong>, <strong>Employee</strong>), sử dụng màu nền Slate Dark (<code>#0F172A</code>) cho Sidebar và tông màu xám sáng nhã nhặn cho nội dung chính.</li>
+  <li><strong>Kiến trúc:</strong> Single Page Application (SPA) xây dựng trên nền <strong>React (Vite)</strong> kết nối với Backend <strong>Django REST Framework</strong> qua REST API và WebSockets (<code>ws/notifications/</code>).</li>
+  <li><strong>Quy tắc ngôn ngữ:</strong> <strong>Sử dụng 100% thuần JavaScript (<code>.js</code> và <code>.jsx</code>)</strong>. Không sử dụng TypeScript.</li>
+  <li><strong>Thiết kế Giao diện:</strong> Thống nhất 100% về giao diện giữa 3 phân hệ (<strong>Admin</strong>, <strong>Manager</strong>, <strong>Employee</strong>), sử dụng màu nền Slate Dark (<code>#0F172A</code>) cho Sidebar.</li>
+  <li><strong>Data Management & State:</strong> Sử dụng <strong><code>@tanstack/react-query</code></strong> cho toàn bộ việc fetch, caching, revalidation và optimistic updates.</li>
 </ol>
-<h3 id="-trạng-thái-thiết-kế-giao-diện-phân-hệ-manager-12-trang-nâng-cấp">📌 Trạng thái Thiết kế Giao diện Phân hệ Manager (12 Trang Nâng Cấp):</h3>
+
+<h3>📌 Trạng thái Thiết kế & Nâng cấp Giao diện Phân hệ Manager (12 Trang):</h3>
 <table>
-<thead>
-<tr>
-<th style="text-align:center">Thứ tự</th>
-<th style="text-align:left">Trang Manager</th>
-<th style="text-align:left">Luồng truy cập &amp; Lý do</th>
-<th style="text-align:center">Trạng thái Thiết kế</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center"><strong>1</strong></td>
-<td style="text-align:left"><strong>Dashboard</strong></td>
-<td style="text-align:left">Trang tổng quan chính của Manager</td>
-<td style="text-align:center">✅ <strong>Đã chốt</strong> (Có ảnh)</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>2</strong></td>
-<td style="text-align:left"><strong>My Jobs (Job List)</strong></td>
-<td style="text-align:left">Trung tâm điều hướng dự án của Manager</td>
-<td style="text-align:center">✅ <strong>Đã chốt</strong> (Có ảnh)</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>3</strong></td>
-<td style="text-align:left"><strong>Job Detail</strong></td>
-<td style="text-align:left">Mở từ danh sách Job List</td>
-<td style="text-align:center">✅ <strong>Đã chốt</strong> (Có ảnh)</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>4</strong></td>
-<td style="text-align:left"><strong>Kanban Board</strong></td>
-<td style="text-align:left">Mở từ trang Job Detail</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>5</strong></td>
-<td style="text-align:left"><strong>Task Detail Drawer/Page</strong></td>
-<td style="text-align:left">Mở từ bảng Kanban Board</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>6</strong></td>
-<td style="text-align:left"><strong>Team Members</strong></td>
-<td style="text-align:left">Xem danh sách nhân sự của Job</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>7</strong></td>
-<td style="text-align:left"><strong>Timesheet Review</strong></td>
-<td style="text-align:left">Duyệt nhật ký giờ làm việc</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>8</strong></td>
-<td style="text-align:left"><strong>Time Lock</strong></td>
-<td style="text-align:left">Khóa kỳ công chốt sổ</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>9</strong></td>
-<td style="text-align:left"><strong>Reports</strong></td>
-<td style="text-align:left">Báo cáo &amp; Trích xuất file</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>10</strong></td>
-<td style="text-align:left"><strong>Notifications</strong></td>
-<td style="text-align:left">Trung tâm thông báo</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>11</strong></td>
-<td style="text-align:left"><strong>Profile</strong></td>
-<td style="text-align:left">Hồ sơ cá nhân</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-<tr>
-<td style="text-align:center"><strong>12</strong></td>
-<td style="text-align:left"><strong>Settings</strong></td>
-<td style="text-align:left">Cài đặt hệ thống</td>
-<td style="text-align:center">⏳ Đang thiết kế</td>
-</tr>
-</tbody>
+  <thead>
+    <tr>
+      <th>Thứ tự</th>
+      <th>Trang Manager</th>
+      <th>Luồng truy cập & Lý do</th>
+      <th>Trạng thái Thực tế</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Dashboard</strong></td><td>Trang tổng quan chính của Manager</td><td>✅ <strong>Hoàn thành 100%</strong> (TanStack Query + Donut Fix)</td></tr>
+    <tr><td>2</td><td><strong>My Jobs (Job List)</strong></td><td>Trung tâm điều hướng dự án của Manager</td><td>✅ <strong>Hoàn thành 100%</strong> (TanStack Query + Pagination)</td></tr>
+    <tr><td>3</td><td><strong>Job Detail</strong></td><td>Mở từ danh sách Job List</td><td>✅ <strong>Hoàn thành 100%</strong> (TanStack Query 4 Tabs)</td></tr>
+    <tr><td>4</td><td><strong>Kanban Board</strong></td><td>Mở từ trang Job Detail</td><td>✅ <strong>Hoàn thành 100%</strong> (TanStack Query + Optimistic 0.01s + Internal Scroll)</td></tr>
+    <tr><td>5</td><td><strong>Task Detail Drawer/Page</strong></td><td>Mở từ bảng Kanban Board</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>6</td><td><strong>Team Members</strong></td><td>Xem danh sách nhân sự của Job</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>7</td><td><strong>Timesheet Review</strong></td><td>Duyệt nhật ký giờ làm việc</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>8</td><td><strong>Time Lock</strong></td><td>Khóa kỳ công chốt sổ</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>9</td><td><strong>Reports</strong></td><td>Báo cáo & Trích xuất file</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>10</td><td><strong>Notifications</strong></td><td>Trung tâm thông báo</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>11</td><td><strong>Profile</strong></td><td>Hồ sơ cá nhân</td><td>⏳ Đang nâng cấp</td></tr>
+    <tr><td>12</td><td><strong>Settings</strong></td><td>Cài đặt hệ thống</td><td>⏳ Đang nâng cấp</td></tr>
+  </tbody>
 </table>
+
 <hr>
-<h2 id="-2-thống-kê-thư-viện-npm-cần-dùng-package-inventory">📦 2. THỐNG KÊ THƯ VIỆN NPM CẦN DÙNG (PACKAGE INVENTORY)</h2>
-<p>Dưới đây là danh sách đầy đủ tất cả các thư viện NPM cần cài đặt cho dự án:</p>
-<table>
-<thead>
-<tr>
-<th style="text-align:left">Nhóm chức năng</th>
-<th style="text-align:left">Thư viện (NPM Package)</th>
-<th style="text-align:left">Vai trò &amp; Mục đích sử dụng</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left"><strong>Lõi App &amp; Routing</strong></td>
-<td style="text-align:left"><code>react-router-dom</code></td>
-<td style="text-align:left">Định tuyến trang SPA và điều hướng Protected Route Guards theo Role</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Quản lý State</strong></td>
-<td style="text-align:left"><code>zustand</code></td>
-<td style="text-align:left">Lưu Global Auth Token, User Info, Notification Badge, Sidebar Collapse State</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Data Fetching &amp; Cache</strong></td>
-<td style="text-align:left"><code>@tanstack/react-query</code></td>
-<td style="text-align:left">Quản lý Cache API, tự động revalidate, polling dữ liệu</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Kết nối HTTP Client</strong></td>
-<td style="text-align:left"><code>axios</code></td>
-<td style="text-align:left">Đính kèm Bearer JWT Token, tự động Refresh Token, xử lý lỗi 401/403/404</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>CSS &amp; Styling</strong></td>
-<td style="text-align:left"><code>tailwindcss</code>, <code>@tailwindcss/vite</code>, <code>clsx</code>, <code>tailwind-merge</code></td>
-<td style="text-align:left">Styling giao diện linh hoạt, hàm tiện ích <code>cn()</code> ghép class động</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Bộ Icon</strong></td>
-<td style="text-align:left"><code>lucide-react</code></td>
-<td style="text-align:left">Bộ Icon chuẩn SaaS (Folder, Play, Eye, Calendar, Bell, User, Lock,...)</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Bảng dữ liệu (Table)</strong></td>
-<td style="text-align:left"><code>@tanstack/react-table</code></td>
-<td style="text-align:left">Bảng phân trang, sắp xếp cột, lọc dữ liệu dung lượng lớn</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Kéo-thả Kanban</strong></td>
-<td style="text-align:left"><code>@dnd-kit/core</code>, <code>@dnd-kit/sortable</code>, <code>@dnd-kit/utilities</code></td>
-<td style="text-align:left">Kéo thả Card giữa các cột Kanban (<code>TODO</code>, <code>IN_PROGRESS</code>, <code>IN_REVIEW</code>,...)</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Biểu đồ Analytics</strong></td>
-<td style="text-align:left"><code>recharts</code></td>
-<td style="text-align:left">Biểu đồ Donut Chart, Grouped Bar Chart, Line Chart, Productivity Heatmap Grid</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Xử lý Form &amp; Validate</strong></td>
-<td style="text-align:left"><code>react-hook-form</code>, <code>zod</code>, <code>@hookform/resolvers</code></td>
-<td style="text-align:left">Validate dữ liệu Form phía Client trước khi gửi API</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Realtime &amp; Toast</strong></td>
-<td style="text-align:left"><code>react-use-websocket</code>, <code>sonner</code></td>
-<td style="text-align:left">Kết nối WebSocket <code>ws/notifications/</code> &amp; Toast thông báo nảy góc</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Thời gian &amp; Date</strong></td>
-<td style="text-align:left"><code>date-fns</code></td>
-<td style="text-align:left">Format định dạng ngày tháng (<code>YYYY-MM-DD</code>, <code>HH:mm</code>, <code>time ago</code>)</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>Headless UI Primitives</strong></td>
-<td style="text-align:left"><code>@radix-ui/react-dialog</code>, <code>@radix-ui/react-dropdown-menu</code>, <code>@radix-ui/react-select</code>, <code>@radix-ui/react-tabs</code>, <code>@radix-ui/react-tooltip</code></td>
-<td style="text-align:left">Bộ linh kiện nguyên tử chuẩn Shadcn UI cho Modal, Drawer, Select</td>
-</tr>
-</tbody>
-</table>
-<hr>
-<h2 id="️-3-lệnh-cài-đặt-từng-bước-step-by-step-terminal-commands">🛠️ 3. LỆNH CÀI ĐẶT TỪNG BƯỚC (STEP-BY-STEP TERMINAL COMMANDS)</h2>
-<p>Thực hiện chạy các lệnh PowerShell dưới đây tại thư mục <code>frontend/</code>:</p>
-<pre class="hljs"><code><div><span class="hljs-comment"># 1. Di chuyển vào thư mục frontend</span>
-<span class="hljs-built_in">cd</span> frontend
 
-<span class="hljs-comment"># 2. Cài đặt Tailwind CSS v4</span>
-npm install <span class="hljs-literal">-D</span> tailwindcss @tailwindcss/vite
-
-<span class="hljs-comment"># 3. Cài đặt các thư viện Lõi (Routing, State, API Client, Icons)</span>
-npm install react<span class="hljs-literal">-router-dom</span> zustand @tanstack/react<span class="hljs-literal">-query</span> axios lucide<span class="hljs-literal">-react</span> clsx tailwind<span class="hljs-literal">-merge</span> date<span class="hljs-literal">-fns</span>
-
-<span class="hljs-comment"># 4. Cài đặt các thư viện Chuyên dụng (Table, Recharts, dnd-kit, WebSockets, Toast)</span>
-npm install @tanstack/react<span class="hljs-literal">-table</span> recharts @dnd<span class="hljs-literal">-kit</span>/core @dnd<span class="hljs-literal">-kit</span>/sortable @dnd<span class="hljs-literal">-kit</span>/utilities react<span class="hljs-literal">-use-websocket</span> sonner
-
-<span class="hljs-comment"># 5. Cài đặt các thư viện Form &amp; Headless UI (Radix UI)</span>
-npm install react<span class="hljs-literal">-hook-form</span> zod @hookform/resolvers @radix<span class="hljs-literal">-ui</span>/react<span class="hljs-literal">-dialog</span> @radix<span class="hljs-literal">-ui</span>/react<span class="hljs-literal">-dropdown-menu</span> @radix<span class="hljs-literal">-ui</span>/react<span class="hljs-literal">-select</span> @radix<span class="hljs-literal">-ui</span>/react<span class="hljs-literal">-tabs</span> @radix<span class="hljs-literal">-ui</span>/react<span class="hljs-literal">-tooltip</span>
-</div></code></pre>
-<hr>
-<h2 id="-4-cấu-trúc-thư-mục-dự-án-frontend-js--jsx-architecture">📂 4. CẤU TRÚC THƯ MỤC DỰ ÁN FRONTEND (JS / JSX ARCHITECTURE)</h2>
-<p>Dưới đây là cấu trúc thư mục chuẩn được sắp xếp khoa học trong <code>frontend/src/</code>:</p>
-<pre class="hljs"><code><div>frontend/src/
+<h2>📂 4. CẤU TRÚC THƯ MỤC DỰ ÁN FRONTEND (JS / JSX ARCHITECTURE)</h2>
+<pre><code>frontend/src/
+├── api/                       # 🌐 API CLIENT CHỦ CHỐT (AXIOS & CORE APIS)
+│   ├── axiosClient.js         # Instance Axios trung tâm (Timeout 15s + Queue 401)
+│   ├── authApi.js             # API Auth (Login, Forgot/Reset/Change password)
+│   └── profileApi.js          # API Profile & Upload Avatar
 ├── assets/                    # Hình ảnh, logo WorkTracker, icon tĩnh
 ├── components/
 │   ├── common/                # 🟩 COMPONENT DÙNG CHUNG TOÀN HỆ THỐNG (3 ROLES)
@@ -570,252 +116,36 @@ npm install react<span class="hljs-literal">-hook-form</span> zod @hookform/reso
 │   │   ├── table/             # DataTable.jsx, PaginationBar.jsx, FilterToolbar.jsx, ViewToggle.jsx
 │   │   ├── badges/            # StatusBadge.jsx, PriorityBadge.jsx, RoleBadge.jsx, SeverityBadge.jsx
 │   │   ├── drawer/            # SideDrawer.jsx, AuditDiffViewer.jsx, ReportDetailDrawer.jsx
+│   │   ├── modal/             # BaseModal.jsx, PromptReasonModal.jsx
 │   │   ├── charts/            # DonutChartCard.jsx, LineChartCard.jsx, HorizontalBarChartCard.jsx, ProductivityHeatmap.jsx
 │   │   ├── forms/             # QuickLogWorkFormCard.jsx, InputField.jsx, SelectDropdown.jsx
 │   │   ├── feeds/             # NotificationListTable.jsx, ActivityFeedTimeline.jsx
 │   │   └── profile/           # AvatarUploadCard.jsx, ProfileFormCard.jsx, AccountSecurityCard.jsx
-│   │
 │   ├── admin/                 # 🟨 Component riêng của phân hệ Admin
-│   │   └── RolePermissionsDrawer.jsx
 │   ├── manager/               # 🟦 Component riêng của phân hệ Manager
-│   │   ├── TaskDetailDrawer.jsx
-│   │   ├── CreateJobModal.jsx
-│   │   └── TimeLockModal.jsx
 │   └── employee/              # 🟪 Component riêng của phân hệ Employee
-│       └── EmployeeTaskCard.jsx
-│
-├── layouts/                   # Khung Router Layout bọc giao diện
-│   ├── MainLayout.jsx
-│   ├── AdminLayout.jsx
-│   ├── ManagerLayout.jsx
-│   └── EmployeeLayout.jsx
-│
-├── pages/                     # Màn hình trang chính (Pages)
-│   ├── auth/                  # LoginPage.jsx, ForgotPasswordPage.jsx
-│   ├── admin/                 # GlobalDashboard, Clients, Jobs, Employees, TimesheetControl, AuditLogs, Reports, Settings
-│   ├── manager/               # TRANG GIAO DIỆN PHÂN HỆ MANAGER (12 TRANG)
-│   │   ├── ManagerDashboardPage.jsx # ✅ Trang 1: Dashboard tổng quan
-│   │   ├── ManagerJobsPage.jsx      # ✅ Trang 2: My Jobs (Job List)
-│   │   ├── ManagerJobDetailPage.jsx # ✅ Trang 3: Job Detail
-│   │   ├── ManagerKanbanPage.jsx    # ⏳ Trang 4: Kanban Board
-│   │   ├── TaskDetailDrawer.jsx     # ⏳ Trang 5: Task Detail Drawer/Page
-│   │   ├── ManagerTeamPage.jsx      # ⏳ Trang 6: Team Members
-│   │   ├── ManagerTimesheetReviewPage.jsx # ⏳ Trang 7: Timesheet Review
-│   │   ├── ManagerTimeLockPage.jsx  # ⏳ Trang 8: Time Lock
-│   │   ├── ManagerReportsPage.jsx   # ⏳ Trang 9: Reports
-│   │   ├── ManagerNotificationsPage.jsx # ⏳ Trang 10: Notifications
-│   │   ├── ManagerProfilePage.jsx   # ⏳ Trang 11: Profile
-│   │   └── ManagerSettingsPage.jsx  # ⏳ Trang 12: Settings
-│   └── employee/              # EmployeeDashboard, MyTasks, EmployeeTimesheet, Notifications, MyPerformance, Profile
-│
-├── services/                  # Gọi API Backend qua Axios (.js)
-│   ├── axiosClient.js           # Axios instance + Interceptor (JWT + Token Revocation)
-│   ├── authService.js         # Login, Refresh token, Logout
-│   ├── jobService.js          # CRUD Job, Change status, List active clients
-│   ├── taskService.js         # CRUD Task, Kanban Move, Transition, Comments, Uploads
-│   ├── timesheetService.js    # Review LogWork (Approve/Reject/Correct/Void), TimeLock
-│   ├── reportService.js       # Dashboard stats, Export XLSX/PDF
-│   ├── teamService.js         # List employees, Assign department
-│   └── systemService.js       # Notifications, Audit logs
-│
-├── store/                     # Zustand Global Stores (.js)
-│   ├── useAuthStore.js        # User profile, Access/Refresh Token, Role
-│   ├── useNotificationStore.js# Danh sách thông báo &amp; đếm số tin chưa đọc
-│   └── useUIStore.js          # Sidebar collapse state, Theme, Modals
-│
-├── hooks/                     # Custom React Hooks (.js)
+├── hooks/                     # ⚓ CUSTOM REACT HOOKS (.JS)
+│   ├── queries/               # 🚀 TANSTACK REACT QUERY HOOKS (NAMESPACED BY ROLE)
+│   │   ├── manager/           # useManagerJobs.js, useManagerTasks.js, useManagerDashboard.js, useManagerTimesheets.js, useManagerAuditLogs.js
+│   │   ├── employee/
+│   │   └── admin/
+│   ├── useAuth.js
+│   ├── useLogin.js
+│   ├── useChangePassword.js
+│   ├── useForgotPassword.js
+│   ├── useResetPassword.js
+│   ├── useProfile.js
 │   ├── useWebSocket.js        # Hook kết nối WebSocket thời gian thực
-│   ├── useDebounce.js         # Hook hoãn tìm kiếm (Debounce Search)
-│   └── usePermissions.js      # Hook kiểm tra quyền nút bấm (Action-level check)
-│
-├── utils/                     # Tiện ích dùng chung (.js)
-│   ├── cn.js                  # Tailwind class merger (clsx + twMerge)
-│   ├── formatters.js          # Format tiền tệ, số giờ (2,450h), định dạng ngày
-│   └── constants.js           # Job status, Task status, Priority ENUMs
-│
-├── App.jsx                    # Root Router &amp; Providers
-├── main.jsx                   # React Entry Point
-└── index.css                  # Tailwind CSS Global Imports
-</div></code></pre>
-<hr>
-<h2 id="-5-danh-sách-component-dùng-chung-shared-component-inventory">🎨 5. DANH SÁCH COMPONENT DÙNG CHUNG (SHARED COMPONENT INVENTORY)</h2>
-<p>Dựa trên việc phân tích toàn bộ 16 bức ảnh giao diện từ cả 3 phân hệ (<strong>Admin</strong>, <strong>Manager</strong>, <strong>Employee</strong>), dưới đây là danh sách các Component dùng chung được đóng gói tại <code>src/components/common/</code>:</p>
-<h3 id="51-khối-layout--khung-trang">5.1 Khối Layout &amp; Khung Trang</h3>
-<ul>
-<li><strong><code>Sidebar.jsx</code></strong>: Thanh điều hướng bên trái theme Dark Slate (<code>#0F172A</code>), chứa logo, danh mục menu dynamic theo Role, quick access, recent items và thẻ User profile footer.</li>
-<li><strong><code>Header.jsx</code></strong>: Thanh Header phía trên chứa Breadcrumb, Ô tìm kiếm <code>Search (Ctrl + K)</code>, Quả chuông Notification Badge và Dropdown Avatar User.</li>
-</ul>
-<h3 id="52-khối-thẻ-thống-kê-kpi--tiến-độ">5.2 Khối Thẻ Thống kê KPI &amp; Tiến độ</h3>
-<ul>
-<li><strong><code>StatCard.jsx</code></strong>: Thẻ thống kê KPI dùng cho tất cả các trang Dashboard/Management (Icon màu + Tiêu đề + Con số in đậm + Chỉ số so sánh).</li>
-<li><strong><code>DailyLimitProgressBar.jsx</code></strong>: Thanh tiến độ đếm số giờ làm trong ngày (VD: <code>6.5h / 24h</code>) kèm tính toán giờ còn lại và tô màu xanh/cam/đỏ.</li>
-<li><strong><code>SystemPolicyCard.jsx</code></strong>: Thẻ hiển thị tóm tắt các chính sách quy định hệ thống.</li>
-</ul>
-<h3 id="53-bảng-dữ-liệu--bộ-lọc">5.3 Bảng Dữ liệu &amp; Bộ lọc</h3>
-<ul>
-<li><strong><code>DataTable.jsx</code></strong>: Bảng dữ liệu TanStack Table Wrapper hỗ trợ sắp xếp cột, hiển thị avatar, progress bar, badges và nút thao tác <code>Actions</code>.</li>
-<li><strong><code>PaginationBar.jsx</code></strong>: Thanh phân trang chân bảng (<code>Showing X to Y of Z results</code>, <code>Items per page</code>, nút điều hướng <code>« &lt; 1 2 3 &gt; »</code>).</li>
-<li><strong><code>FilterToolbar.jsx</code></strong>: Thanh tìm kiếm từ khóa, dropdown lọc danh mục, trình chọn khoảng ngày, nút <code>Filter</code> &amp; <code>Reset</code>.</li>
-<li><strong><code>ViewToggle.jsx</code></strong>: Nút chuyển đổi chế độ xem giữa <code>List View</code> ↔ <code>Kanban View</code> ↔ <code>Week View</code> ↔ <code>Calendar View</code>.</li>
-</ul>
-<h3 id="54-hệ-thống-nhãn-badge">5.4 Hệ thống Nhãn Badge</h3>
-<ul>
-<li><strong><code>StatusBadge.jsx</code></strong>: Hiển thị trạng thái tô màu (<code>Active</code>, <code>Running</code>, <code>On Hold</code>, <code>Completed</code>, <code>Pending</code>, <code>Reviewing</code>, <code>Locked</code>, <code>Overdue</code>, <code>Cancelled</code>).</li>
-<li><strong><code>PriorityBadge.jsx</code></strong>: Nhãn mức độ ưu tiên (<code>Low</code>, <code>Medium</code>, <code>High</code>, <code>Urgent</code>).</li>
-<li><strong><code>RoleBadge.jsx</code></strong>: Nhãn phân loại chức danh (<code>Admin</code>, <code>Manager</code>, <code>Employee</code>).</li>
-<li><strong><code>SeverityBadge.jsx</code></strong>: Nhãn mức độ nghiêm trọng cho Audit Logs (<code>Critical</code>, <code>Warning</code>, <code>Normal</code>).</li>
-</ul>
-<h3 id="55-khối-cửa-sổ-trượt--overlay">5.5 Khối Cửa sổ Trượt &amp; Overlay</h3>
-<ul>
-<li><strong><code>SideDrawer.jsx</code></strong>: Cửa sổ trượt từ bên phải vào (Slide-over Panel) dùng cho Chi tiết Nhân viên, Chi tiết Task (multi-tab), Chi tiết Thông báo, Chi tiết Audit Log.</li>
-<li><strong><code>AuditDiffViewer.jsx</code></strong>: Khối hiển thị bảng so sánh 2 cột <code>Before</code> và <code>After</code> cho dữ liệu snapshot trong Audit Log.</li>
-<li><strong><code>ReportDetailDrawer.jsx</code></strong>: Drawer trích xuất báo cáo tích hợp các nút tải xuống <code>Export PDF</code>, <code>Export Excel</code>, <code>Export CSV</code>.</li>
-</ul>
-<h3 id="56-khối-biểu-đồ-analytics">5.6 Khối Biểu đồ Analytics</h3>
-<ul>
-<li><strong><code>DonutChartCard.jsx</code></strong>: Biểu đồ tròn có lỗ ở giữa hiển thị tổng số ở tâm (<code>Task Status Summary</code>, <code>Jobs by Status</code>, <code>Clients Overview</code>).</li>
-<li><strong><code>LineChartCard.jsx</code></strong>: Biểu đồ đường biến động theo thời gian (<code>Logged Hours Trend</code>, <code>Total Work Hours</code>).</li>
-<li><strong><code>HorizontalBarChartCard.jsx</code></strong>: Biểu đồ cột nằm ngang (<code>Hours by Project</code>).</li>
-<li><strong><code>ProductivityHeatmap.jsx</code></strong>: Ma trận biểu đồ nhiệt giờ làm việc của nhân viên theo các ngày trong tháng.</li>
-</ul>
-<hr>
-<h2 id="-6-ma-trận-tái-sử-dụng-component-reuse-matrix">📋 6. MA TRẬN TÁI SỬ DỤNG COMPONENT (REUSE MATRIX)</h2>
-<table>
-<thead>
-<tr>
-<th style="text-align:left">Component (.jsx)</th>
-<th style="text-align:center">Admin Portal</th>
-<th style="text-align:center">Manager Portal</th>
-<th style="text-align:center">Employee Portal</th>
-<th style="text-align:left">Vị trí File trong Code</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left"><strong><code>Sidebar</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/layout/Sidebar.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>Header</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/layout/Header.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>StatCard</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/cards/StatCard.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>DailyLimitProgressBar</code></strong></td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/cards/DailyLimitProgressBar.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>DataTable</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/table/DataTable.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>PaginationBar</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/table/PaginationBar.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>FilterToolbar</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/table/FilterToolbar.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>ViewToggle</code></strong></td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/table/ViewToggle.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>StatusBadge</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/badges/StatusBadge.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>PriorityBadge</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/badges/PriorityBadge.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>RoleBadge</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/badges/RoleBadge.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>SideDrawer</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/drawer/SideDrawer.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>AuditDiffViewer</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:left"><code>src/components/common/drawer/AuditDiffViewer.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>DonutChartCard</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/charts/DonutChartCard.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>LineChartCard</code></strong></td>
-<td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/charts/LineChartCard.jsx</code></td>
-</tr>
-<tr>
-<td style="text-align:left"><strong><code>QuickLogWorkFormCard</code></strong></td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
-<td style="text-align:left"><code>src/components/common/forms/QuickLogWorkFormCard.jsx</code></td>
-</tr>
-</tbody>
-</table>
-<hr>
-<h2 id="️-7-lộ-trình-các-bước-thực-thi-execution-roadmap">🗺️ 7. LỘ TRÌNH CÁC BƯỚC THỰC THI (EXECUTION ROADMAP)</h2>
-<ul>
-<li><input type="checkbox" id="checkbox0"><label for="checkbox0"><strong>Bước 1:</strong> Thực thi cài đặt toàn bộ các thư viện NPM trong mục 3 vào <code>frontend/package.json</code>.</label></li>
-<li><input type="checkbox" id="checkbox1"><label for="checkbox1"><strong>Bước 2:</strong> Tạo khung cấu trúc thư mục trong <code>frontend/src/</code> theo sơ đồ mục 4.</label></li>
-<li><input type="checkbox" id="checkbox2"><label for="checkbox2"><strong>Bước 3:</strong> Cấu hình Tailwind CSS, Axios Interceptor (<code>axiosClient.js</code>) và Zustand Auth Store (<code>useAuthStore.js</code>).</label></li>
-<li><input type="checkbox" id="checkbox3"><label for="checkbox3"><strong>Bước 4:</strong> Xây dựng bộ <strong>Shared Components dùng chung</strong> tại <code>src/components/common/</code> (<code>Sidebar</code>, <code>Header</code>, <code>StatCard</code>, <code>DataTable</code>, <code>StatusBadge</code>, <code>SideDrawer</code>).</label></li>
-<li><input type="checkbox" id="checkbox4"><label for="checkbox4"><strong>Bước 5:</strong> Ghép nối các trang giao diện cụ thể theo từng phân hệ (<strong>Manager</strong> ➔ <strong>Employee</strong> ➔ <strong>Admin</strong>).</label></li>
-</ul>
-<hr>
-<p><em>Tài liệu này lưu trữ tại <code>docs/HUONG_DAN_THUC_HIEN_FRONTEND.md</code> làm kim chỉ nam thực hiện phần Frontend.</em></p>
+│   └── useDebounce.js         # Hook hoãn tìm kiếm (Debounce Search)
+├── layouts/                   # AdminLayout.jsx, ManagerLayout.jsx, EmployeeLayout.jsx
+├── pages/                     # Màn hình trang chính (Pages)
+├── router/                    # AppRouter.jsx, ProtectedRoute.jsx, RoleRoute.jsx
+├── services/                  # Gọi API Backend phân hệ qua Axios (.js)
+├── stores/                    # ZUSTAND GLOBAL STORES (.JS)
+└── utils/                     # cn.js, errorMessages.js
+</code></pre>
 
+<hr>
+<p><em>Tài liệu được đồng bộ liên tục với mã nguồn thực tế WorkTracker Pro.</em></p>
 </body>
 </html>
