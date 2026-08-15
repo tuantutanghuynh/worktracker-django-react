@@ -136,4 +136,4 @@ class Command(BaseCommand):
                 RolePermission.objects.get_or_create(role=employee_role, permission=perm)
             self.stdout.write('5. RolePermissions seeded cho EMPLOYEE.')
 
-        self.stdout.write(self.style.SUCCESS('\n🎉 Đã Seed dữ liệu phân quyền hoàn tất & an toàn tuyệt đối!'))
+        self.stdout.write(self.style.SUCCESS('\nDa Seed du lieu phan quyen hoan tat & an toan tuyet doi!'))

@@ -44,12 +44,14 @@ class ManagerAuditLogSerializer(serializers.ModelSerializer):
         read_only=True,
         default=None,
     )
+    actor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = AuditLog
         fields = [
             "id",
             "actor_email",
+            "actor_name",
             "action",
             "table_name",
             "record_id",
@@ -59,3 +61,12 @@ class ManagerAuditLogSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_actor_name(self, obj):
+        if not obj.user:
+            return "System"
+        profile = getattr(obj.user, "profile", None)
+        if profile and profile.full_name:
+            return profile.full_name
+        return obj.user.email.split("@")[0]
+

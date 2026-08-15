@@ -1,464 +1,417 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Settings,
-  Clock,
   Bell,
-  Globe,
-  Sliders,
   ShieldCheck,
-  Save,
   RotateCcw,
-  CheckCircle2,
+  Search,
+  Filter,
   Calendar,
   Layers,
-  Sparkles,
-  Info,
-  RefreshCw,
-  Search,
-  ChevronRight,
+  History,
+  User,
+  Volume2,
+  VolumeX,
+  ExternalLink,
+  Sliders,
+  CheckCircle2,
+  Lock,
+  FileText
 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
-import InputField from '../../components/common/forms/InputField';
+
+import DataTable from '../../components/common/table/DataTable';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import { useManagerAuditLogs } from '../../hooks/queries/manager/useManagerAuditLogs';
+
+function formatDateSafe(dateStr, pattern = 'dd/MM/yyyy HH:mm:ss') {
+  if (!dateStr) return 'N/A';
+  try {
+    return format(parseISO(dateStr), pattern);
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function ManagerSettingsPage() {
-  const [activeTab, setActiveTab] = useState('GENERAL'); // 'GENERAL' | 'TIMESHEET' | 'NOTIFICATIONS'
-  const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('AUDIT_LOGS'); // 'AUDIT_LOGS' | 'PREFERENCES'
 
-  // Settings State
-  const [settings, setSettings] = useState({
-    // General & Regional Preferences
-    systemLanguage: 'en-us',
-    timeZone: 'Asia/Ho_Chi_Minh',
-    dateFormat: 'YYYY-MM-DD',
-    pageSize: '20',
-    defaultJobView: 'KANBAN',
-
-    // Working Hours & Timesheet Rules
-    workStartTime: '08:00',
-    workEndTime: '17:30',
-    dailyTargetHours: '8.0',
-    workingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-    requireUnlockReason: true,
-
-    // Notification Triggers
-    timesheetSubmittedAlert: true,
-    taskStatusChangedAlert: true,
-    timeLockAlert: true,
-    realtimePushNotifs: true,
+  // Preferences State (Persisted in localStorage)
+  const [preferences, setPreferences] = useState(() => {
+    try {
+      const saved = localStorage.getItem('manager_user_preferences');
+      return saved
+        ? JSON.parse(saved)
+        : {
+            soundAlerts: true,
+            autoRefreshFeed: true,
+            tableDensity: 'STANDARD', // 'COMPACT' | 'STANDARD'
+          };
+    } catch {
+      return {
+        soundAlerts: true,
+        autoRefreshFeed: true,
+        tableDensity: 'STANDARD',
+      };
+    }
   });
 
-  const handleSaveSettings = (e) => {
-    if (e) e.preventDefault();
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast.success('System preferences and settings saved successfully!');
-    }, 500);
-  };
+  // Audit Logs Filter State
+  const [selectedAction, setSelectedAction] = useState('');
+  const [selectedTable, setSelectedTable] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const handleResetDefaults = () => {
-    setSettings({
-      systemLanguage: 'en-us',
-      timeZone: 'Asia/Ho_Chi_Minh',
-      dateFormat: 'YYYY-MM-DD',
-      pageSize: '20',
-      defaultJobView: 'KANBAN',
-      workStartTime: '08:00',
-      workEndTime: '17:30',
-      dailyTargetHours: '8.0',
-      workingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-      requireUnlockReason: true,
-      timesheetSubmittedAlert: true,
-      taskStatusChangedAlert: true,
-      timeLockAlert: true,
-      realtimePushNotifs: true,
-    });
-    toast.info('Preferences restored to default values.');
-  };
+  // 🚀 TANSTACK REACT QUERY: Fetch Real Audit Logs from Database
+  const {
+    data: auditLogsResponse,
+    isLoading: loadingLogs,
+    isFetching: fetchingLogs,
+    refetch: refetchLogs,
+  } = useManagerAuditLogs({
+    action: selectedAction || undefined,
+    table_name: selectedTable || undefined,
+  });
 
-  const toggleWorkingDay = (day) => {
-    setSettings((prev) => {
-      const exists = prev.workingDays.includes(day);
-      const updated = exists
-        ? prev.workingDays.filter((d) => d !== day)
-        : [...prev.workingDays, day];
-      return { ...prev, workingDays: updated };
+  // Handle Save Preferences
+  const handleTogglePreference = (key) => {
+    setPreferences((prev) => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('manager_user_preferences', JSON.stringify(updated));
+      toast.success('Preference updated!');
+      return updated;
     });
   };
 
-  const handleClearCache = () => {
-    localStorage.clear();
-    toast.success('Local browser cache cleared successfully!');
+  const handleTableDensityChange = (density) => {
+    setPreferences((prev) => {
+      const updated = { ...prev, tableDensity: density };
+      localStorage.setItem('manager_user_preferences', JSON.stringify(updated));
+      toast.success(`Table layout set to ${density.toLowerCase()}.`);
+      return updated;
+    });
   };
+
+  // Chuẩn hóa và lọc danh sách Audit Logs
+  const auditLogsList = useMemo(() => {
+    const raw = Array.isArray(auditLogsResponse)
+      ? auditLogsResponse
+      : auditLogsResponse?.results || [];
+
+    if (!searchQuery.trim()) return raw;
+    const q = searchQuery.toLowerCase();
+    return raw.filter((log) => {
+      const action = (log.action || '').toLowerCase();
+      const table = (log.table_name || '').toLowerCase();
+      const id = String(log.record_id || '');
+      return action.includes(q) || table.includes(q) || id.includes(q);
+    });
+  }, [auditLogsResponse, searchQuery]);
+
+  // Cấu hình Cột DataTable cho Audit Logs
+  const auditColumns = [
+    {
+      header: 'Timestamp',
+      accessorKey: 'created_at',
+      cell: (row) => (
+        <span className="font-mono text-xs text-slate-600 font-medium">
+          {formatDateSafe(row.created_at)}
+        </span>
+      ),
+    },
+    {
+      header: 'Action Taken',
+      accessorKey: 'action',
+      cell: (row) => {
+        const action = row.action || 'ACTIVITY';
+        let badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+
+        if (action.includes('CREATE') || action.includes('APPROVE') || action.includes('UNLOCK')) {
+          badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        } else if (action.includes('REJECT') || action.includes('DELETE') || action.includes('VOID')) {
+          badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
+        } else if (action.includes('LOCK') || action.includes('PASSWORD')) {
+          badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+        }
+
+        return (
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider ${badgeColor}`}
+          >
+            {action}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Resource / Table',
+      accessorKey: 'table_name',
+      cell: (row) => (
+        <div className="flex items-center gap-1.5 text-xs text-slate-700">
+          <Layers className="w-3.5 h-3.5 text-slate-400" />
+          <span className="font-semibold font-mono">{row.table_name || 'System'}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Record ID',
+      accessorKey: 'record_id',
+      cell: (row) => (
+        <span className="font-mono text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+          #{row.record_id || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      header: 'Actor / User',
+      accessorKey: 'user',
+      cell: (row) => (
+        <span className="text-xs font-semibold text-slate-800">
+          {row.user?.full_name || row.user?.email || 'You (Manager)'}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto text-slate-800">
-      {/* Breadcrumb & Top Bar Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-        <div className="flex items-center space-x-2 text-slate-400 font-medium">
-          <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-slate-800 font-semibold">Settings &amp; Preferences</span>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search settings..."
-              className="w-56 pl-9 pr-12 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
-            />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-1 py-0.5 rounded">
-              Ctrl K
-            </span>
+    <div className="space-y-6 max-w-6xl mx-auto text-slate-800 pb-12">
+      {/* 🌟 HERO HEADER */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20 shrink-0">
+            <Settings className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Manager Settings & Activity Audit</h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Review verified manager activity logs, configure notifications, and manage account security preferences.
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Page Title & Header Action Buttons */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Settings className="w-6 h-6 text-blue-600" />
-            <span>System Settings &amp; Preferences</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Customize localization, notification triggers, manager timesheet defaults, and security policies.
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center gap-2">
           <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="flex items-center space-x-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3.5 py-2 rounded-lg text-xs font-semibold transition shadow-2xs cursor-pointer"
+            onClick={() => navigate('/manager/profile')}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-            <span>Reset Defaults</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveSettings}
-            disabled={saving}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
-          >
-            {saving ? (
-              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span>Save Preferences</span>
+            <User className="w-3.5 h-3.5" />
+            <span>Account Profile</span>
           </button>
         </div>
       </div>
 
-      {/* Tabs Navigation Header */}
-      <div className="flex items-center space-x-1 border-b border-slate-200 bg-white px-4 pt-2 rounded-t-xl">
-        {[
-          { key: 'GENERAL', label: 'General & Regional', icon: Globe },
-          { key: 'TIMESHEET', label: 'Timesheet Rules', icon: Sliders },
-          { key: 'NOTIFICATIONS', label: 'Notifications & Alerts', icon: Bell },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center space-x-2 px-4 py-2.5 text-xs transition border-b-2 font-semibold cursor-pointer ${
-                isActive
-                  ? 'border-blue-600 text-blue-600 font-bold'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* 🧭 NAVIGATION TABS */}
+      <div className="flex items-center gap-2 p-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs max-w-md">
+        <button
+          onClick={() => setActiveTab('AUDIT_LOGS')}
+          className={`flex-1 py-2 text-center rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'AUDIT_LOGS'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          Security Audit Trail
+        </button>
+        <button
+          onClick={() => setActiveTab('PREFERENCES')}
+          className={`flex-1 py-2 text-center rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'PREFERENCES'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          Preferences
+        </button>
       </div>
 
-      {/* Main Section: 3:1 Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Left 3 Columns: Main Settings Forms */}
-        <div className="lg:col-span-3 space-y-4">
-          <form onSubmit={handleSaveSettings} className="space-y-4">
-            {/* Tab 1: General & Regional Preferences */}
-            {activeTab === 'GENERAL' && (
-              <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-                  General &amp; Regional Preferences
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <SelectDropdown
-                    label="System Language"
-                    value={settings.systemLanguage}
-                    onChange={(val) => setSettings({ ...settings, systemLanguage: val })}
-                    options={[
-                      { value: 'en-us', label: 'English (US)' },
-                      { value: 'vi-vn', label: 'Tiếng Việt (Vietnam)' },
-                    ]}
-                  />
-
-                  <SelectDropdown
-                    label="Time Zone"
-                    value={settings.timeZone}
-                    onChange={(val) => setSettings({ ...settings, timeZone: val })}
-                    options={[
-                      { value: 'Asia/Ho_Chi_Minh', label: 'Asia/Ho_Chi_Minh (UTC+07:00)' },
-                      { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-                      { value: 'America/New_York', label: 'America/New_York (EST)' },
-                    ]}
-                  />
-
-                  <SelectDropdown
-                    label="Date Format"
-                    value={settings.dateFormat}
-                    onChange={(val) => setSettings({ ...settings, dateFormat: val })}
-                    options={[
-                      { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (e.g. 2026-08-11)' },
-                      { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (e.g. 11/08/2026)' },
-                      { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (e.g. 08/11/2026)' },
-                    ]}
-                  />
-
-                  <SelectDropdown
-                    label="Default Pagination Limit"
-                    value={settings.pageSize}
-                    onChange={(val) => setSettings({ ...settings, pageSize: val })}
-                    options={[
-                      { value: '10', label: '10 items per page' },
-                      { value: '20', label: '20 items per page' },
-                      { value: '50', label: '50 items per page' },
-                    ]}
-                  />
-
-                  <SelectDropdown
-                    label="Default Project View"
-                    value={settings.defaultJobView}
-                    onChange={(val) => setSettings({ ...settings, defaultJobView: val })}
-                    options={[
-                      { value: 'KANBAN', label: 'Kanban Board View' },
-                      { value: 'LIST', label: 'Task List View' },
-                      { value: 'TABLE', label: 'Detailed Data Table' },
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Tab 2: Timesheet Rules & Working Hours */}
-            {activeTab === 'TIMESHEET' && (
-              <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-5">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-                  Timesheet Rules &amp; Working Hours Capacity
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <InputField
-                    label="Work Shift Start Time"
-                    type="time"
-                    value={settings.workStartTime}
-                    onChange={(e) => setSettings({ ...settings, workStartTime: e.target.value })}
-                  />
-                  <InputField
-                    label="Work Shift End Time"
-                    type="time"
-                    value={settings.workEndTime}
-                    onChange={(e) => setSettings({ ...settings, workEndTime: e.target.value })}
-                  />
-                  <InputField
-                    label="Daily Target Hours (hrs/day)"
-                    type="number"
-                    step="0.5"
-                    value={settings.dailyTargetHours}
-                    onChange={(e) => setSettings({ ...settings, dailyTargetHours: e.target.value })}
-                  />
-                </div>
-
-                {/* Working Days */}
-                <div className="space-y-2 pt-2">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Active Working Days in Week
-                  </label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {[
-                      { id: 'MON', label: 'Monday' },
-                      { id: 'TUE', label: 'Tuesday' },
-                      { id: 'WED', label: 'Wednesday' },
-                      { id: 'THU', label: 'Thursday' },
-                      { id: 'FRI', label: 'Friday' },
-                      { id: 'SAT', label: 'Saturday' },
-                      { id: 'SUN', label: 'Sunday' },
-                    ].map((d) => {
-                      const isChecked = settings.workingDays.includes(d.id);
-                      return (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() => toggleWorkingDay(d.id)}
-                          className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                            isChecked
-                              ? 'bg-blue-50 text-blue-700 border-blue-300 font-bold'
-                              : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-800'
-                          }`}
-                        >
-                          {d.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* TimeLock Policy Option */}
-                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-800 block">
-                      Require Reason Statement on TimeLock Unlock
-                    </span>
-                    <span className="text-[11px] text-slate-500 block">
-                      Mandate Manager explanation before unlocking closed monthly timesheet periods.
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings.requireUnlockReason}
-                    onChange={(e) =>
-                      setSettings({ ...settings, requireUnlockReason: e.target.checked })
-                    }
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Tab 3: Notification Event Triggers */}
-            {activeTab === 'NOTIFICATIONS' && (
-              <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-                  Notification Event Triggers &amp; Channels
-                </h3>
-
-                <div className="space-y-3 text-xs">
-                  {[
-                    {
-                      key: 'timesheetSubmittedAlert',
-                      title: 'Timesheet Log Submissions',
-                      code: 'TIMESHEET_SUBMITTED',
-                      desc: 'Receive notification when team members submit daily hours for manager review.',
-                    },
-                    {
-                      key: 'taskStatusChangedAlert',
-                      title: 'Task Status Transitions',
-                      code: 'TASK_STATUS_CHANGED',
-                      desc: 'Notify when task status transitions between Todo, In Progress, Reviewing, Completed.',
-                    },
-                    {
-                      key: 'timeLockAlert',
-                      title: 'Time Lock Period Notifications',
-                      code: 'TIMESHEET_LOCK',
-                      desc: 'Notify project team when a monthly period is locked or unlocked by Manager/Admin.',
-                    },
-                    {
-                      key: 'realtimePushNotifs',
-                      title: 'Real-time WebSocket Notifications',
-                      code: 'WEBSOCKET_PUSH',
-                      desc: 'Display instant header badge update via real-time WebSocket channel.',
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.key}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200/80"
-                    >
-                      <div className="space-y-0.5">
-                        <p className="font-bold text-slate-800">{item.title}</p>
-                        <p className="text-[11px] text-slate-500">
-                          {item.desc}{' '}
-                          <code className="bg-slate-200/70 text-slate-700 px-1 rounded text-[10px]">
-                            {item.code}
-                          </code>
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={settings[item.key]}
-                        onChange={(e) =>
-                          setSettings({ ...settings, [item.key]: e.target.checked })
-                        }
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer shrink-0"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </form>
-        </div>
-
-        {/* Right 1 Column: Sidebar Widgets */}
+      {/* 🛡️ TAB 1: REAL AUDIT TRAIL LOGS */}
+      {activeTab === 'AUDIT_LOGS' && (
         <div className="space-y-4">
-          {/* Widget 1: System Info */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-              System Info
-            </h4>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Backend Framework</span>
-                <span className="font-bold text-slate-800">Django 5.0 REST</span>
+          {/* Filter Toolbar for Audit Logs */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1 flex-wrap">
+              <div className="w-48">
+                <SelectDropdown
+                  value={selectedTable}
+                  onChange={(val) => setSelectedTable(val)}
+                  options={[
+                    { value: '', label: 'All Resources' },
+                    { value: 'tasks', label: 'Tasks' },
+                    { value: 'jobs', label: 'Jobs / Projects' },
+                    { value: 'timesheets', label: 'Timesheets' },
+                    { value: 'timelocks', label: 'Time Locks' },
+                    { value: 'users', label: 'Users & Profile' },
+                  ]}
+                  placeholder="Filter by Resource..."
+                />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">JWT Token Expiry</span>
-                <span className="font-bold text-slate-800">30 minutes</span>
+
+              <div className="w-52">
+                <SelectDropdown
+                  value={selectedAction}
+                  onChange={(val) => setSelectedAction(val)}
+                  options={[
+                    { value: '', label: 'All Actions' },
+                    { value: 'APPROVE', label: 'Approve Actions' },
+                    { value: 'REJECT', label: 'Reject Actions' },
+                    { value: 'LOCK', label: 'Lock Actions' },
+                    { value: 'UNLOCK', label: 'Unlock Actions' },
+                    { value: 'CHANGE_PASSWORD', label: 'Password Changes' },
+                  ]}
+                  placeholder="Filter by Action..."
+                />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Standard Work Hours</span>
-                <span className="font-bold text-slate-800">8.0 hrs/day</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative w-full md:w-56">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by action or ID..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs rounded-xl border border-transparent focus:border-blue-400 focus:outline-none"
+                />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Max Daily Limit</span>
-                <span className="font-bold text-slate-800">24.0 hrs/day</span>
-              </div>
+
+              <button
+                onClick={() => {
+                  refetchLogs();
+                  toast.success('Audit trail refreshed!');
+                }}
+                disabled={fetchingLogs}
+                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition cursor-pointer"
+                title="Refresh audit trail"
+              >
+                <RotateCcw className={`w-4 h-4 ${fetchingLogs ? 'animate-spin' : ''}`} />
+              </button>
             </div>
           </div>
 
-          {/* Widget 2: Audit Log Status */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-              Audit Log Status
-            </h4>
-            <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-lg space-y-1 text-xs">
-              <div className="flex items-center space-x-1.5 text-blue-800 font-bold">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                <span>Audit Log Enabled</span>
+          {/* Audit DataTable */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-900">Verified Activity & Security Audit Trail</h3>
               </div>
-              <p className="text-[11px] text-blue-700 leading-normal">
-                All preference changes trigger automatic audit log entries in Django{' '}
-                <code className="bg-blue-100 px-1 rounded font-mono">AuditLog</code> table.
-              </p>
+              <span className="text-xs text-slate-400 font-mono">
+                {auditLogsList.length} recorded events
+              </span>
             </div>
-          </div>
 
-          {/* Widget 3: Quick Actions */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-              Quick Actions
-            </h4>
-            <button
-              type="button"
-              onClick={handleClearCache}
-              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-              <span>Clear Local Cache</span>
-            </button>
+            <DataTable
+              columns={auditColumns}
+              data={auditLogsList}
+              isLoading={loadingLogs}
+              emptyMessage="No audit trail events found matching the criteria."
+            />
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ⚙️ TAB 2: WORKSPACE & NOTIFICATION PREFERENCES */}
+      {activeTab === 'PREFERENCES' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-6">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Workspace & Notification Preferences</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Personalize your workspace experience and audio feedback alerts.
+            </p>
+          </div>
+
+          <div className="divide-y divide-slate-100 text-xs">
+            {/* Preference 1: Audio Notification */}
+            <div className="py-4 flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  {preferences.soundAlerts ? (
+                    <Volume2 className="w-4 h-4 text-blue-600" />
+                  ) : (
+                    <VolumeX className="w-4 h-4 text-slate-400" />
+                  )}
+                  <span className="font-bold text-slate-900">Audio Sound Alerts</span>
+                </div>
+                <p className="text-slate-500">
+                  Play an audible chime when new deliverable tasks are submitted for review or messages arrive.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleTogglePreference('soundAlerts')}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  preferences.soundAlerts ? 'bg-blue-600' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    preferences.soundAlerts ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Preference 2: Table Density */}
+            <div className="py-4 flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-blue-600" />
+                  <span className="font-bold text-slate-900">Table Density</span>
+                </div>
+                <p className="text-slate-500">
+                  Choose row spacing across data tables for better information density.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => handleTableDensityChange('COMPACT')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition ${
+                    preferences.tableDensity === 'COMPACT'
+                      ? 'bg-white text-blue-600 shadow-xs'
+                      : 'text-slate-600'
+                  }`}
+                >
+                  Compact
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTableDensityChange('STANDARD')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition ${
+                    preferences.tableDensity === 'STANDARD'
+                      ? 'bg-white text-blue-600 shadow-xs'
+                      : 'text-slate-600'
+                  }`}
+                >
+                  Standard
+                </button>
+              </div>
+            </div>
+
+            {/* Preference 3: Auto Refresh Live Feed */}
+            <div className="py-4 flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span className="font-bold text-slate-900">Auto Live Sync</span>
+                </div>
+                <p className="text-slate-500">
+                  Keep real-time WebSocket connection alive in the background for instant notification badges.
+                </p>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                Active (WebSocket)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

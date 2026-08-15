@@ -11,7 +11,6 @@ from system.services.notification_manager_service import (
     resolve_task_recipients,
 )
 
-
 ACTOR_ASSIGNEE = "ASSIGNEE"
 ACTOR_JOB_MANAGER = "JOB_MANAGER"
 ACTOR_ADMIN = "ADMIN"
@@ -63,13 +62,42 @@ TASK_TRANSITIONS = {
         ACTOR_JOB_MANAGER,
         ACTOR_ADMIN,
     ],
+    # 🚀 CHUẨN JIRA WORKFLOW (RE-OPEN TASK):
+    # Cho phép Manager & Admin mở lại Task đã Completed về In Progress hoặc To Do để giao nhân viên làm lại
+    (Task.Status.COMPLETED, Task.Status.IN_PROGRESS): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
+    (Task.Status.COMPLETED, Task.Status.TODO): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
+    # 🔄 KHÔI PHỤC TASK (RESTORE CANCELLED TASK):
+    # Cho phép Manager & Admin khôi phục lại Task đã Cancel về To Do hoặc In Progress
+    (Task.Status.CANCELLED, Task.Status.TODO): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
+    (Task.Status.CANCELLED, Task.Status.IN_PROGRESS): [
+        ACTOR_JOB_MANAGER,
+        ACTOR_ADMIN,
+    ],
 }
 
 
 EVENT_MAP = {
-    (Task.Status.IN_PROGRESS, Task.Status.REVIEWING): Notification.EventType.TASK_SUBMITTED,
-    (Task.Status.REVIEWING, Task.Status.COMPLETED): Notification.EventType.TASK_APPROVED,
-    (Task.Status.REVIEWING, Task.Status.IN_PROGRESS): Notification.EventType.TASK_REJECTED,
+    (
+        Task.Status.IN_PROGRESS,
+        Task.Status.REVIEWING,
+    ): Notification.EventType.TASK_SUBMITTED,
+    (
+        Task.Status.REVIEWING,
+        Task.Status.COMPLETED,
+    ): Notification.EventType.TASK_APPROVED,
+    (
+        Task.Status.REVIEWING,
+        Task.Status.IN_PROGRESS,
+    ): Notification.EventType.TASK_REJECTED,
 }
 
 
@@ -87,6 +115,9 @@ def get_action_name(from_status, to_status):
 
     if to_status == Task.Status.CANCELLED:
         return "CANCEL_TASK"
+
+    if from_status == Task.Status.CANCELLED:
+        return "RESTORE_TASK"
 
     return "UPDATE_TASK_STATUS"
 
@@ -111,6 +142,9 @@ def get_transition_title(from_status, to_status, task):
     if to_status == Task.Status.CANCELLED:
         return "Task cancelled"
 
+    if from_status == Task.Status.CANCELLED:
+        return "Task restored & reactivated"
+
     return "Task status changed"
 
 
@@ -130,10 +164,7 @@ def assert_actor(user, task, allowed_actors):
     ):
         return
 
-    if (
-        ACTOR_ASSIGNEE in allowed_actors
-        and task.assignee_id == user.id
-    ):
+    if ACTOR_ASSIGNEE in allowed_actors and task.assignee_id == user.id:
         return
 
     raise PermissionDenied("USER_NOT_ALLOWED_FOR_THIS_TASK_TRANSITION")
@@ -156,17 +187,20 @@ def validate_transition(task, to_status, reason=None):
     if to_status == Task.Status.CANCELLED and not reason:
         raise BusinessRuleError("CANCELLATION_REASON_REQUIRED")
 
+        # 🚀 Yêu cầu lý do khi Manager Re-open Task từ COMPLETED về IN_PROGRESS hoặc TODO
+    if (
+        task.status == Task.Status.COMPLETED
+        and to_status in (Task.Status.IN_PROGRESS, Task.Status.TODO)
+        and not reason
+    ):
+        raise BusinessRuleError("REWORK_REASON_REQUIRED")
+
     return allowed_actors
 
 
 def apply_transition(*, user, task, to_status, reason=None, request=None):
     """
     Áp dụng transition Task theo bảng §8.1.
-
-    Dùng cho:
-    - Employee submit task.
-    - Manager approve/reject/cancel.
-    - Kanban cross-column drag-and-drop.
     """
     clean_reason = reason.strip() if isinstance(reason, str) else reason
 
@@ -220,6 +254,29 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
                 user=user,
                 content=clean_reason,
                 comment_type=TaskComment.CommentType.REJECTION_NOTE,
+            )
+
+            # 🚀 Tự động lưu Lý do làm lại thành Bình luận để Nhân viên đọc được
+        if from_status == Task.Status.COMPLETED and to_status in (
+            Task.Status.IN_PROGRESS,
+            Task.Status.TODO,
+        ):
+            TaskComment.objects.create(
+                task=locked_task,
+                user=user,
+                content=f"[Rework Requested]: {clean_reason}",
+                comment_type=TaskComment.CommentType.REJECTION_NOTE,
+            )
+
+        if from_status == Task.Status.CANCELLED and to_status in (
+            Task.Status.IN_PROGRESS,
+            Task.Status.TODO,
+        ):
+            TaskComment.objects.create(
+                task=locked_task,
+                user=user,
+                content=f"[Task Restored]: Task reactivated by Manager" + (f" - Reason: {clean_reason}" if clean_reason else ""),
+                comment_type=TaskComment.CommentType.NORMAL,
             )
 
         action_name = get_action_name(

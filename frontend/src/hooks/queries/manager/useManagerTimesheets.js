@@ -92,6 +92,24 @@ export function useCorrectLogWork() {
 }
 
 /**
+ * Mutation: Void / Invalidate a LogWork entry
+ */
+export function useVoidLogWork() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reason }) => managerTimesheetService.voidLogWork(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      toast.success('LogWork entry voided!');
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, 'Failed to void LogWork'));
+    },
+  });
+}
+
+/**
  * Fetch time locks list
  */
 export function useTimeLocks(params = {}) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -7,22 +7,40 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  MoreVertical,
   Eye,
   Edit3,
   Building2,
   Layers,
+  Kanban,
+  ArrowRightLeft,
+  Flame,
+  FolderGit2,
+  TrendingUp,
+  RotateCcw,
 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { toast } from 'sonner';
+
 import FilterToolbar from '../../components/common/table/FilterToolbar';
 import DataTable from '../../components/common/table/DataTable';
 import PaginationBar from '../../components/common/table/PaginationBar';
 import SideDrawer from '../../components/common/drawer/SideDrawer';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
-import { cn } from '../../utils/cn';
-import { useManagerJobs, useCreateJob } from '../../hooks/queries/manager/useManagerJobs';
+import BaseModal from '../../components/common/modal/BaseModal';
 
-// Định nghĩa danh sách Trạng thái Job (English UI)
+import { cn } from '../../utils/cn';
+import { useDebounce } from '../../hooks/useDebounce';
+import {
+  useManagerJobs,
+  useCreateJob,
+  useUpdateJob,
+  useChangeJobStatus,
+  useManagerClients,
+} from '../../hooks/queries/manager/useManagerJobs';
+import { useRecentJobsStore } from '../../stores/useRecentJobsStore';
+
+// Định nghĩa danh sách Trạng thái Job
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'PLANNING', label: 'Planning' },
@@ -40,152 +58,442 @@ const PRIORITY_OPTIONS = [
   { value: 'LOW', label: 'Low Priority' },
 ];
 
+// Helper format ngày hiển thị an toàn
+function formatDateSafe(dateStr) {
+  if (!dateStr) return 'No date';
+  try {
+    return format(parseISO(dateStr), 'dd/MM/yyyy');
+  } catch {
+    return dateStr;
+  }
+}
+
+// Helper render Status Badge
+function JobStatusBadge({ status }) {
+  const configs = {
+    PLANNING: {
+      bg: 'bg-blue-50 text-blue-700 border-blue-200/80',
+      dot: 'bg-blue-500',
+    },
+    ACTIVE: {
+      bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+      dot: 'bg-emerald-500',
+    },
+    COMPLETED: {
+      bg: 'bg-purple-50 text-purple-700 border-purple-200/80',
+      dot: 'bg-purple-500',
+    },
+    ON_HOLD: {
+      bg: 'bg-amber-50 text-amber-700 border-amber-200/80',
+      dot: 'bg-amber-500',
+    },
+    CANCELLED: {
+      bg: 'bg-rose-50 text-rose-700 border-rose-200/80',
+      dot: 'bg-rose-500',
+    },
+  };
+
+  const current = configs[status] || {
+    bg: 'bg-slate-100 text-slate-700 border-slate-200',
+    dot: 'bg-slate-400',
+  };
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border tracking-wide uppercase shrink-0',
+        current.bg
+      )}
+    >
+      <span className={cn('w-1.5 h-1.5 rounded-full', current.dot)} />
+      {status || 'UNKNOWN'}
+    </span>
+  );
+}
+
+// Helper render Priority Badge
+function JobPriorityBadge({ priority }) {
+  const isHigh = priority === 'HIGH';
+  const isMedium = priority === 'MEDIUM';
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+        isHigh
+          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+          : isMedium
+          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+          : 'bg-slate-100 text-slate-600 border border-slate-200'
+      )}
+    >
+      {isHigh && <Flame className="w-3 h-3 text-rose-500" />}
+      {priority || 'LOW'}
+    </span>
+  );
+}
+
 export default function ManagerJobsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const addRecentJob = useRecentJobsStore((state) => state.addRecentJob);
 
   // State cho Bộ lọc, Chế độ xem & Phân trang
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
+  const [selectedClient, setSelectedClient] = useState('');
+  const [isOverdueOnly, setIsOverdueOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // State cho Drawer Tạo Job Mới
-  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  // State cho Drawer Tạo / Chỉnh sửa Job
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState('create'); // 'create' | 'edit'
+  const [editingJobId, setEditingJobId] = useState(null);
   const [formData, setFormData] = useState({
     job_name: '',
-    description: '',
-    client_name: '',
+    job_code: '',
+    client_id: '',
+    start_date: '',
     deadline: '',
     priority: 'MEDIUM',
+    description: '',
   });
 
-  // 🚀 TANSTACK REACT QUERY: Nạp danh sách Jobs tự động theo bộ lọc & phân trang
-  const queryParams = useMemo(() => ({
-    page: currentPage,
-    page_size: pageSize,
-    search: searchQuery || undefined,
-    status: selectedStatus || undefined,
-    priority: selectedPriority || undefined,
-  }), [currentPage, pageSize, searchQuery, selectedStatus, selectedPriority]);
+  // State cho Modal Đổi trạng thái Job (State Machine)
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusTargetJob, setStatusTargetJob] = useState(null);
+  const [newStatusValue, setNewStatusValue] = useState('ACTIVE');
+  const [statusReason, setStatusReason] = useState('');
+
+  // 🛡️ Hoãn tìm kiếm 400ms chống spam API
+  const debouncedSearch = useDebounce(searchQuery, 400);
+
+  // 🚀 TANSTACK REACT QUERY: Nạp danh sách Khách hàng cho Dropdown
+  const { data: clientsData = [] } = useManagerClients();
+  const clientOptions = useMemo(() => {
+    const list = Array.isArray(clientsData) ? clientsData : clientsData.results || [];
+    return list.map((c) => ({
+      value: String(c.id),
+      label: c.client_name,
+    }));
+  }, [clientsData]);
+
+  // 🚀 TANSTACK REACT QUERY: Nạp danh sách Jobs
+  const queryParams = useMemo(
+    () => ({
+      page: currentPage,
+      page_size: pageSize,
+      search: debouncedSearch || undefined,
+      status: selectedStatus || undefined,
+      priority: selectedPriority || undefined,
+      client_id: selectedClient || undefined,
+      is_overdue: isOverdueOnly ? 'true' : undefined,
+    }),
+    [currentPage, pageSize, debouncedSearch, selectedStatus, selectedPriority, selectedClient, isOverdueOnly]
+  );
 
   const { data: response, isLoading } = useManagerJobs(queryParams);
   const createJobMutation = useCreateJob();
+  const updateJobMutation = useUpdateJob();
+  const changeJobStatusMutation = useChangeJobStatus();
 
-  // Chuẩn hóa dữ liệu trả về từ TanStack Query
+  // Chuẩn hóa dữ liệu Jobs
   const jobs = useMemo(() => {
     if (response && Array.isArray(response.results)) return response.results;
     if (Array.isArray(response)) return response;
     return [];
   }, [response]);
 
-  const totalItems = useMemo(() => {
+  const totalCount = useMemo(() => {
     if (response && typeof response.count === 'number') return response.count;
     return jobs.length;
   }, [response, jobs]);
 
-  // 🚀 MUTATION: Tạo Job mới với TanStack Query
-  const handleCreateJob = (e) => {
-    e.preventDefault();
-    if (!formData.job_name.trim()) return;
+  // Điều hướng và lưu vào Store Recent Jobs
+  const handleJobClick = useCallback(
+    (job) => {
+      addRecentJob(job);
+      navigate(`/manager/jobs/${job.id}`);
+    },
+    [addRecentJob, navigate]
+  );
 
-    createJobMutation.mutate(formData, {
-      onSuccess: () => {
-        setCreateDrawerOpen(false);
-        setFormData({
-          job_name: '',
-          description: '',
-          client_name: '',
-          deadline: '',
-          priority: 'MEDIUM',
-        });
-      },
+  const handleOpenKanban = useCallback(
+    (job, e) => {
+      if (e) e.stopPropagation();
+      addRecentJob(job);
+      navigate(`/manager/kanban?job_id=${job.id}`);
+    },
+    [addRecentJob, navigate]
+  );
+
+  // Reset bộ lọc
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedStatus('');
+    setSelectedPriority('');
+    setSelectedClient('');
+    setIsOverdueOnly(false);
+    setCurrentPage(1);
+  };
+
+  // Mở Drawer Tạo Job Mới
+  const handleOpenCreateDrawer = () => {
+    setDrawerMode('create');
+    setEditingJobId(null);
+    setFormData({
+      job_name: '',
+      job_code: '',
+      client_id: clientOptions.length > 0 ? clientOptions[0].value : '',
+      start_date: new Date().toISOString().split('T')[0],
+      deadline: '',
+      priority: 'MEDIUM',
+      description: '',
     });
+    setIsDrawerOpen(true);
   };
 
-  // Render Màu Badge cho Trạng thái
-  const renderStatusBadge = (status) => {
-    const config = {
-      ACTIVE: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Active' },
-      PLANNING: { bg: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Planning' },
-      COMPLETED: { bg: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Completed' },
-      ON_HOLD: { bg: 'bg-amber-50 text-amber-700 border-amber-200', label: 'On Hold' },
-      CANCELLED: { bg: 'bg-rose-50 text-rose-700 border-rose-200', label: 'Cancelled' },
-    };
-    const item = config[status] || { bg: 'bg-slate-50 text-slate-700 border-slate-200', label: status };
-    return (
-      <span className={cn('px-2.5 py-1 rounded-full text-xs font-semibold border', item.bg)}>
-        {item.label}
-      </span>
+  // Mở Drawer Sửa Job
+  const handleOpenEditDrawer = (job, e) => {
+    if (e) e.stopPropagation();
+    setDrawerMode('edit');
+    setEditingJobId(job.id);
+    setFormData({
+      job_name: job.job_name || '',
+      job_code: job.job_code || '',
+      client_id: job.client?.id ? String(job.client.id) : '',
+      start_date: job.start_date || '',
+      deadline: job.deadline || '',
+      priority: job.priority || 'MEDIUM',
+      description: job.description || '',
+    });
+    setIsDrawerOpen(true);
+  };
+
+  // Xử lý gửi Form Create / Update Job
+  const handleDrawerFormSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.job_name.trim()) {
+      toast.error('Please enter a project name.');
+      return;
+    }
+
+    if (drawerMode === 'create') {
+      if (!formData.client_id) {
+        toast.error('Please select a client.');
+        return;
+      }
+      if (!formData.deadline) {
+        toast.error('Please set a deadline.');
+        return;
+      }
+      if (formData.start_date && formData.deadline && formData.deadline < formData.start_date) {
+        toast.error('Deadline cannot be earlier than start date.');
+        return;
+      }
+
+      const payload = {
+        job_name: formData.job_name.trim(),
+        job_code: formData.job_code.trim() || undefined,
+        client_id: parseInt(formData.client_id, 10),
+        priority: formData.priority,
+        start_date: formData.start_date || new Date().toISOString().split('T')[0],
+        deadline: formData.deadline,
+        description: formData.description.trim() || undefined,
+      };
+
+      createJobMutation.mutate(payload, {
+        onSuccess: () => {
+          setIsDrawerOpen(false);
+        },
+      });
+    } else {
+      // Edit Mode
+      if (formData.deadline && formData.start_date && formData.deadline < formData.start_date) {
+        toast.error('Deadline cannot be earlier than start date.');
+        return;
+      }
+
+      const payload = {
+        job_name: formData.job_name.trim(),
+        priority: formData.priority,
+        deadline: formData.deadline || undefined,
+        description: formData.description.trim() || '',
+      };
+
+      updateJobMutation.mutate(
+        { id: editingJobId, data: payload },
+        {
+          onSuccess: () => {
+            setIsDrawerOpen(false);
+          },
+        }
+      );
+    }
+  };
+
+const ALLOWED_TRANSITIONS = {
+  PLANNING: [
+    { value: 'ACTIVE', label: 'ACTIVE - Start project execution' },
+    { value: 'CANCELLED', label: 'CANCELLED - Discontinue project' },
+  ],
+  ACTIVE: [
+    { value: 'ON_HOLD', label: 'ON HOLD - Temporarily pause project' },
+    { value: 'COMPLETED', label: 'COMPLETED - Mark project as finished' },
+    { value: 'CANCELLED', label: 'CANCELLED - Discontinue project' },
+  ],
+  ON_HOLD: [
+    { value: 'ACTIVE', label: 'ACTIVE - Resume project execution' },
+    { value: 'CANCELLED', label: 'CANCELLED - Discontinue project' },
+  ],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
+  // Mở Modal Đổi Trạng thái
+  const handleOpenStatusModal = (job, e) => {
+    if (e) e.stopPropagation();
+    const currentStatus = job?.status || 'ACTIVE';
+    const validTransitions = ALLOWED_TRANSITIONS[currentStatus] || [];
+    if (validTransitions.length === 0) {
+      toast.info(`Project is in ${currentStatus} state and cannot be changed further.`);
+      return;
+    }
+    setStatusTargetJob(job);
+    setNewStatusValue(validTransitions[0].value);
+    setStatusReason('');
+    setIsStatusModalOpen(true);
+  };
+
+  // Submit Đổi Trạng thái
+  const handleStatusSubmit = (e) => {
+    e.preventDefault();
+    if (!statusTargetJob) return;
+
+    if ((newStatusValue === 'ON_HOLD' || newStatusValue === 'CANCELLED') && !statusReason.trim()) {
+      toast.error('Reason is required when placing a project on hold or cancelling.');
+      return;
+    }
+
+    changeJobStatusMutation.mutate(
+      {
+        id: statusTargetJob.id,
+        newStatus: newStatusValue,
+        reason: statusReason.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setIsStatusModalOpen(false);
+          setStatusTargetJob(null);
+        },
+      }
     );
   };
 
-  // Render Màu Badge cho Mức độ Ưu tiên
-  const renderPriorityBadge = (priority) => {
-    const config = {
-      HIGH: { bg: 'bg-rose-100 text-rose-800', label: 'High' },
-      MEDIUM: { bg: 'bg-amber-100 text-amber-800', label: 'Medium' },
-      LOW: { bg: 'bg-slate-100 text-slate-700', label: 'Low' },
-    };
-    const item = config[priority] || { bg: 'bg-slate-100 text-slate-700', label: priority };
-    return (
-      <span className={cn('px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider', item.bg)}>
-        {item.label}
-      </span>
-    );
-  };
-
-  // Cấu hình Cột Bảng DataTable
+  // Cấu hình Cột cho Bảng DataTable
   const columns = [
     {
-      header: 'Job Code & Name',
+      header: 'Project Code & Name',
       accessorKey: 'job_name',
-      cell: (row) => (
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-blue-50 text-blue-600 font-bold text-xs shrink-0">
-            {row.job_code || `JOB-${row.id}`}
+      cell: (row) => {
+        const isOverdue = row.is_overdue;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-xs shrink-0 shadow-2xs">
+              <Briefcase className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[11px] text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-100">
+                  {row.job_code || `JOB-${row.id}`}
+                </span>
+                <span
+                  className="font-bold text-slate-900 text-xs hover:text-blue-600 transition-colors cursor-pointer"
+                  onClick={() => handleJobClick(row)}
+                >
+                  {row.job_name}
+                </span>
+                {isOverdue && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
+                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                    OVERDUE
+                  </span>
+                )}
+              </div>
+              {row.description && (
+                <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{row.description}</p>
+              )}
+            </div>
           </div>
-          <div>
-            <button
-              onClick={() => navigate(`/manager/jobs/${row.id}`)}
-              className="font-bold text-slate-900 hover:text-blue-600 text-sm text-left transition-colors line-clamp-1 cursor-pointer"
-            >
-              {row.job_name}
-            </button>
-            <p className="text-xs text-slate-400 line-clamp-1">{row.description || 'No description provided'}</p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Client',
-      accessorKey: 'client_name',
+      accessorKey: 'client',
       cell: (row) => (
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
-          <Building2 className="w-3.5 h-3.5 text-slate-400" />
-          <span>{row.client_name || row.client?.name || 'Internal Project'}</span>
+        <div className="flex items-center gap-1.5 text-xs text-slate-700">
+          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="font-medium truncate max-w-[140px]">
+            {row.client?.client_name || row.client_name || 'N/A'}
+          </span>
         </div>
       ),
-    },
-    {
-      header: 'Priority',
-      accessorKey: 'priority',
-      cell: (row) => renderPriorityBadge(row.priority),
     },
     {
       header: 'Status',
       accessorKey: 'status',
-      cell: (row) => renderStatusBadge(row.status),
+      cell: (row) => <JobStatusBadge status={row.status} />,
     },
     {
-      header: 'Deadline',
+      header: 'Priority',
+      accessorKey: 'priority',
+      cell: (row) => <JobPriorityBadge priority={row.priority} />,
+    },
+    {
+      header: 'Task Progress',
+      accessorKey: 'task_counts',
+      cell: (row) => {
+        const counts = row.task_counts || {};
+        const total = counts.total_tasks || 0;
+        const completed = counts.completed_count || 0;
+        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return (
+          <div className="w-36 space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600">
+              <span>
+                {completed}/{total} Tasks
+              </span>
+              <span className="text-blue-600 font-bold">{pct}%</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Timeline',
       accessorKey: 'deadline',
       cell: (row) => (
-        <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-          <span>{row.deadline || 'No deadline'}</span>
+        <div className="space-y-0.5 text-xs">
+          <div className="flex items-center gap-1 text-slate-600 font-medium">
+            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>{formatDateSafe(row.deadline)}</span>
+          </div>
+          {row.start_date && (
+            <div className="text-[10px] text-slate-400">
+              Start: {formatDateSafe(row.start_date)}
+            </div>
+          )}
         </div>
       ),
     },
@@ -194,13 +502,34 @@ export default function ManagerJobsPage() {
       accessorKey: 'actions',
       className: 'text-right',
       cell: (row) => (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => navigate(`/manager/jobs/${row.id}`)}
-            title="View Job Details"
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+            onClick={() => handleJobClick(row)}
+            className="p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            title="View Details"
           >
             <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => handleOpenKanban(row, e)}
+            className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            title="Open Kanban Board"
+          >
+            <Kanban className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => handleOpenEditDrawer(row, e)}
+            className="p-1.5 hover:bg-slate-100 hover:text-slate-900 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            title="Edit Project"
+          >
+            <Edit3 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => handleOpenStatusModal(row, e)}
+            className="p-1.5 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            title="Change Status"
+          >
+            <ArrowRightLeft className="w-4 h-4" />
           </button>
         </div>
       ),
@@ -208,171 +537,337 @@ export default function ManagerJobsPage() {
   ];
 
   return (
-    <div className="space-y-5 text-slate-800 pb-10">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Project / Job Management</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage projects, scope, deadlines, and task allocations.
-          </p>
+    <div className="space-y-5 text-slate-800 pb-12">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+              <FolderGit2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                My Managed Projects
+              </h1>
+              <p className="text-xs text-slate-500">
+                Track deliverables, monitor milestones, and coordinate teams across active jobs.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={() => setCreateDrawerOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Job</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleOpenCreateDrawer}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Job</span>
+          </button>
+        </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
+      {/* Filter Toolbar with Extended Dropdowns */}
       <FilterToolbar
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);
           setCurrentPage(1);
         }}
-        searchPlaceholder="Search jobs by name or code..."
+        searchPlaceholder="Search project name, code, client..."
+        statusOptions={STATUS_OPTIONS}
         statusValue={selectedStatus}
         onStatusChange={(val) => {
           setSelectedStatus(val);
           setCurrentPage(1);
         }}
-        statusOptions={STATUS_OPTIONS}
+        priorityOptions={PRIORITY_OPTIONS}
         priorityValue={selectedPriority}
         onPriorityChange={(val) => {
           setSelectedPriority(val);
           setCurrentPage(1);
         }}
-        priorityOptions={PRIORITY_OPTIONS}
+        onClearFilters={handleResetFilters}
         currentView={viewMode}
         onViewChange={setViewMode}
-        onClearFilters={() => {
-          setSearchQuery('');
-          setSelectedStatus('');
-          setSelectedPriority('');
-          setCurrentPage(1);
-        }}
-      />
+        viewModes={['table', 'grid']}
+      >
+        {/* Client Selector Filter */}
+        {clientOptions.length > 0 && (
+          <select
+            value={selectedClient}
+            onChange={(e) => {
+              setSelectedClient(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
+          >
+            <option value="">All Clients</option>
+            {clientOptions.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        )}
 
-      {/* Primary Display: Table or Grid */}
+        {/* Overdue Quick Filter Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsOverdueOnly(!isOverdueOnly);
+            setCurrentPage(1);
+          }}
+          className={cn(
+            'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors cursor-pointer',
+            isOverdueOnly
+              ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+              : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+          )}
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+          <span>Overdue Only</span>
+        </button>
+      </FilterToolbar>
+
+      {/* Main Content: Table or Grid View */}
       {viewMode === 'table' ? (
-        <DataTable
-          columns={columns}
-          data={jobs}
-          isLoading={isLoading}
-          onRowClick={(row) => navigate(`/manager/jobs/${row.id}`)}
-          emptyMessage="No projects found matching your search criteria."
-        />
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <DataTable
+            columns={columns}
+            data={jobs}
+            isLoading={isLoading}
+            onRowClick={handleJobClick}
+            emptyMessage="No projects found matching your filter criteria."
+          />
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={Math.ceil(totalCount / pageSize) || 1}
+            totalItems={totalCount}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
+        </div>
       ) : (
-        /* Grid Card View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        /* Grid Cards View */
+        <div className="space-y-4">
           {isLoading ? (
-            Array.from({ length: 6 }).map((_, idx) => (
-              <div key={idx} className="h-44 bg-white rounded-xl border border-slate-200/80 p-4 animate-pulse" />
-            ))
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="h-56 bg-slate-100 rounded-2xl animate-pulse border border-slate-200/60"
+                />
+              ))}
+            </div>
           ) : jobs.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-              No projects found.
+            <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <AlertCircle className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-700">No Projects Found</h3>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                No projects matched your active filters or search criteria. Try resetting filters or create a new job.
+              </p>
+              <button
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Filters</span>
+              </button>
             </div>
           ) : (
-            jobs.map((job) => (
-              <div
-                key={job.id}
-                onClick={() => navigate(`/manager/jobs/${job.id}`)}
-                className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs hover:border-blue-300 transition-all cursor-pointer space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded">
-                    {job.job_code || `JOB-${job.id}`}
-                  </span>
-                  {renderStatusBadge(job.status)}
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {jobs.map((job) => {
+                const counts = job.task_counts || {};
+                const total = counts.total_tasks || 0;
+                const completed = counts.completed_count || 0;
+                const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+                const isOverdue = job.is_overdue;
 
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm line-clamp-1">{job.job_name}</h3>
-                  <p className="text-xs text-slate-400 line-clamp-2 mt-1">
-                    {job.description || 'No description provided.'}
-                  </p>
-                </div>
+                return (
+                  <div
+                    key={job.id}
+                    onClick={() => handleJobClick(job)}
+                    className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-4 relative group"
+                  >
+                    {/* Top Row: Code, Priority, Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                          {job.job_code || `JOB-${job.id}`}
+                        </span>
+                        <JobPriorityBadge priority={job.priority} />
+                        {isOverdue && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
+                            OVERDUE
+                          </span>
+                        )}
+                      </div>
+                      <JobStatusBadge status={job.status} />
+                    </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{job.deadline || 'No deadline'}</span>
+                    {/* Middle: Title & Description */}
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-sm text-slate-900 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                        {job.job_name}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                        {job.description || 'No description provided.'}
+                      </p>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                        <span className="flex items-center gap-1 text-[11px]">
+                          <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
+                          Progress ({completed}/{total} Tasks)
+                        </span>
+                        <span className="text-blue-600 font-bold text-xs">{pct}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bottom Metadata & Quick Actions */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                      <div className="flex items-center gap-1 font-medium truncate max-w-[130px]">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{job.client?.client_name || job.client_name || 'No Client'}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => handleOpenKanban(job, e)}
+                          className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-400 transition cursor-pointer"
+                          title="Open Kanban Board"
+                        >
+                          <Kanban className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleOpenEditDrawer(job, e)}
+                          className="p-1.5 hover:bg-slate-100 hover:text-slate-800 rounded-lg text-slate-400 transition cursor-pointer"
+                          title="Edit Project"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleOpenStatusModal(job, e)}
+                          className="p-1.5 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition cursor-pointer"
+                          title="Change Status"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  {renderPriorityBadge(job.priority)}
-                </div>
-              </div>
-            ))
+                );
+              })}
+            </div>
           )}
+
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={Math.ceil(totalCount / pageSize) || 1}
+            totalItems={totalCount}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       )}
 
-      {/* Pagination Controls */}
-      {totalItems > 0 && (
-        <PaginationBar
-          page={currentPage}
-          pageSize={pageSize}
-          totalItems={totalItems}
-          totalPages={Math.ceil(totalItems / pageSize)}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize);
-            setCurrentPage(1);
-          }}
-        />
-      )}
-
-      {/* SideDrawer: Form Tạo Job Mới */}
+      {/* SideDrawer: Create & Edit Job Form */}
       <SideDrawer
-        isOpen={createDrawerOpen}
-        onClose={() => setCreateDrawerOpen(false)}
-        title="Create New Project / Job"
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title={drawerMode === 'create' ? 'Create New Project (Job)' : 'Edit Project Details'}
       >
-        <form onSubmit={handleCreateJob} className="space-y-4 text-xs">
+        <form onSubmit={handleDrawerFormSubmit} className="space-y-4 text-xs">
           <InputField
-            label="Job Name *"
+            label="Project Name *"
             value={formData.job_name}
             onChange={(e) => setFormData({ ...formData, job_name: e.target.value })}
-            placeholder="e.g. ERP System Redesign 2026"
+            placeholder="e.g. ERP Implementation Phase 1"
             required
           />
 
-          <InputField
-            label="Client Name"
-            value={formData.client_name}
-            onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-            placeholder="e.g. VinGroup / Internal"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <InputField
+              label="Project Code"
+              value={formData.job_code}
+              onChange={(e) => setFormData({ ...formData, job_code: e.target.value })}
+              placeholder="e.g. JOB-ERP-01"
+              disabled={drawerMode === 'edit'}
+            />
 
-          <SelectDropdown
-            label="Priority"
-            value={formData.priority}
-            onChange={(val) => setFormData({ ...formData, priority: val })}
-            options={[
-              { value: 'HIGH', label: 'High Priority' },
-              { value: 'MEDIUM', label: 'Medium Priority' },
-              { value: 'LOW', label: 'Low Priority' },
-            ]}
-          />
+            <SelectDropdown
+              label="Priority Level *"
+              value={formData.priority}
+              onChange={(val) => setFormData({ ...formData, priority: val })}
+              options={[
+                { value: 'HIGH', label: 'High Priority' },
+                { value: 'MEDIUM', label: 'Medium Priority' },
+                { value: 'LOW', label: 'Low Priority' },
+              ]}
+            />
+          </div>
 
-          <InputField
-            label="Deadline Date"
-            type="date"
-            value={formData.deadline}
-            onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-          />
+          {drawerMode === 'create' && (
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Select Client *</label>
+              <select
+                value={formData.client_id}
+                onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Choose Client --</option>
+                {clientOptions.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <InputField
+              label="Start Date"
+              type="date"
+              value={formData.start_date}
+              onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              disabled={drawerMode === 'edit'}
+            />
+
+            <InputField
+              label="Deadline Date *"
+              type="date"
+              value={formData.deadline}
+              onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+              required
+            />
+          </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Description</label>
+            <label className="block font-semibold text-slate-700 mb-1">Project Description</label>
             <textarea
-              rows={3}
+              rows={4}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe the job goals and deliverables..."
+              placeholder="Enter deliverables, scope, and objectives..."
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -380,22 +875,90 @@ export default function ManagerJobsPage() {
           <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setCreateDrawerOpen(false)}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              onClick={() => setIsDrawerOpen(false)}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer font-medium"
             >
               Cancel
             </button>
-
             <button
               type="submit"
-              disabled={createJobMutation.isPending}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+              disabled={createJobMutation.isPending || updateJobMutation.isPending}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
             >
-              {createJobMutation.isPending ? 'Creating...' : 'Create Job'}
+              {createJobMutation.isPending || updateJobMutation.isPending
+                ? 'Saving...'
+                : drawerMode === 'create'
+                ? 'Create Project'
+                : 'Save Changes'}
             </button>
           </div>
         </form>
       </SideDrawer>
+
+      {/* Modal: Change Job Status */}
+      <BaseModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        title="Change Project Status"
+        description={`Update lifecycle status for "${statusTargetJob?.job_name}"`}
+      >
+        <form onSubmit={handleStatusSubmit} className="space-y-4 text-xs">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <span className="text-slate-600 font-semibold">Current Status:</span>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+              {statusTargetJob?.status}
+            </span>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1.5">New Project Status *</label>
+            <select
+              value={newStatusValue}
+              onChange={(e) => setNewStatusValue(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {(ALLOWED_TRANSITIONS[statusTargetJob?.status] || []).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(newStatusValue === 'ON_HOLD' || newStatusValue === 'CANCELLED') && (
+            <div className="space-y-1">
+              <label className="block font-bold text-rose-700">
+                Reason for status change *
+              </label>
+              <textarea
+                rows={3}
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+                placeholder="Explain why this project is put on hold or cancelled..."
+                required
+                className="w-full bg-rose-50/50 border border-rose-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+          )}
+
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsStatusModalOpen(false)}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={changeJobStatusMutation.isPending}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
+            >
+              {changeJobStatusMutation.isPending ? 'Updating...' : 'Confirm Status Change'}
+            </button>
+          </div>
+        </form>
+      </BaseModal>
     </div>
   );
 }

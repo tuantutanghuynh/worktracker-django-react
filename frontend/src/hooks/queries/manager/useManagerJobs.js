@@ -15,6 +15,14 @@ export const managerJobKeys = {
 };
 
 /**
+ * Query Key Factory for Manager Clients
+ */
+export const managerClientKeys = {
+  all: ['manager-clients'],
+  list: () => [...managerClientKeys.all, 'list'],
+};
+
+/**
  * Fetch paginated list of jobs with caching and automatic background refetching
  */
 export function useManagerJobs(params = {}) {
@@ -34,6 +42,17 @@ export function useManagerJobDetail(id) {
     queryKey: managerJobKeys.detail(id),
     queryFn: () => managerJobService.getJobDetail(id),
     enabled: Boolean(id),
+  });
+}
+
+/**
+ * Fetch list of active clients for manager
+ */
+export function useManagerClients() {
+  return useQuery({
+    queryKey: managerClientKeys.list(),
+    queryFn: () => managerJobService.getClients(),
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
   });
 }
 

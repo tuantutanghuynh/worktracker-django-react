@@ -1,338 +1,378 @@
-import React, { useState } from 'react';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Building2, 
-  ShieldCheck, 
-  KeyRound, 
-  Camera, 
-  Save, 
-  Lock, 
-  CheckCircle2, 
-  Sparkles,
-  AlertCircle,
-  Briefcase
+import React, { useState, useEffect } from 'react';
+import {
+  User,
+  Mail,
+  Phone,
+  Building2,
+  KeyRound,
+  Camera,
+  Save,
+  Lock,
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import InputField from '../../components/common/forms/InputField';
 import RoleBadge from '../../components/common/badges/RoleBadge';
+import { useAuthStore } from '../../stores/authStore';
+import {
+  useProfile,
+  useUpdateProfile,
+  useUploadAvatar,
+  useChangePassword,
+} from '../../hooks/queries/common/useProfile';
 
 export default function ManagerProfilePage() {
-  // Avatar state
-  const [avatarUrl, setAvatarUrl] = useState(
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'
-  );
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const { user } = useAuthStore();
 
-  // Profile Form state
-  const [profile, setProfile] = useState({
-    fullName: 'Trần Thị Thu Hà',
-    email: 'ha.tran@worktracker.vn',
-    phone: '0988 123 456',
-    department: 'Phòng Phát triển Dự án',
-    title: 'Senior Project Manager',
-    bio: 'Quản lý 12 dự án phát triển phần mềm doanh nghiệp & chuyển đổi số.',
+  // 🚀 TANSTACK REACT QUERY HOOKS
+  const { data: profileData, isLoading, isFetching, refetch } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
+  const uploadAvatarMutation = useUploadAvatar();
+  const changePasswordMutation = useChangePassword();
+
+  // Local Form state
+  const [profileForm, setProfileForm] = useState({
+    fullName: '',
+    phone: '',
   });
-  const [savingProfile, setSavingProfile] = useState(false);
 
   // Security Form state
-  const [security, setSecurity] = useState({
+  const [securityForm, setSecurityForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    enable2FA: true,
   });
-  const [savingSecurity, setSavingSecurity] = useState(false);
   const [securityError, setSecurityError] = useState('');
 
-  // Handle Avatar Upload Simulation
+  // Sync profile data from React Query into local form
+  useEffect(() => {
+    if (profileData) {
+      setProfileForm({
+        fullName: profileData.full_name || '',
+        phone: profileData.phone_number || '',
+      });
+    } else if (user) {
+      setProfileForm({
+        fullName: user.full_name || '',
+        phone: '',
+      });
+    }
+  }, [profileData, user]);
+
+  // 📷 AVATAR UPLOAD VIA TANSTACK MUTATION
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Dung lượng ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
-        return;
-      }
-      setUploadingAvatar(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTimeout(() => {
-          setAvatarUrl(reader.result);
-          setUploadingAvatar(false);
-          toast.success('Đã cập nhật ảnh đại diện thành công!');
-        }, 600);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Avatar file size must be 2MB or smaller.');
+      return;
     }
+
+    uploadAvatarMutation.mutate(file);
   };
 
-  // Handle Profile Update
+  // 💾 SAVE PROFILE VIA TANSTACK MUTATION
   const handleSaveProfile = (e) => {
     e.preventDefault();
-    setSavingProfile(true);
-    setTimeout(() => {
-      setSavingProfile(false);
-      toast.success('Đã lưu thông tin cá nhân thành công!');
-    }, 500);
+    updateProfileMutation.mutate({
+      full_name: profileForm.fullName.trim(),
+      phone_number: profileForm.phone.trim(),
+    });
   };
 
-  // Handle Security Update
+  // 🔒 CHANGE PASSWORD VIA TANSTACK MUTATION
   const handleSaveSecurity = (e) => {
     e.preventDefault();
     setSecurityError('');
 
-    if (!security.currentPassword) {
-      setSecurityError('Vui lòng nhập mật khẩu hiện tại');
+    if (!securityForm.currentPassword) {
+      setSecurityError('Please enter your current password.');
       return;
     }
-    if (security.newPassword && security.newPassword.length < 6) {
-      setSecurityError('Mật khẩu mới phải có ít nhất 6 ký tự');
+    if (!securityForm.newPassword || securityForm.newPassword.length < 6) {
+      setSecurityError('New password must be at least 6 characters.');
       return;
     }
-    if (security.newPassword !== security.confirmPassword) {
-      setSecurityError('Xác nhận mật khẩu mới không khớp');
+    if (securityForm.newPassword !== securityForm.confirmPassword) {
+      setSecurityError('New password confirmation does not match.');
       return;
     }
 
-    setSavingSecurity(true);
-    setTimeout(() => {
-      setSavingSecurity(false);
-      setSecurity((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
-      toast.success('Đã đổi mật khẩu và cập nhật cài đặt bảo mật!');
-    }, 600);
+    changePasswordMutation.mutate(
+      {
+        old_password: securityForm.currentPassword,
+        new_password: securityForm.newPassword,
+      },
+      {
+        onSuccess: () => {
+          setSecurityForm({
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: '',
+          });
+        },
+        onError: (err) => {
+          const errMsg =
+            err.response?.data?.old_password?.[0] ||
+            err.response?.data?.new_password?.[0] ||
+            err.response?.data?.detail ||
+            'Failed to change password. Please verify your current password.';
+          setSecurityError(errMsg);
+        },
+      }
+    );
   };
 
+  const currentAvatar = profileData?.avatar_url || user?.avatar_url;
+  const currentEmail = user?.email || profileData?.email || '';
+  const currentDepartment = profileData?.department || user?.department || 'Management Dept';
+  const currentRole = user?.role || 'MANAGER';
+
   return (
-    <div className="space-y-6 text-slate-100 max-w-6xl mx-auto">
-      {/* Page Title Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <User className="w-6 h-6 text-indigo-400" />
-            Hồ Sơ Cá Nhân & Tài Khoản
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Cập nhật ảnh đại diện, thông tin làm việc và tùy chọn bảo mật tài khoản Manager
-          </p>
+    <div className="space-y-6 max-w-6xl mx-auto text-slate-800 pb-12">
+      {/* 🌟 HERO HEADER */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20 shrink-0">
+            <User className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Personal Profile & Security</h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Manage your personal account credentials, department identity, and system access security.
+            </p>
+          </div>
         </div>
-        <RoleBadge role="MANAGER" size="lg" />
+
+        <button
+          onClick={() => {
+            refetch();
+            toast.success('Profile reloaded!');
+          }}
+          disabled={isFetching}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs transition cursor-pointer"
+        >
+          <RotateCcw className={`w-3.5 h-3.5 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
+          <span>Reload Profile</span>
+        </button>
       </div>
 
-      {/* Main Grid: Left Avatar & Stats | Right Profile Forms */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: AvatarUploadCard & Quick Stats */}
-        <div className="space-y-6">
-          {/* Avatar Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-4 shadow-sm relative overflow-hidden">
-            <div className="relative inline-block mx-auto">
-              <img
-                src={avatarUrl}
-                alt="Manager Avatar"
-                className="w-32 h-32 rounded-2xl object-cover ring-4 ring-slate-800 shadow-md"
-              />
-              <label
-                htmlFor="avatar-input"
-                className="absolute -bottom-2 -right-2 p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-lg transition-transform hover:scale-105"
-                title="Đổi ảnh đại diện"
-              >
-                <Camera className="w-4 h-4" />
-                <input
-                  id="avatar-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
-              </label>
-              {uploadingAvatar && (
-                <div className="absolute inset-0 bg-slate-950/70 rounded-2xl flex items-center justify-center text-xs font-semibold text-white">
-                  <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+        {/* ============================================================
+            CỘT TRÁI: THẺ HỒ SƠ TỔNG QUAN & AVATAR
+           ============================================================ */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 text-center relative overflow-hidden shadow-xs">
+            <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90" />
+
+            <div className="relative pt-6">
+              <div className="relative inline-block">
+                <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-slate-100 mx-auto flex items-center justify-center">
+                  {currentAvatar ? (
+                    <img
+                      src={currentAvatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-blue-100 text-blue-700 font-extrabold text-2xl flex items-center justify-center uppercase">
+                      {(profileForm.fullName || currentEmail || 'U').charAt(0)}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-1">
-              <h2 className="text-lg font-bold text-white">{profile.fullName}</h2>
-              <p className="text-xs text-indigo-400 font-medium">{profile.title}</p>
-              <p className="text-xs text-slate-400">{profile.email}</p>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800/80 grid grid-cols-2 gap-3 text-left">
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <span className="text-[11px] text-slate-400 block">Dự án quản lý</span>
-                <span className="text-base font-bold text-slate-100">12 Dự án</span>
+                <label
+                  htmlFor="avatar-upload"
+                  className="absolute bottom-0 right-0 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md cursor-pointer transition transform hover:scale-105"
+                  title="Upload new avatar"
+                >
+                  <Camera className="w-4 h-4" />
+                  <input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                    disabled={uploadAvatarMutation.isPending}
+                  />
+                </label>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <span className="text-[11px] text-slate-400 block">Cấp bậc</span>
-                <span className="text-base font-bold text-emerald-400">Senior L4</span>
+
+              {uploadAvatarMutation.isPending && (
+                <p className="text-[11px] text-blue-600 font-semibold mt-2 animate-pulse">
+                  Uploading avatar to server...
+                </p>
+              )}
+
+              <h2 className="text-base font-bold text-slate-900 mt-4">
+                {profileForm.fullName || currentEmail}
+              </h2>
+              <p className="text-xs text-slate-400 font-medium">{currentEmail}</p>
+
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <RoleBadge role={currentRole} />
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                  Active
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 space-y-3 text-left text-xs">
+              <div className="flex items-center justify-between text-slate-600">
+                <span className="flex items-center gap-2 font-medium">
+                  <Building2 className="w-4 h-4 text-slate-400" /> Department
+                </span>
+                <span className="font-bold text-slate-800">{currentDepartment}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-slate-600">
+                <span className="flex items-center gap-2 font-medium">
+                  <Mail className="w-4 h-4 text-slate-400" /> Email
+                </span>
+                <span className="font-bold text-slate-800 truncate max-w-[160px]">
+                  {currentEmail}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-slate-600">
+                <span className="flex items-center gap-2 font-medium">
+                  <Phone className="w-4 h-4 text-slate-400" /> Phone
+                </span>
+                <span className="font-bold text-slate-800">
+                  {profileForm.phone || 'Not provided'}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Profile Form & Account Security Cards */}
+        {/* ============================================================
+            CỘT PHẢI: FORM CHỈNH SỬA THÔNG TIN & ĐỔI MẬT KHẨU
+           ============================================================ */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile Details Form Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
-            <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-base font-bold text-slate-100">Thông Tin Hồ Sơ</h3>
+          {/* 📝 FORM 1: THÔNG TIN HỒ SƠ */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Personal Information</h3>
+                  <p className="text-xs text-slate-400">Update your public name and contact phone number</p>
+                </div>
               </div>
-              <span className="text-xs text-slate-400">Cập nhật chi tiết cá nhân</span>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
-                  label="Họ và Tên"
-                  name="fullName"
-                  value={profile.fullName}
-                  onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
-                  leftIcon={User}
+                  label="Full Name"
+                  value={profileForm.fullName}
+                  onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
+                  placeholder="e.g. John Doe"
                   required
                 />
+
                 <InputField
-                  label="Địa chỉ Email"
-                  name="email"
+                  label="Email Address"
                   type="email"
-                  value={profile.email}
-                  onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                  leftIcon={Mail}
-                  required
+                  value={currentEmail}
+                  disabled
+                  helperText="Primary email cannot be changed directly."
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
-                  label="Số điện thoại"
-                  name="phone"
-                  value={profile.phone}
-                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  leftIcon={Phone}
+                  label="Phone Number"
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  placeholder="e.g. 0988 123 456"
                 />
+
                 <InputField
-                  label="Chức danh / Vị trí"
-                  name="title"
-                  value={profile.title}
-                  onChange={(e) => setProfile({ ...profile, title: e.target.value })}
-                  leftIcon={Briefcase}
+                  label="Department"
+                  value={currentDepartment}
+                  disabled
+                  helperText="Managed via System Admin / Team Directory"
                 />
               </div>
 
-              <InputField
-                label="Phòng ban làm việc"
-                name="department"
-                value={profile.department}
-                onChange={(e) => setProfile({ ...profile, department: e.target.value })}
-                leftIcon={Building2}
-              />
-
-              {/* Bio / Description */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-300">Giới thiệu ngắn (Bio)</label>
-                <textarea
-                  rows={3}
-                  value={profile.bio}
-                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
-                  placeholder="Mô tả công việc hoặc vai trò của bạn..."
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end">
+              <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={savingProfile}
-                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md hover:shadow-indigo-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                  disabled={updateProfileMutation.isPending}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition cursor-pointer disabled:opacity-50"
                 >
-                  {savingProfile ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  <span>Lưu Thay Đổi</span>
+                  <Save className="w-4 h-4" />
+                  <span>{updateProfileMutation.isPending ? 'Saving Changes...' : 'Save Profile'}</span>
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Account Security Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
-            <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-base font-bold text-slate-100">Bảo Mật Tài Khoản & Mật Khẩu</h3>
+          {/* 🔒 FORM 2: BẢO MẬT & ĐỔI MẬT KHẨU */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Security & Password</h3>
+                  <p className="text-xs text-slate-400">Ensure your account uses a strong password</p>
+                </div>
               </div>
-              <span className="text-xs text-slate-400">Đổi mật khẩu định kỳ</span>
             </div>
 
-            <form onSubmit={handleSaveSecurity} className="space-y-4">
-              {securityError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{securityError}</span>
-                </div>
-              )}
+            {securityError && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{securityError}</span>
+              </div>
+            )}
 
+            <form onSubmit={handleSaveSecurity} className="space-y-4">
               <InputField
-                label="Mật khẩu hiện tại"
-                name="currentPassword"
+                label="Current Password"
                 type="password"
-                value={security.currentPassword}
-                onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })}
-                leftIcon={Lock}
+                value={securityForm.currentPassword}
+                onChange={(e) => setSecurityForm({ ...securityForm, currentPassword: e.target.value })}
+                placeholder="Enter current password"
                 required
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
-                  label="Mật khẩu mới"
-                  name="newPassword"
+                  label="New Password"
                   type="password"
-                  value={security.newPassword}
-                  onChange={(e) => setSecurity({ ...security, newPassword: e.target.value })}
-                  leftIcon={KeyRound}
+                  value={securityForm.newPassword}
+                  onChange={(e) => setSecurityForm({ ...securityForm, newPassword: e.target.value })}
+                  placeholder="Min 6 characters"
+                  required
                 />
+
                 <InputField
-                  label="Xác nhận mật khẩu mới"
-                  name="confirmPassword"
+                  label="Confirm New Password"
                   type="password"
-                  value={security.confirmPassword}
-                  onChange={(e) => setSecurity({ ...security, confirmPassword: e.target.value })}
-                  leftIcon={KeyRound}
+                  value={securityForm.confirmPassword}
+                  onChange={(e) => setSecurityForm({ ...securityForm, confirmPassword: e.target.value })}
+                  placeholder="Repeat new password"
+                  required
                 />
               </div>
 
-              {/* 2FA Option */}
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-slate-200 block">Xác thực 2 lớp (2FA / OTP)</span>
-                  <span className="text-[11px] text-slate-400 block">
-                    Yêu cầu mã xác thực ứng dụng khi đăng nhập từ thiết bị lạ
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={security.enable2FA}
-                  onChange={(e) => setSecurity({ ...security, enable2FA: e.target.checked })}
-                  className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end">
+              <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={savingSecurity}
-                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center gap-2 disabled:opacity-50"
+                  disabled={changePasswordMutation.isPending}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50"
                 >
-                  {savingSecurity ? (
-                    <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  )}
-                  <span>Cập Nhật Mật Khẩu</span>
+                  <Lock className="w-4 h-4" />
+                  <span>{changePasswordMutation.isPending ? 'Updating Password...' : 'Change Password'}</span>
                 </button>
               </div>
             </form>
@@ -342,4 +382,3 @@ export default function ManagerProfilePage() {
     </div>
   );
 }
-

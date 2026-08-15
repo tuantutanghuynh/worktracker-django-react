@@ -28,6 +28,9 @@ urlpatterns = [
     path("api/timesheets/", include("timesheets.employee.urls_employee")),
     path("api/notifications/", include("system.employee.urls_employee")),
 
+    # ── CHAT & MESSAGING SCOPE ────────────────────────────────────────────────
+    path("api/chat/", include("chat.urls")),
+
     # ── SWAGGER / API DOCS ─────────────────────────────────────────────────────
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

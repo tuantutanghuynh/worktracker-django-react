@@ -1,4 +1,4 @@
-import useReactWebSocket from 'react-use-websocket';
+import useReactWebSocket, { useWebSocket as useNamedWebSocket } from 'react-use-websocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
@@ -11,12 +11,17 @@ export function useWebSocket() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Tự động nhận diện hàm hook chuẩn từ thư viện react-use-websocket
+  const wsHook = typeof useReactWebSocket === 'function' ? useReactWebSocket : useNamedWebSocket;
+
   const token = localStorage.getItem('access_token');
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsHost = window.location.hostname || 'localhost';
-  const socketUrl = user && token ? `${wsProtocol}//${wsHost}:8000/ws/notifications/?token=${token}` : null;
+  const socketUrl = user && token && typeof wsHook === 'function' 
+    ? `${wsProtocol}//${wsHost}:8000/ws/notifications/?token=${token}` 
+    : null;
 
-  const { lastJsonMessage, readyState } = useReactWebSocket(socketUrl, {
+  const { lastJsonMessage, readyState } = (typeof wsHook === 'function' ? wsHook : () => ({}))(socketUrl, {
     shouldReconnect: () => Boolean(user && token),
     reconnectInterval: 3000,
     onMessage: (event) => {

@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'timesheets',
     'system',
     'reports',
+    'chat',
 ]
 
 MIDDLEWARE = [

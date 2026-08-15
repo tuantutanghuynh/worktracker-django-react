@@ -23,6 +23,7 @@ const ManagerTimesheetReviewPage = lazy(() => import('../pages/manager/ManagerTi
 const ManagerTimeLockPage = lazy(() => import('../pages/manager/ManagerTimeLockPage'));
 const ManagerReportsPage = lazy(() => import('../pages/manager/ManagerReportsPage'));
 const ManagerNotificationsPage = lazy(() => import('../pages/manager/ManagerNotificationsPage'));
+const ManagerChatPage = lazy(() => import('../pages/manager/ManagerChatPage'));
 const ManagerProfilePage = lazy(() => import('../pages/manager/ManagerProfilePage'));
 const ManagerSettingsPage = lazy(() => import('../pages/manager/ManagerSettingsPage'));
 
@@ -72,6 +73,7 @@ export function AppRouter() {
                                 <Route path="timelock" element={<ManagerTimeLockPage />} />
                                 <Route path="timelocks" element={<ManagerTimeLockPage />} />
                                 <Route path="reports" element={<ManagerReportsPage />} />
+                                <Route path="chat" element={<ManagerChatPage />} />
                                 <Route path="notifications" element={<ManagerNotificationsPage />} />
                                 <Route path="profile" element={<ManagerProfilePage />} />
                                 <Route path="settings" element={<ManagerSettingsPage />} />

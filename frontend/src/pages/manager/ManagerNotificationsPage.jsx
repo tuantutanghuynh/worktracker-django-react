@@ -14,45 +14,6 @@ import { toast } from 'sonner';
 import NotificationListTable from '../../components/common/feeds/NotificationListTable';
 import { useNotificationStore } from '../../stores/useNotificationStore';
 
-const DEFAULT_NOTIFICATIONS = [
-  {
-    id: 1,
-    event_type: 'TASK_ASSIGNED',
-    title: 'Công việc mới được giao',
-    content: 'Bạn đã được phân công quản lý dự án "Thiết kế UI WorkTracker Pro"',
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    related_url: '/manager/kanban',
-  },
-  {
-    id: 2,
-    event_type: 'TIMESHEET_LOCK',
-    title: 'Khóa kỳ công tháng 07/2026',
-    content: 'Kỳ công làm việc tháng 07/2026 của phòng Kỹ Thuật đã chính thức được chốt khóa',
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    related_url: '/manager/timelock',
-  },
-  {
-    id: 3,
-    event_type: 'TASK_STATUS_CHANGED',
-    title: 'Thay đổi trạng thái Task',
-    content: 'Nguyễn Văn A đã cập nhật task "Tối ưu hóa Query Database" sang COMPLETED',
-    is_read: true,
-    created_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    related_url: '/manager/kanban',
-  },
-  {
-    id: 4,
-    event_type: 'SYSTEM_ALERT',
-    title: 'Cảnh báo tiến độ công việc',
-    content: 'Có 3 công việc thuộc dự án Mobile App đã quá hạn chót phê duyệt',
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 720).toISOString(),
-    related_url: '/manager/dashboard',
-  },
-];
-
 export default function ManagerNotificationsPage() {
   const navigate = useNavigate();
   const {
@@ -64,10 +25,9 @@ export default function ManagerNotificationsPage() {
     markAsRead,
     markAllAsRead,
     connectWebSocket,
-    disconnectWebSocket
   } = useNotificationStore();
 
-  const [localNotifications, setLocalNotifications] = useState(DEFAULT_NOTIFICATIONS);
+  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'UNREAD' | 'READ'
 
   useEffect(() => {
     // Initial fetch from backend API
@@ -77,136 +37,154 @@ export default function ManagerNotificationsPage() {
 
     // Initiate real-time WebSocket connection
     connectWebSocket();
-
-    return () => {
-      // Clean up WebSocket connection when leaving page if needed
-      // disconnectWebSocket();
-    };
   }, [fetchNotifications, connectWebSocket]);
 
-  // Combine store notifications or default fallback if store empty
-  const displayNotifications = notifications && notifications.length > 0
-    ? notifications
-    : localNotifications;
+  const displayNotifications = notifications || [];
+
+  // Lọc thông báo
+  const filteredNotifications = displayNotifications.filter((n) => {
+    if (activeFilter === 'UNREAD') return !n.is_read;
+    if (activeFilter === 'READ') return n.is_read;
+    return true;
+  });
 
   const handleMarkAsRead = async (idOrIds) => {
-    if (Array.isArray(idOrIds)) {
-      for (const id of idOrIds) {
-        await markAsRead(id);
+    try {
+      if (Array.isArray(idOrIds)) {
+        for (const id of idOrIds) {
+          await markAsRead(id);
+        }
+        toast.success(`Marked ${idOrIds.length} notifications as read.`);
+      } else {
+        await markAsRead(idOrIds);
+        toast.success('Notification marked as read.');
       }
-      setLocalNotifications((prev) =>
-        prev.map((n) => (idOrIds.includes(n.id) ? { ...n, is_read: true } : n))
-      );
-      toast.success(`Đã đánh dấu đọc ${idOrIds.length} thông báo`);
-    } else {
-      await markAsRead(idOrIds);
-      setLocalNotifications((prev) =>
-        prev.map((n) => (n.id === idOrIds ? { ...n, is_read: true } : n))
-      );
-      toast.success('Đã đánh dấu đọc thông báo');
+    } catch (err) {
+      console.error('Mark read failed:', err);
     }
   };
 
   const handleMarkAllRead = async () => {
-    await markAllAsRead();
-    setLocalNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    toast.success('Đã đánh dấu đọc tất cả thông báo');
-  };
-
-  const handleDelete = (id) => {
-    setLocalNotifications((prev) => prev.filter((n) => n.id !== id));
-    toast.success('Đã xóa thông báo khỏi danh sách');
-  };
-
-  const handleNotificationClick = (item) => {
-    if (!item.is_read) {
-      handleMarkAsRead(item.id);
-    }
-    if (item.related_url) {
-      navigate(item.related_url);
+    try {
+      await markAllAsRead();
+      toast.success('All notifications marked as read.');
+    } catch (err) {
+      console.error('Mark all read failed:', err);
     }
   };
-
-  const handleReconnectWs = () => {
-    connectWebSocket();
-    toast.info('Đang kết nối lại WebSockets...');
-  };
-
-  const calculatedUnread = displayNotifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="space-y-6 text-slate-100">
-      {/* Header Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              <Bell className="w-5 h-5 text-indigo-400" />
-              Trung Tâm Thông Báo
-            </h1>
-            {calculatedUnread > 0 && (
-              <span className="px-2.5 py-0.5 text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full">
-                {calculatedUnread} chưa đọc
+    <div className="space-y-6 max-w-6xl mx-auto text-slate-800 pb-12">
+      {/* 🌟 HERO HEADER */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-start gap-4">
+          <div className="relative shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20">
+              <Bell className="w-6 h-6" />
+            </div>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center border-2 border-white shadow-xs">
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">
-            Thông báo thời gian thực về tiến độ dự án, duyệt giờ làm (Timesheet) và biến động hệ thống
-          </p>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900">System Notifications & Alerts</h1>
+              {wsConnected ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Wifi className="w-3 h-3 text-emerald-500" /> Live WebSocket
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                  <WifiOff className="w-3 h-3" /> Polling Mode
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Real-time audit alerts, task approvals, workflow assignments, and timesheet lock notifications.
+            </p>
+          </div>
         </div>
 
-        {/* WebSocket Status & Quick Tools */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div
-            className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${wsConnected
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-              }`}
-          >
-            {wsConnected ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span>WS Realtime: Đã kết nối</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5" />
-                <span>WS Ngoại tuyến</span>
-                <button
-                  type="button"
-                  onClick={handleReconnectWs}
-                  className="ml-1 underline hover:text-amber-200"
-                >
-                  Kết nối lại
-                </button>
-              </>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllRead}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl border border-blue-200 text-xs shadow-2xs transition cursor-pointer"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              <span>Mark All as Read</span>
+            </button>
+          )}
 
           <button
-            type="button"
             onClick={() => fetchNotifications()}
-            className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-2"
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs transition cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${loading ? 'animate-spin' : ''}`} />
-            <span>Làm mới</span>
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
-      {/* Main Notification Table Feed */}
-      <NotificationListTable
-        notifications={displayNotifications}
-        isLoading={loading}
-        onMarkAsRead={handleMarkAsRead}
-        onMarkAllRead={handleMarkAllRead}
-        onDelete={handleDelete}
-        onNotificationClick={handleNotificationClick}
-      />
+      {/* 🔍 FILTER TABS */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+          <button
+            onClick={() => setActiveFilter('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              activeFilter === 'ALL'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            All ({displayNotifications.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('UNREAD')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              activeFilter === 'UNREAD'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Unread ({unreadCount})
+          </button>
+          <button
+            onClick={() => setActiveFilter('READ')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              activeFilter === 'READ'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Read ({Math.max(0, displayNotifications.length - unreadCount)})
+          </button>
+        </div>
+      </div>
+
+      {/* 📋 NOTIFICATIONS TABLE OR EMPTY STATE */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {filteredNotifications.length > 0 ? (
+          <NotificationListTable
+            notifications={filteredNotifications}
+            onMarkRead={handleMarkAsRead}
+            onNavigate={(url) => url && navigate(url)}
+          />
+        ) : (
+          <div className="py-16 px-4 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <Inbox className="w-6 h-6 stroke-1" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800">No notifications found</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              You are all caught up! When new tasks are assigned, reviewed, or locked, real-time alerts will appear here.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-

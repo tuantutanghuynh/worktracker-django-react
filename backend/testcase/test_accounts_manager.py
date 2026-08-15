@@ -1,7 +1,7 @@
 import pytest
 from django.core.cache import cache
 from rest_framework import status
-from rest_framework.test import axiosClient
+from rest_framework.test import APIClient
 from model_bakery import baker
 from system.security.permissions_manager import MANAGER_ROLE_CODE
 
@@ -23,7 +23,7 @@ class TestManagerEmployeeList:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -67,7 +67,7 @@ class TestManagerDepartmentUpdate:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")

@@ -51,6 +51,14 @@ export const managerJobService = {
     });
     return response.data;
   },
+
+  /**
+   * Fetch active clients list for manager dropdowns
+   */
+  getClients: async () => {
+    const response = await axiosClient.get('/manager/clients/');
+    return response.data;
+  },
 };
 
 export default managerJobService;

@@ -2,7 +2,7 @@ import datetime
 import pytest
 from django.core.cache import cache
 from rest_framework import status
-from rest_framework.test import axiosClient
+from rest_framework.test import APIClient
 from model_bakery import baker
 from accounts.models import Permission
 from system.security.permissions_manager import MANAGER_ROLE_CODE
@@ -38,7 +38,7 @@ class TestManagerJobScoping:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager_A = make_manager_with_perms(self.role_manager, "task:view")
@@ -94,7 +94,7 @@ class TestManagerTaskCreate:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -186,7 +186,7 @@ class TestManagerTaskUpdate:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
@@ -257,7 +257,7 @@ class TestManagerTaskTransition:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager = make_manager_with_perms(
@@ -329,7 +329,7 @@ class TestManagerTaskKanbanMove:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager = make_manager_with_perms(
@@ -393,7 +393,7 @@ class TestManagerTaskComment:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager_A = make_manager_with_perms(
@@ -446,7 +446,7 @@ class TestManagerTaskFilters:
 
     def setup_method(self):
         cache.clear()
-        self.client = axiosClient()
+        self.client = APIClient()
 
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
