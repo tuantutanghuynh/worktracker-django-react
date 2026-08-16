@@ -6,6 +6,7 @@ import { ResetPasswordPage } from "../pages/auth/ResetPasswordPage"
 import { ChangePasswordPage } from "../pages/auth/ChangePasswordPage"
 import { EmployeeLayout } from "../layouts/EmployeeLayout"
 import { ProfilePage } from "../pages/employee/ProfilePage"
+import { DashboardPage } from "../pages/employee/DashboardPage"
 
 // Single place declaring every route in the app. Public routes (login,
 // forgot/reset password) sit outside ProtectedRoute; everything else —
@@ -25,15 +26,15 @@ export function AppRouter() {
                     <Route path="/change-password" element={<ChangePasswordPage />} />
 
                     <Route element={<EmployeeLayout />}>
-                        {/* TODO Phase 3: thay bằng Dashboard/My Tasks/Timesheet... thật */}
-                        <Route path="/" element={<div>Employee Dashboard (Phase 3)</div>} />
+                        <Route path="/" element={<DashboardPage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         {/* Sidebar's EMPLOYEE nav config (pulled from LongNguyen) links
-                            under /employee/*, not the flat paths above — alias profile
-                            so that nav item resolves instead of hitting the catch-all
-                            redirect. Other /employee/* nav items (dashboard, my-tasks,
-                            timesheet, my-performance, notifications) still 404 → home
-                            until Phase 3 builds those pages. */}
+                            under /employee/*, not the flat paths above — alias the pages
+                            that exist so those nav items resolve instead of hitting the
+                            catch-all redirect. Other /employee/* nav items (my-tasks,
+                            timesheet, my-performance, notifications) still fall through
+                            to "*" → home until Phase 3 builds those pages. */}
+                        <Route path="/employee/dashboard" element={<DashboardPage />} />
                         <Route path="/employee/profile" element={<ProfilePage />} />
                     </Route>
                 </Route>
