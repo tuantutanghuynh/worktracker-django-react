@@ -1,6 +1,7 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from timesheets.models import LogWork, TimeLock
@@ -40,6 +41,12 @@ from system.security.scoping_manager import (
 )
 
 
+class ManagerLogWorkPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Manager LogWork Review API.
@@ -53,6 +60,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
         IsManagerRole,
         HasPermissionCode,
     ]
+    pagination_class = ManagerLogWorkPagination
 
     http_method_names = [
         "get",
@@ -286,6 +294,7 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
         IsManagerRole,
         HasPermissionCode,
     ]
+    pagination_class = ManagerLogWorkPagination
 
     http_method_names = [
         "get",

@@ -5,8 +5,9 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from projects.models import Job
+from projects.models import Job, Client
 from projects.manager.serializers_manager import (
+    ManagerClientMiniSerializer,
     ManagerJobCreateSerializer,
     ManagerJobDetailSerializer,
     ManagerJobListSerializer,
@@ -272,3 +273,21 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
             output_serializer.data,
             status=status.HTTP_200_OK,
         )
+
+
+class ManagerClientViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Manager Client API (Read-only).
+    Cho phép Manager xem danh sách khách hàng để chọn khi tạo / gán Job.
+    """
+    permission_classes = [
+        IsActiveAuthenticated,
+        IsManagerRole,
+        HasPermissionCode,
+    ]
+    serializer_class = ManagerClientMiniSerializer
+    queryset = Client.objects.filter(is_active=True).order_by("client_name")
+
+    def get_permissions(self):
+        self.required_permission = "client:view"
+        return super().get_permissions()

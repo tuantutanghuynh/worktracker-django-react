@@ -17,6 +17,9 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 
 import system.routing
+import chat.routing
+
+combined_websocket_urlpatterns = system.routing.websocket_urlpatterns + chat.routing.websocket_urlpatterns
 
 application = ProtocolTypeRouter(
     {
@@ -28,7 +31,7 @@ application = ProtocolTypeRouter(
         # AuthMiddlewareStack: tự động load session/user từ cookie
         "websocket": AllowedHostsOriginValidator(
             AuthMiddlewareStack(
-                URLRouter(system.routing.websocket_urlpatterns)
+                URLRouter(combined_websocket_urlpatterns)
             )
         ),
     }

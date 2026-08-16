@@ -3,7 +3,7 @@ from django.db import transaction
 from rest_framework.test import APIClient
 from accounts.models import CustomUser, Role, Permission, RolePermission
 
-#APIClient là HTTP client giả lập của Django REST Framework — dùng để gọi API trong test mà không cần server thật chạy.
+# APIClient là HTTP client giả lập của Django REST Framework — dùng để gọi API trong test mà không cần server thật chạy.
 
 #tắt redis khi test
 @pytest.fixture(autouse=True) #autouse=True — fixture này tự chạy cho MỌI test, không cần gọi tay. Thay Redis bằng DummyCache để test không cần Redis đang chạy.
@@ -14,8 +14,13 @@ def use_dummy_cache(settings):
         # khi xác thực JWT thật (mọi request không dùng force_authenticate).
         'blacklist': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'},
     }
+    settings.CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
     
-#tạo APICLient
+#tạo APIClient
 @pytest.fixture
 def api_client():
     return APIClient()

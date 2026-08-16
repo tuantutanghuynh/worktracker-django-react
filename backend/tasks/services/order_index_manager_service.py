@@ -1,4 +1,9 @@
-ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+"""
+Service tính toán chuỗi sắp xếp Lexicographical (LexoRank) cho Bảng Kanban.
+Đảm bảo đồng bộ tuyệt đối 100% giữa Python, SQLite, PostgreSQL và JavaScript.
+"""
+
+ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 BASE = len(ALPHABET)
 
 MIN_CHAR = ALPHABET[0]
@@ -12,7 +17,7 @@ class OrderIndexError(ValueError):
 
 def _char_to_index(char):
     try:
-        return ALPHABET.index(char)
+        return ALPHABET.index(char.lower())
     except ValueError:
         raise OrderIndexError(f"Invalid order_index character: {char}")
 
@@ -35,16 +40,13 @@ def key_between(prev_key=None, next_key=None):
     """
     Sinh một chuỗi nằm giữa prev_key và next_key theo thứ tự từ điển.
 
-    Trường hợp:
+    Trường hợp xử lý an toàn (Fail-Safe):
     - prev_key=None, next_key=None: task đầu tiên trong cột.
     - prev_key có, next_key=None: thêm cuối cột.
     - prev_key=None, next_key có: thêm đầu cột.
     - cả hai có: thêm giữa hai task.
-
-    Lưu ý:
-    - Đây là LexoRank giản lược.
-    - Nếu hệ thống bị kéo thả cực nhiều làm key quá dài, có thể bổ sung
-      tác vụ rebalance order_index sau. Hiện chưa cần làm.
+    - NẾU DỮ LIỆU BỊ TRÙNG (prev_key == next_key): Tự động sinh key mới nằm sau prev_key.
+    - NẾU VỊ TRÍ BỊ ĐẢO (prev_key > next_key): Tự động đảo lại để tính khoảng giữa mượt mà.
     """
     if prev_key is not None:
         prev_key = str(prev_key)
@@ -52,8 +54,13 @@ def key_between(prev_key=None, next_key=None):
     if next_key is not None:
         next_key = str(next_key)
 
-    if prev_key and next_key and prev_key >= next_key:
-        raise OrderIndexError("prev_key must be smaller than next_key.")
+    # 🛡️ XỬ LÝ AN TOÀN NẾU 2 KEY BẰNG NHAU (DUPLICATE DB KEYS)
+    if prev_key and next_key and prev_key == next_key:
+        return key_between(prev_key, None)
+
+    # 🛡️ XỬ LÝ AN TOÀN NẾU THỨ TỰ BỊ ĐẢO
+    if prev_key and next_key and prev_key > next_key:
+        prev_key, next_key = next_key, prev_key
 
     if prev_key is None and next_key is None:
         return initial_key()

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Detail - TASK-2024-112 - WorkTracker Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen overflow-hidden flex">
+
+  <!-- ============================================================ -->
+  <!-- LEFT SIDEBAR (STANDARDIZED 100% MATCHING ALL OTHER PAGES)    -->
+  <!-- ============================================================ -->
+  <aside class="w-64 bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0">
+    <div class="space-y-3.5">
+      
+      <!-- LOGO -->
+      <div class="flex items-center space-x-3 px-2 py-0.5">
+        <svg class="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#60A5FA" />
+              <stop offset="40%" stop-color="#3B82F6" />
+              <stop offset="80%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#1D4ED8" />
+            </linearGradient>
+          </defs>
+          <path d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26" 
+                stroke="url(#wBlueGradient)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+
+        <span class="text-xl font-bold tracking-tight text-white leading-none">WorkTracker <span class="text-xs font-semibold text-blue-400">Pro</span></span>
+      </div>
+
+      <!-- MANAGER PORTAL MENU -->
+      <div class="space-y-1">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Manager Portal</p>
+        
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-border-all w-5 text-center"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <!-- ACTIVE: My Jobs -->
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30 transition">
+          <i class="fa-solid fa-briefcase w-5 text-center"></i>
+          <span>My Jobs</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-users w-5 text-center"></i>
+          <span>Team Members</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-clock w-5 text-center"></i>
+          <span>Timesheets</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-lock w-5 text-center"></i>
+          <span>Time Lock</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+          <span>Reports</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-gear w-5 text-center"></i>
+          <span>Settings</span>
+        </a>
+      </div>
+
+      <!-- QUICK ACCESS -->
+      <div class="space-y-0.5 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Quick Access</p>
+        <a href="#" class="flex items-center justify-between px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bell w-5 text-center"></i>
+            <span>Notifications</span>
+          </div>
+          <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">12</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-3 py-1.5 text-sm text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-magnifying-glass w-5 text-center"></i>
+          <span>Search (Ctrl + K)</span>
+        </a>
+      </div>
+
+      <!-- RECENTLY VIEWED JOBS -->
+      <div class="space-y-1 pt-2.5 border-t border-slate-800/80">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">Recently Viewed Jobs</p>
+        
+        <div class="px-3 py-1 rounded-lg bg-slate-800/60 cursor-pointer flex items-center space-x-2.5 border-l-2 border-blue-500">
+          <div class="w-2.5 h-2.5 rounded bg-emerald-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-white truncate">ERP System Implementation</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-amber-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Mobile App Development</p>
+            <span class="text-[9px] font-bold text-emerald-400">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-1 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5">
+          <div class="w-2.5 h-2.5 rounded bg-blue-500 shrink-0"></div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-semibold text-slate-200 truncate">Website Redesign</p>
+            <span class="text-[9px] font-bold text-blue-400">ON HOLD</span>
+          </div>
+        </div>
+
+        <a href="#" class="inline-block px-3 pt-0.5 text-[11px] font-medium text-blue-400 hover:underline">View all jobs →</a>
+      </div>
+    </div>
+
+    <!-- USER PROFILE -->
+    <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="relative">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-700">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-white leading-tight">Nguyen Van A</p>
+          <p class="text-[10px] text-slate-400">Manager</p>
+        </div>
+      </div>
+      <i class="fa-solid fa-angles-left text-slate-500 text-xs hover:text-slate-300 cursor-pointer"></i>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- MAIN WORKSPACE (INDEPENDENT SCROLLING CONTAINER)              -->
+  <!-- ============================================================ -->
+  <main class="flex-1 bg-slate-50 text-slate-800 p-6 space-y-5 h-screen overflow-y-auto">
+
+    <!-- BREADCRUMB & TOPBAR -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+      <!-- Breadcrumb -->
+      <div class="flex items-center space-x-2 text-xs text-slate-500 font-medium">
+        <a href="#" class="hover:text-blue-600 flex items-center text-slate-700 font-semibold"><i class="fa-solid fa-arrow-left text-xs mr-2"></i>Task Detail</a>
+        <span class="text-slate-300 mx-1">|</span>
+        <a href="#" class="hover:text-blue-600">Dashboard</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <a href="#" class="hover:text-blue-600">My Jobs</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <a href="#" class="hover:text-blue-600">ERP-2024-068</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <a href="#" class="hover:text-blue-600">Kanban Board</a>
+        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+        <span class="text-slate-900 font-semibold">TASK-2024-112</span>
+      </div>
+
+      <!-- Right Topbar Controls -->
+      <div class="flex items-center space-x-4">
+        <!-- Search Bar -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" placeholder="Search tasks, employees..." class="w-64 pl-9 pr-12 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm">
+          <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Ctrl K</span>
+        </div>
+
+        <!-- Date Range Selector -->
+        <div class="flex items-center space-x-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 shadow-sm cursor-pointer">
+          <i class="fa-regular fa-calendar text-slate-400"></i>
+          <span>Jun 1 – Jun 30, 2026</span>
+          <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
+        </div>
+
+        <!-- Notification Bell -->
+        <div class="relative cursor-pointer">
+          <i class="fa-regular fa-bell text-slate-600 text-base"></i>
+          <span class="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full">12</span>
+        </div>
+
+        <!-- Profile Pill -->
+        <div class="flex items-center space-x-2 border-l border-slate-200 pl-4 cursor-pointer">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+          <div>
+            <p class="text-xs font-bold text-slate-900 leading-tight">Nguyen Van A</p>
+            <p class="text-[10px] text-slate-400">Manager</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK HERO HEADER CARD -->
+    <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <div class="flex items-start space-x-4">
+        <!-- Task Status Icon -->
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center text-xl shrink-0">
+          <i class="fa-regular fa-eye"></i>
+        </div>
+
+        <div class="space-y-2">
+          <!-- Title & Badges -->
+          <div class="flex flex-wrap items-center gap-2.5">
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Performance Testing</h1>
+            <span class="px-2.5 py-0.5 rounded bg-purple-50 text-purple-600 border border-purple-200 text-xs font-bold uppercase">IN REVIEW</span>
+            <span class="px-2.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 text-xs font-bold uppercase">High Priority</span>
+            <span class="px-2.5 py-0.5 rounded bg-blue-50 text-blue-600 text-xs font-bold">TASK-2024-112</span>
+          </div>
+
+          <!-- Primary Metadata Line -->
+          <div class="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-briefcase text-slate-400"></i>
+              <span>Job: <strong class="text-slate-800 hover:text-blue-600 cursor-pointer">ERP System Implementation</strong></span>
+            </div>
+            <span>•</span>
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-building text-slate-400"></i>
+              <span>Client: <strong class="text-slate-800">ABC Corporation</strong></span>
+            </div>
+            <span>•</span>
+            <div class="flex items-center space-x-1.5">
+              <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-4 h-4 rounded-full object-cover">
+              <span>Assignee: <strong class="text-slate-800">Pham Thi D</strong></span>
+            </div>
+            <span>•</span>
+            <div class="flex items-center space-x-1.5">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-4 h-4 rounded-full object-cover">
+              <span>Creator: <strong class="text-slate-800">Nguyen Van A</strong></span>
+            </div>
+          </div>
+
+          <!-- Secondary Metadata Line -->
+          <div class="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-0.5">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-regular fa-calendar text-slate-400"></i>
+              <span>Deadline: <strong class="text-rose-600 font-bold">Jun 28, 2026</strong></span>
+              <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-500 text-white">OVERDUE</span>
+            </div>
+            <span>•</span>
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-regular fa-clock text-slate-400"></i>
+              <span>Created: <strong class="text-slate-700">May 20, 2026</strong></span>
+            </div>
+            <span>•</span>
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-rotate text-slate-400"></i>
+              <span>Updated: <strong class="text-slate-700">Jun 27, 2026 03:45 PM</strong></span>
+            </div>
+            <span>•</span>
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-list-ol text-slate-400"></i>
+              <span>Order: <strong class="text-slate-700">3 of 35</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2.5 shrink-0">
+        <div class="inline-flex rounded-lg shadow-md shadow-blue-500/20">
+          <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-l-lg flex items-center space-x-2 transition">
+            <i class="fa-regular fa-pen-to-square"></i>
+            <span>Edit Task</span>
+          </button>
+          <button class="px-2.5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs rounded-r-lg border-l border-blue-500 transition">
+            <i class="fa-solid fa-chevron-down text-[10px]"></i>
+          </button>
+        </div>
+
+        <button class="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-kanban text-slate-400"></i>
+          <span>Open in Kanban</span>
+        </button>
+
+        <button class="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-download text-slate-400"></i>
+          <span>Export Task</span>
+        </button>
+
+        <button class="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 shadow-sm transition">
+          <i class="fa-solid fa-ellipsis"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB NAVIGATION BAR -->
+    <div class="border-b border-slate-200 flex space-x-6 text-xs font-semibold">
+      <a href="#" class="pb-3 text-blue-600 border-b-2 border-blue-600 flex items-center space-x-2">
+        <i class="fa-solid fa-bars-staggered"></i>
+        <span>Overview</span>
+      </a>
+      <a href="#" class="pb-3 text-slate-500 hover:text-slate-900 flex items-center space-x-2 transition">
+        <i class="fa-regular fa-comments"></i>
+        <span>Comments</span>
+        <span class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full">4</span>
+      </a>
+      <a href="#" class="pb-3 text-slate-500 hover:text-slate-900 flex items-center space-x-2 transition">
+        <i class="fa-solid fa-paperclip"></i>
+        <span>Attachments</span>
+        <span class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full">3</span>
+      </a>
+      <a href="#" class="pb-3 text-slate-500 hover:text-slate-900 flex items-center space-x-2 transition">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Activity</span>
+      </a>
+    </div>
+
+    <!-- MAIN GRID LAYOUT: 2 COLUMNS (LEFT 65%, RIGHT 35%) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+
+      <!-- LEFT COLUMN: MAIN CONTENT (2 COLUMNS SPAN) -->
+      <div class="lg:col-span-2 space-y-5">
+        
+        <!-- CARD 1: TASK DESCRIPTION -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Task Description</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Execute comprehensive performance testing for the ERP system to ensure system stability, scalability, and responsiveness under expected load conditions. Identify performance bottlenecks and provide optimization recommendations.
+          </p>
+        </div>
+
+        <!-- CARD 2: PROGRESS TIMELINE (WORKFLOW STEPPER) -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-4">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Progress Timeline</h3>
+
+          <div class="relative pl-6 space-y-6 text-xs before:absolute before:left-2.5 before:top-2.5 before:bottom-2.5 before:w-0.5 before:bg-slate-200">
+            
+            <!-- Step 1: TODO -->
+            <div class="relative">
+              <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-sm">
+                <i class="fa-solid fa-check"></i>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h4 class="font-bold text-slate-900">TODO</h4>
+                  <p class="text-[11px] text-slate-500">Task created</p>
+                </div>
+                <div class="sm:text-right text-[11px] text-slate-400">
+                  <p class="font-medium text-slate-600">May 20, 2026 09:15 AM</p>
+                  <p>Nguyen Van A</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2: IN PROGRESS -->
+            <div class="relative">
+              <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-sm">
+                <i class="fa-solid fa-check"></i>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h4 class="font-bold text-slate-900">IN PROGRESS</h4>
+                  <p class="text-[11px] text-slate-500">Work started</p>
+                </div>
+                <div class="sm:text-right text-[11px] text-slate-400">
+                  <p class="font-medium text-slate-600">May 25, 2026 10:30 AM</p>
+                  <p>Pham Thi D</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3: REVIEWING (ACTIVE STEP) -->
+            <div class="relative">
+              <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] ring-4 ring-purple-100 shadow-sm">
+                <i class="fa-regular fa-dot-circle"></i>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h4 class="font-bold text-purple-700">REVIEWING</h4>
+                  <p class="text-[11px] text-purple-600 font-medium">Submitted for review</p>
+                </div>
+                <div class="sm:text-right text-[11px] text-slate-400">
+                  <p class="font-medium text-slate-600">Jun 27, 2026 03:45 PM</p>
+                  <p>Pham Thi D</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 4: COMPLETED -->
+            <div class="relative">
+              <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-white border-2 border-slate-300 text-slate-400 flex items-center justify-center text-[10px]">
+              </div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h4 class="font-bold text-slate-400">COMPLETED</h4>
+                  <p class="text-[11px] text-slate-400">Pending approval</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- CARD 3: RECENT REVIEW & REJECTION NOTES -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Recent Review & Rejection Notes</h3>
+
+          <div class="p-4 bg-purple-50/70 border border-purple-200/80 rounded-xl space-y-2 text-xs">
+            <div class="flex items-start space-x-3 text-purple-950">
+              <div class="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                <i class="fa-regular fa-comment-dots"></i>
+              </div>
+              <p class="font-medium leading-relaxed italic">
+                "Please add more stress test results for peak concurrent users scenario and include database performance analysis."
+              </p>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-purple-200/60 text-[11px] text-purple-800">
+              <span>Reviewed by: <strong>Hoang Van E (Developer)</strong></span>
+              <span>Jun 27, 2026 04:10 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 4: COMMENTS THREAD (4 COMMENTS) -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Comments (4)</h3>
+          </div>
+
+          <!-- Comments List -->
+          <div class="space-y-4 text-xs">
+            <!-- Comment 1 -->
+            <div class="flex items-start space-x-3">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200 mt-0.5">
+              <div class="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-200/60 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-slate-900">Nguyen Van A <span class="text-[10px] font-normal text-slate-400">(Manager)</span></p>
+                  <span class="text-[10px] text-slate-400">May 25, 2026 10:15 AM</span>
+                </div>
+                <p class="text-slate-700">Please ensure all performance metrics are within acceptable thresholds.</p>
+              </div>
+            </div>
+
+            <!-- Comment 2 -->
+            <div class="flex items-start space-x-3">
+              <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200 mt-0.5">
+              <div class="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-200/60 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-slate-900">Pham Thi D <span class="text-[10px] font-normal text-slate-400">(Tester)</span></p>
+                  <span class="text-[10px] text-slate-400">Jun 27, 2026 03:45 PM</span>
+                </div>
+                <p class="text-slate-700">Load testing completed. Initial results look good. Preparing detailed report.</p>
+              </div>
+            </div>
+
+            <!-- Comment 3 -->
+            <div class="flex items-start space-x-3">
+              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200 mt-0.5">
+              <div class="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-200/60 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-slate-900">Hoang Van E <span class="text-[10px] font-normal text-slate-400">(Developer)</span></p>
+                  <span class="text-[10px] text-slate-400">Jun 27, 2026 04:10 PM</span>
+                </div>
+                <p class="text-slate-700">Added a review note. Need additional stress test data and DB analysis.</p>
+              </div>
+            </div>
+
+            <!-- Comment 4 -->
+            <div class="flex items-start space-x-3">
+              <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200 mt-0.5">
+              <div class="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-200/60 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-slate-900">Pham Thi D <span class="text-[10px] font-normal text-slate-400">(Tester)</span></p>
+                  <span class="text-[10px] text-slate-400">Jun 27, 2026 04:25 PM</span>
+                </div>
+                <p class="text-slate-700">Understood. Will run additional tests and update the report.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Comment Input Box -->
+          <div class="flex items-start space-x-3 pt-3 border-t border-slate-100">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-8 h-8 rounded-full object-cover border border-slate-200 mt-1">
+            <div class="flex-1 space-y-2">
+              <textarea placeholder="Write a comment..." rows="2" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"></textarea>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3 text-slate-400 text-sm pl-1">
+                  <i class="fa-solid fa-paperclip hover:text-slate-600 cursor-pointer"></i>
+                  <i class="fa-regular fa-face-smile hover:text-slate-600 cursor-pointer"></i>
+                </div>
+                <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs shadow-md shadow-blue-500/20 transition">Post</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: SIDEBAR PANELS (1 COLUMN SPAN) -->
+      <div class="space-y-5">
+        
+        <!-- CARD 1: STATUS ACTIONS (MANAGER WORKFLOW BUTTONS) -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Status Actions</h3>
+
+          <div class="space-y-2 text-xs font-semibold">
+            <button class="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg flex items-center justify-center space-x-2 shadow-sm transition">
+              <i class="fa-regular fa-circle-check"></i>
+              <span>Approve Task</span>
+            </button>
+
+            <button class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg flex items-center justify-center space-x-2 shadow-sm transition">
+              <i class="fa-regular fa-circle-xmark"></i>
+              <span>Reject Task</span>
+            </button>
+
+            <button class="w-full py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded-lg flex items-center justify-center space-x-2 shadow-sm transition">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>Send Back to In Progress</span>
+            </button>
+
+            <button class="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg flex items-center justify-center space-x-2 transition">
+              <i class="fa-solid fa-ban"></i>
+              <span>Cancel Task</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD 2: TASK METADATA -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">Task Metadata</h3>
+
+          <div class="space-y-2.5 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Assignee</span>
+              <div class="flex items-center space-x-2">
+                <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" class="w-5 h-5 rounded-full object-cover">
+                <span class="font-bold text-slate-900">Pham Thi D</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Creator</span>
+              <div class="flex items-center space-x-2">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="w-5 h-5 rounded-full object-cover">
+                <span class="font-bold text-slate-900">Nguyen Van A</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Status</span>
+              <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-bold uppercase">IN REVIEW</span>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Priority</span>
+              <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold uppercase">High</span>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Deadline</span>
+              <div class="flex items-center space-x-1.5">
+                <i class="fa-regular fa-calendar text-slate-400"></i>
+                <span class="font-bold text-slate-900">Jun 28, 2026</span>
+                <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-rose-500 text-white">OVERDUE</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Created</span>
+              <div class="flex items-center space-x-1.5">
+                <i class="fa-regular fa-calendar text-slate-400"></i>
+                <span class="font-semibold text-slate-700">May 20, 2026 09:15 AM</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Updated</span>
+              <div class="flex items-center space-x-1.5">
+                <i class="fa-solid fa-rotate text-slate-400"></i>
+                <span class="font-semibold text-slate-700">Jun 27, 2026 03:45 PM</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Order Index</span>
+              <div class="flex items-center space-x-1.5">
+                <i class="fa-solid fa-list-ol text-slate-400"></i>
+                <span class="font-bold text-slate-900">3 of 35</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 3: ATTACHMENTS (3 FILES) -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Attachments (3)</h3>
+            <i class="fa-solid fa-download text-slate-400 text-xs hover:text-slate-600 cursor-pointer"></i>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            <!-- File 1 -->
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-lg border border-slate-200/60 transition">
+              <div class="flex items-center space-x-2.5 overflow-hidden">
+                <div class="w-7 h-7 rounded bg-rose-100 text-rose-600 flex items-center justify-center text-xs shrink-0"><i class="fa-regular fa-file-pdf font-bold"></i></div>
+                <div class="truncate">
+                  <p class="font-semibold text-slate-800 truncate">Test_Report.pdf</p>
+                  <p class="text-[10px] text-slate-400">1.24 MB</p>
+                </div>
+              </div>
+              <i class="fa-solid fa-download text-slate-400 hover:text-blue-600 cursor-pointer ml-2"></i>
+            </div>
+
+            <!-- File 2 -->
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-lg border border-slate-200/60 transition">
+              <div class="flex items-center space-x-2.5 overflow-hidden">
+                <div class="w-7 h-7 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs shrink-0"><i class="fa-regular fa-file-excel font-bold"></i></div>
+                <div class="truncate">
+                  <p class="font-semibold text-slate-800 truncate">Performance_Checklist.xlsx</p>
+                  <p class="text-[10px] text-slate-400">235 KB</p>
+                </div>
+              </div>
+              <i class="fa-solid fa-download text-slate-400 hover:text-blue-600 cursor-pointer ml-2"></i>
+            </div>
+
+            <!-- File 3 -->
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-lg border border-slate-200/60 transition">
+              <div class="flex items-center space-x-2.5 overflow-hidden">
+                <div class="w-7 h-7 rounded bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0"><i class="fa-regular fa-file-image font-bold"></i></div>
+                <div class="truncate">
+                  <p class="font-semibold text-slate-800 truncate">Screenshot_Error.png</p>
+                  <p class="text-[10px] text-slate-400">842 KB</p>
+                </div>
+              </div>
+              <i class="fa-solid fa-download text-slate-400 hover:text-blue-600 cursor-pointer ml-2"></i>
+            </div>
+          </div>
+
+          <a href="#" class="inline-block text-[11px] font-semibold text-blue-600 hover:underline pt-1">View all attachments →</a>
+        </div>
+
+        <!-- CARD 4: RELATED TIMESHEETS -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Related Timesheets</h3>
+            <a href="#" class="text-[11px] font-semibold text-blue-600 hover:underline">View all →</a>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            <div class="p-2 hover:bg-slate-50 rounded-lg border border-slate-100 transition space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-semibold text-slate-700">Jun 25, 2026</span>
+                <span class="font-bold text-slate-900">4.0h</span>
+              </div>
+              <p class="text-[11px] text-slate-500">Execute load testing scenarios</p>
+            </div>
+
+            <div class="p-2 hover:bg-slate-50 rounded-lg border border-slate-100 transition space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-semibold text-slate-700">Jun 26, 2026</span>
+                <span class="font-bold text-slate-900">3.5h</span>
+              </div>
+              <p class="text-[11px] text-slate-500">Analyze test results</p>
+            </div>
+
+            <div class="p-2 hover:bg-slate-50 rounded-lg border border-slate-100 transition space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-semibold text-slate-700">Jun 27, 2026</span>
+                <div class="flex items-center space-x-1.5">
+                  <span class="font-bold text-slate-900">4.0h</span>
+                  <span class="px-1.5 py-0.2 font-bold text-[9px] rounded bg-purple-50 text-purple-600 border border-purple-200">PENDING REVIEW</span>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500">Prepare performance report</p>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-500 font-medium">Total Logged Hours</span>
+            <span class="font-extrabold text-slate-900">15.0h</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-slate-200 text-xs text-slate-400">
+      <p>© 2026 WorkTracker. All rights reserved.</p>
+      <p>Version 1.0.0 • Manager Portal</p>
+    </div>
+  </main>
+
+</body>
+</html>
