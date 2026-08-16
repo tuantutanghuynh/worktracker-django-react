@@ -4,10 +4,12 @@ from accounts.models import EmployeeProfile
 
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):
+    department = serializers.SlugRelatedField(slug_field="name", read_only=True)
+
     class Meta:
         model = EmployeeProfile
-        fields = ["full_name", "phone_number", "department", "avatar_url", "joined_date"]
-        read_only_fields = ["department", "avatar_url", "joined_date"]
+        fields = ["full_name", "phone_number", "department", "avatar_url", "joined_date", "updated_at"]
+        read_only_fields = ["department", "avatar_url", "joined_date", "updated_at"]
 
 class AvatarUploadSerializer(serializers.Serializer):
     avatar = serializers.ImageField()

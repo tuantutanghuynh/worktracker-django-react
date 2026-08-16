@@ -36,7 +36,14 @@ export function ProfilePage() {
                     <AccountSecurityCard />
                 </div>
                 <div className="col-span-8">
-                    <ProfileFormCard profile={profile} onSave={saveProfile} saving={saving} error={error} />
+                    <ProfileFormCard
+                        profile={profile}
+                        email={user?.email}
+                        role={user?.role}
+                        onSave={saveProfile}
+                        saving={saving}
+                        error={error}
+                    />
                 </div>
             </div>
         </div>

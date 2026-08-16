@@ -40,6 +40,23 @@ export function ChangePasswordPage() {
             <div className="w-full max-w-md space-y-6">
                 <div className="text-center">
                     <div className="inline-flex items-center justify-center space-x-3 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800 shadow-xl">
+                        <svg className="w-7 h-7 shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#60A5FA" />
+                                    <stop offset="40%" stopColor="#3B82F6" />
+                                    <stop offset="80%" stopColor="#2563EB" />
+                                    <stop offset="100%" stopColor="#1D4ED8" />
+                                </linearGradient>
+                            </defs>
+                            <path
+                                d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26"
+                                stroke="url(#wBlueGradient)"
+                                strokeWidth="13"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
                         <span className="text-xl font-bold text-white">
                             WorkTracker <span className="text-xs text-blue-400">Pro</span>
                         </span>

@@ -28,6 +28,13 @@ export function AppRouter() {
                         {/* TODO Phase 3: thay bằng Dashboard/My Tasks/Timesheet... thật */}
                         <Route path="/" element={<div>Employee Dashboard (Phase 3)</div>} />
                         <Route path="/profile" element={<ProfilePage />} />
+                        {/* Sidebar's EMPLOYEE nav config (pulled from LongNguyen) links
+                            under /employee/*, not the flat paths above — alias profile
+                            so that nav item resolves instead of hitting the catch-all
+                            redirect. Other /employee/* nav items (dashboard, my-tasks,
+                            timesheet, my-performance, notifications) still 404 → home
+                            until Phase 3 builds those pages. */}
+                        <Route path="/employee/profile" element={<ProfilePage />} />
                     </Route>
                 </Route>
 
