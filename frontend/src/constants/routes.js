@@ -3,6 +3,8 @@
 // Static route paths used for navigation and redirect guards.
 export const ROUTES = {
   LOGIN: '/login',
+  FORGOT_PASSWORD: '/forgot-password',
+  RESET_PASSWORD: '/reset-password',
   CHANGE_PASSWORD: '/change-password',
   UNAUTHORIZED: '/unauthorized',
 }

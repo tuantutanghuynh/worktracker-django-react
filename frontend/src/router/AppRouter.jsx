@@ -1,18 +1,42 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { ProtectedRoute } from "./ProtectedRoute"
+import { RoleRoute } from "./RoleRoute"
+import { ROUTES } from "../constants/routes"
+import { LoginPage } from "../pages/auth/LoginPage"
+import { ForgotPasswordPage } from "../pages/auth/ForgotPasswordPage"
+import { ResetPasswordPage } from "../pages/auth/ResetPasswordPage"
+import { ChangePasswordPage } from "../pages/auth/ChangePasswordPage"
+import AdminLayout from "../layouts/AdminLayout"
+import { DepartmentsPage } from "../pages/admin/DepartmentsPage"
+import { CreateUserPage } from "../pages/admin/CreateUserPage"
+import { SearchUserPage } from "../pages/admin/SearchUserPage"
 
 export function AppRouter() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* TODO Phase 1: thay bằng LoginPage thật */}
-                <Route path="/login" element={<div>Login page (Phase 1)</div>} />
+                <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+                <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+                <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
 
                 <Route element={<ProtectedRoute />}>
+                    <Route path={ROUTES.CHANGE_PASSWORD} element={<ChangePasswordPage />} />
+
+                    <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
+                        <Route path="/admin" element={<AdminLayout />}>
+                            {/* TODO: thay bằng Global Dashboard thật */}
+                            <Route index element={<div>Admin Dashboard (Phase 2)</div>} />
+                            <Route path="departments" element={<DepartmentsPage />} />
+                            <Route path="users/create" element={<CreateUserPage />} />
+                            <Route path="users/search" element={<SearchUserPage />} />
+                        </Route>
+                    </Route>
+
                     {/* TODO Phase 3: thay bằng Dashboard/My Tasks/Timesheet... thật */}
                     <Route path="/" element={<div>Employee Dashboard (Phase 3)</div>} />
                 </Route>
 
+                <Route path={ROUTES.UNAUTHORIZED} element={<div>403 — Unauthorized</div>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>

@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
-import useAuth from '../../hooks/useAuth'
+import { useAuth } from '../hooks/useAuth'
 
 /**
  * PermissionRoute — restricts a route to users who hold a specific permission code.

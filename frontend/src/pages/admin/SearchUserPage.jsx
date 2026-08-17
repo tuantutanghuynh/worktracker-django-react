@@ -1,0 +1,261 @@
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Search, Lock, Unlock } from 'lucide-react';
+import BaseModal from '../../components/common/modal/BaseModal';
+import InputField from '../../components/common/forms/InputField';
+import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import RoleBadge from '../../components/common/badges/RoleBadge';
+import { useDebounce } from '../../hooks/useDebounce';
+import {
+  listUsers,
+  updateUser,
+  lockUser,
+  unlockUser,
+  resetUserPassword,
+  listRoles,
+} from '../../api/users';
+
+const editUserSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  role: z.string().min(1, 'Role is required'),
+});
+
+const resetPasswordSchema = z.object({
+  new_password: z.string()
+    .min(8, 'At least 8 characters')
+    .regex(/[a-z]/, 'Must contain a lowercase letter')
+    .regex(/[A-Z]/, 'Must contain an uppercase letter')
+    .regex(/[0-9]/, 'Must contain a number')
+    .regex(/[^A-Za-z0-9]/, 'Must contain a special symbol'),
+});
+
+// Admin page to find a user by email and modify their email/role/status/password.
+export function SearchUserPage() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['users', { email: debouncedSearch }],
+    queryFn: () => listUsers({ email: debouncedSearch }),
+    enabled: debouncedSearch.length > 0,
+  });
+
+  const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: listRoles });
+  const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({ resolver: zodResolver(editUserSchema) });
+
+  const {
+    register: registerPassword,
+    handleSubmit: handlePasswordSubmit,
+    reset: resetPasswordForm,
+    formState: { errors: passwordErrors },
+  } = useForm({ resolver: zodResolver(resetPasswordSchema) });
+
+  function openUser(user) {
+    setSelectedUser(user);
+    reset({ email: user.email, role: user.role_detail ? String(user.role_detail.id) : '' });
+    resetPasswordForm({ new_password: '' });
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: (payload) => updateUser(selectedUser.id, payload),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setSelectedUser((prev) => ({ ...prev, ...updated }));
+      toast.success('User updated.');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.email?.[0] || err.response?.data?.detail || 'Update failed.');
+    },
+  });
+
+  // Deliberately calls the dedicated lock/unlock actions instead of a plain
+  // PATCH is_active — those also revoke the Redis-cached session, a plain
+  // PATCH would leave an already-issued JWT usable until it expires.
+  const lockMutation = useMutation({
+    mutationFn: () =>
+      selectedUser.is_active ? lockUser(selectedUser.id) : unlockUser(selectedUser.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setSelectedUser((prev) => ({ ...prev, is_active: !prev.is_active }));
+      toast.success(selectedUser.is_active ? 'Account locked.' : 'Account unlocked.');
+    },
+    onError: () => toast.error('Failed to change account status.'),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (payload) => resetUserPassword(selectedUser.id, payload.new_password),
+    onSuccess: () => {
+      toast.success('Password reset. The user must change it on next login.');
+      resetPasswordForm({ new_password: '' });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.new_password?.[0] || 'Failed to reset password.');
+    },
+  });
+
+  function onSubmitEdit(data) {
+    updateMutation.mutate({ email: data.email, role: Number(data.role) });
+  }
+
+  function onSubmitPassword(data) {
+    resetPasswordMutation.mutate(data);
+  }
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-lg font-bold text-slate-900">Search Users</h1>
+
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by email..."
+          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+            <tr>
+              <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Role</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {!debouncedSearch && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                  Type an email to search.
+                </td>
+              </tr>
+            )}
+            {debouncedSearch && isLoading && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                  Searching...
+                </td>
+              </tr>
+            )}
+            {debouncedSearch && !isLoading && users.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                  No users found.
+                </td>
+              </tr>
+            )}
+            {users.map((u) => (
+              <tr key={u.id} onClick={() => openUser(u)} className="cursor-pointer hover:bg-slate-50">
+                <td className="px-4 py-3 font-medium text-slate-900">{u.email}</td>
+                <td className="px-4 py-3">{u.role_detail && <RoleBadge role={u.role_detail.code} />}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={
+                      u.is_active
+                        ? 'text-xs font-semibold text-emerald-600'
+                        : 'text-xs font-semibold text-rose-500'
+                    }
+                  >
+                    {u.is_active ? 'Active' : 'Locked'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <BaseModal
+        isOpen={!!selectedUser}
+        onClose={() => setSelectedUser(null)}
+        title="Modify User"
+        description={selectedUser?.email}
+      >
+        {selectedUser && (
+          <div className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmitEdit)} className="space-y-3">
+              <InputField label="Email" error={errors.email?.message} {...register('email')} />
+              <SelectDropdown
+                label="Role"
+                options={roleOptions}
+                error={errors.role?.message}
+                {...register('role')}
+              />
+              <button
+                type="submit"
+                disabled={updateMutation.isPending}
+                className="w-full rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </button>
+            </form>
+
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+              <span className="text-xs text-slate-500">
+                Status:{' '}
+                <span
+                  className={
+                    selectedUser.is_active
+                      ? 'font-semibold text-emerald-600'
+                      : 'font-semibold text-rose-500'
+                  }
+                >
+                  {selectedUser.is_active ? 'Active' : 'Locked'}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => lockMutation.mutate()}
+                disabled={lockMutation.isPending}
+                className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+              >
+                {selectedUser.is_active ? (
+                  <Lock className="h-3.5 w-3.5" />
+                ) : (
+                  <Unlock className="h-3.5 w-3.5" />
+                )}
+                {selectedUser.is_active ? 'Lock Account' : 'Unlock Account'}
+              </button>
+            </div>
+
+            <form
+              onSubmit={handlePasswordSubmit(onSubmitPassword)}
+              className="space-y-2 border-t border-slate-100 pt-3"
+            >
+              <InputField
+                label="Reset Password"
+                type="password"
+                placeholder="New default password"
+                error={passwordErrors.new_password?.message}
+                {...registerPassword('new_password')}
+              />
+              <button
+                type="submit"
+                disabled={resetPasswordMutation.isPending}
+                className="w-full rounded-lg bg-amber-500 py-2 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
+              >
+                {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </form>
+          </div>
+        )}
+      </BaseModal>
+    </div>
+  );
+}

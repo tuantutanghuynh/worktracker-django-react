@@ -1,4 +1,6 @@
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -47,6 +49,8 @@ class UserViewSet(viewsets.ModelViewSet):
             return [HasPermission("user:create")]
         if self.action in ("list", "retrieve"):
             return [HasPermission("user:view")]
+        if self.action == "reset_password":
+            return [HasPermission("user:reset_password")]
         return [HasPermission("user:update")]
 
     def get_serializer_class(self):
@@ -104,6 +108,35 @@ class UserViewSet(viewsets.ModelViewSet):
             request=request,
         )
         return Response({"detail": "User unlocked."}, status=status.HTTP_200_OK)
+
+    @transaction.atomic
+    @action(detail=True, methods=["patch"], url_path="reset-password")
+    def reset_password(self, request, pk=None):
+        user = self.get_object()
+        new_password = request.data.get("new_password")
+        if not new_password:
+            return Response(
+                {"new_password": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(new_password, user)
+        except DjangoValidationError as exc:
+            return Response({"new_password": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.must_change_password = True
+        user.save()
+        log_audit_event(
+            actor=request.user,
+            action="RESET_PASSWORD",
+            table_name="users",
+            record_id=user.id,
+            new_values={"must_change_password": True},
+            request=request,
+        )
+        return Response({"detail": "Password reset."}, status=status.HTTP_200_OK)
 
     @transaction.atomic
     @action(detail=True, methods=["patch"], url_path="assign-department")

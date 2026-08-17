@@ -1,7 +1,7 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import AppRouter from './router/AppRouter';
+import { AppRouter } from './router/AppRouter';
 
 const queryClient = new QueryClient({
   defaultOptions: {
