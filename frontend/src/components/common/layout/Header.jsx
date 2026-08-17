@@ -1,41 +1,201 @@
-import { Bell, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import {
+  Search,
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Menu,
+} from 'lucide-react';
+import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
-import RoleBadge from '../badges/RoleBadge';
+import { useNotificationStore } from '../../../stores/useNotificationStore';
 
-export default function Header() {
-  const { user } = useAuth();
+// Bản ánh xạ Nhãn đường dẫn Breadcrumbs sang Tiếng Anh
+const ROUTE_LABELS = {
+  manager: 'Manager',
+  dashboard: 'Dashboard',
+  jobs: 'Projects & Jobs',
+  kanban: 'Kanban Board',
+  team: 'Team Members',
+  timesheet: 'Timesheet Review',
+  timesheets: 'Timesheets',
+  review: 'Review',
+  timelock: 'Period Lock',
+  timelocks: 'Period Lock',
+  reports: 'Reports & Analytics',
+  notifications: 'Notification Center',
+  profile: 'My Profile',
+  settings: 'System Settings',
+};
+
+export default function Header({ onOpenSearchModal }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { toggleSidebar } = useUIStore();
+  const { unreadCount } = useNotificationStore();
+
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Lấy thông tin user đăng nhập từ useAuth (Zustand Store)
+  const { user, logout } = useAuth();
+  const displayUser = user || { email: 'manager@worktracker.vn', role: 'MANAGER' };
+
+  // Đóng Dropdown khi click ra ngoài vùng menu
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Tính toán chuỗi Breadcrumb động
+  const pathSegments = location.pathname.split('/').filter(Boolean);
+  const breadcrumbs = pathSegments.map((segment, idx) => {
+    const path = '/' + pathSegments.slice(0, idx + 1).join('/');
+    const isLast = idx === pathSegments.length - 1;
+
+    let label = ROUTE_LABELS[segment.toLowerCase()] || segment;
+    if (!isNaN(segment)) {
+      label = `Detail #${segment}`;
+    }
+
+    return { path, label, isLast };
+  });
+
+  // Xử lý Đăng xuất an toàn
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-      <div className="relative w-72">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search... (Ctrl + K)"
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-        />
-      </div>
-
-      <div className="flex items-center gap-4">
+    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
+      {/* Nút Toggle Sidebar trên Mobile & Thanh điều hướng Breadcrumb */}
+      <div className="flex items-center gap-3 min-w-0">
         <button
-          type="button"
-          className="relative text-slate-500 transition hover:text-slate-700"
-          aria-label="Notifications"
+          onClick={toggleSidebar}
+          className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          title="Toggle Navigation"
         >
-          <Bell className="h-5 w-5" />
+          <Menu className="w-5 h-5" />
         </button>
 
-        {user && (
-          <div className="flex items-center gap-2.5 border-l border-slate-200 pl-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-              {user.email.charAt(0).toUpperCase()}
+        {/* Thanh Breadcrumb Động */}
+        <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 overflow-hidden">
+          <Link to="/manager/dashboard" className="hover:text-blue-600 transition-colors shrink-0">
+            Home
+          </Link>
+          {breadcrumbs.map((crumb) => (
+            <React.Fragment key={crumb.path}>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              {crumb.isLast ? (
+                <span className="font-semibold text-slate-900 truncate">
+                  {crumb.label}
+                </span>
+              ) : (
+                <Link to={crumb.path} className="hover:text-blue-600 transition-colors truncate">
+                  {crumb.label}
+                </Link>
+              )}
+            </React.Fragment>
+          ))}
+        </nav>
+      </div>
+
+      {/* Bên Phải: Nút Tìm kiếm, Chuông thông báo & Avatar User */}
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Nút Mở Modal Tìm kiếm Quick Search (Ctrl + K) */}
+        <button
+          onClick={onOpenSearchModal}
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 transition-colors"
+          title="Quick Search (Ctrl + K)"
+        >
+          <Search className="w-4 h-4 text-slate-400" />
+          <span className="hidden md:inline font-medium">Search jobs, tasks...</span>
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 rounded shadow-2xs">
+            Ctrl K
+          </kbd>
+        </button>
+
+        {/* Biểu tượng Chuông Thông báo */}
+        <Link
+          to="/manager/notifications"
+          className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          title="Notifications Center"
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </Link>
+
+        {/* Avatar Người dùng & Dropdown Menu */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+            className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-xs border border-white">
+              {displayUser.email ? displayUser.email.substring(0, 2).toUpperCase() : 'MP'}
             </div>
-            <div>
-              <p className="text-xs font-semibold leading-tight text-slate-900">{user.email}</p>
-              <RoleBadge role={user.role} />
+          </button>
+
+          {/* Menu Dropdown Tài khoản */}
+          {userDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-lg border border-slate-200 p-2 z-50 animate-slide-in-top">
+              <div className="px-3 py-2.5 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-900 truncate">
+                    {displayUser.full_name || 'Manager Account'}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold text-[10px]">
+                    {displayUser.role || 'MANAGER'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 truncate mt-0.5">{displayUser.email}</p>
+              </div>
+
+              <div className="py-1">
+                <Link
+                  to="/manager/profile"
+                  onClick={() => setUserDropdownOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <User className="w-4 h-4 text-slate-400" />
+                  <span>My Profile</span>
+                </Link>
+
+                <Link
+                  to="/manager/settings"
+                  onClick={() => setUserDropdownOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-slate-400" />
+                  <span>System Settings</span>
+                </Link>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

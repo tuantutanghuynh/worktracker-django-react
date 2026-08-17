@@ -1,120 +1,281 @@
-import { Link, useLocation } from 'react-router-dom';
+import React, { useMemo } from 'react';
+import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Building2,
+  LayoutGrid,
   Briefcase,
-  UserPlus,
-  Search,
-  ScrollText,
   Users,
   Clock,
-  FileBarChart,
-  ChevronsLeft,
-  LogOut,
+  Lock,
+  BarChart3,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  ListChecks,
+  TrendingUp,
+  Bell,
+  User,
+  Kanban,
+  MessageSquare
 } from 'lucide-react';
-import clsx from 'clsx';
+import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
-import RoleBadge from '../badges/RoleBadge';
+import { useNotificationStore } from '../../../stores/useNotificationStore';
+import { useRecentJobsStore } from '../../../stores/useRecentJobsStore';
+import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
+import { cn } from '../../../utils/cn';
 
-const MENU_BY_ROLE = {
-  ADMIN: [
-    { label: 'Dashboard', to: '/admin', icon: LayoutDashboard },
-    { label: 'Clients', to: '/admin/clients', icon: Building2 },
-    { label: 'Jobs', to: '/admin/jobs', icon: Briefcase },
-    { label: 'Create User', to: '/admin/users/create', icon: UserPlus },
-    { label: 'Search Users', to: '/admin/users/search', icon: Search },
-    { label: 'Departments', to: '/admin/departments', icon: Users },
-    { label: 'Audit Logs', to: '/admin/audit-logs', icon: ScrollText },
-  ],
-  MANAGER: [
-    { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-    { label: 'My Jobs', to: '/manager/jobs', icon: Briefcase },
-    { label: 'Team Members', to: '/manager/team', icon: Users },
-    { label: 'Timesheets', to: '/manager/timesheets', icon: Clock },
-    { label: 'Reports', to: '/manager/reports', icon: FileBarChart },
-  ],
-  EMPLOYEE: [
-    { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-    { label: 'My Tasks', to: '/emp/tasks', icon: Briefcase },
-    { label: 'Timesheet', to: '/emp/timesheet', icon: Clock },
-  ],
+// 1. BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
+const MENU_CONFIG = {
+  // Cấu hình Menu dành cho MANAGER
+  MANAGER: {
+    portalLabel: 'Manager Portal',
+    navItems: [
+      { path: '/manager/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/manager/jobs', label: 'My Jobs', icon: Briefcase },
+      { path: '/manager/kanban', label: 'Kanban Board', icon: Kanban },
+      { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
+      { path: '/manager/team', label: 'Team Members', icon: Users },
+      { path: '/manager/timesheet', altPath: '/manager/timesheets/review', label: 'Timesheets', icon: Clock },
+      { path: '/manager/reports', label: 'Reports', icon: BarChart3 },
+      { path: '/manager/settings', label: 'Settings', icon: Settings },
+    ],
+    showRecentJobs: true,
+  },
+
+  // Cấu hình Menu dành cho EMPLOYEE
+  EMPLOYEE: {
+    portalLabel: 'Employee Portal',
+    navItems: [
+      { path: '/employee/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks },
+      { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
+      { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp },
+      { path: '/employee/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
+      { path: '/employee/profile', label: 'Profile', icon: User },
+    ],
+    showRecentJobs: false,
+  },
+
+  // Cấu hình Menu dành cho ADMIN
+  ADMIN: {
+    portalLabel: 'Admin Portal',
+    navItems: [
+      { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/admin/users', label: 'User Management', icon: Users },
+      { path: '/admin/settings', label: 'System Settings', icon: Settings },
+    ],
+    showRecentJobs: false,
+  },
 };
 
-export default function Sidebar({ open, onToggle }) {
-  const { user, logout } = useAuth();
+export default function Sidebar() {
   const location = useLocation();
-  const menuItems = MENU_BY_ROLE[user?.role] ?? [];
+  const navigate = useNavigate();
+  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const { unreadCount } = useNotificationStore();
+
+  const { user } = useAuth();
+  const displayUser = user || { full_name: 'Manager User', role: 'MANAGER' };
+
+  const userRole = (displayUser.role || 'MANAGER').toUpperCase();
+  const currentConfig = MENU_CONFIG[userRole] || MENU_CONFIG.MANAGER;
+
+  // 🚀 ZUSTAND STORE: Danh sách Jobs xem gần nhất từ LocalStorage
+  const { recentJobs, addRecentJob } = useRecentJobsStore();
+
+  // 🚀 REACT QUERY: Lấy danh sách Jobs từ Database làm dữ liệu Fallback nếu chưa có lịch sử xem
+  const { data: jobResponse } = useManagerJobs({ page_size: 5 });
+
+  // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
+  const displayRecentJobs = useMemo(() => {
+    if (recentJobs && recentJobs.length > 0) {
+      return recentJobs;
+    }
+
+    if (!jobResponse) return [];
+    const list = Array.isArray(jobResponse)
+      ? jobResponse
+      : Array.isArray(jobResponse.results)
+      ? jobResponse.results
+      : [];
+
+    return list.slice(0, 3).map((j) => ({
+      id: j.id,
+      job_code: j.job_code || `JOB-${j.id}`,
+      job_name: j.job_name,
+      status: j.status || 'ACTIVE',
+    }));
+  }, [recentJobs, jobResponse]);
+
+  const handleJobClick = (job) => {
+    addRecentJob(job);
+    navigate(`/manager/jobs/${job.id}`);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'ACTIVE':
+        return { dot: 'bg-emerald-500', text: 'text-emerald-400' };
+      case 'PLANNING':
+        return { dot: 'bg-blue-500', text: 'text-blue-400' };
+      case 'ON_HOLD':
+        return { dot: 'bg-amber-500', text: 'text-amber-400' };
+      case 'COMPLETED':
+        return { dot: 'bg-indigo-500', text: 'text-indigo-400' };
+      default:
+        return { dot: 'bg-slate-500', text: 'text-slate-400' };
+    }
+  };
 
   return (
     <aside
-      className={clsx(
-        'flex h-screen shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0A1128] p-4 text-slate-100 transition-all duration-200',
-        open ? 'w-64' : 'w-16'
+      className={cn(
+        'bg-[#0A1128] border-r border-slate-800 flex flex-col justify-between p-4 h-screen shrink-0 transition-all duration-300 ease-in-out z-20 shadow-xl select-none',
+        isSidebarCollapsed ? 'w-20' : 'w-64'
       )}
     >
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-            W
-          </div>
-          {open && (
-            <span className="truncate text-sm font-bold text-white">
-              WorkTracker <span className="text-blue-400">Pro</span>
+      <div className="space-y-3.5 flex-1 overflow-y-auto custom-scrollbar pr-1">
+
+        {/* LOGO */}
+        <div className={cn('flex items-center space-x-3 px-2 py-0.5', isSidebarCollapsed && 'justify-center space-x-0')}>
+          <svg className="w-10 h-10 drop-shadow-md shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="wBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#60A5FA" />
+                <stop offset="40%" stopColor="#3B82F6" />
+                <stop offset="80%" stopColor="#2563EB" />
+                <stop offset="100%" stopColor="#1D4ED8" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 22 55 Q 32 88 46 88 Q 58 88 66 50 Q 76 88 88 88 Q 98 88 108 26"
+              stroke="url(#wBlueGradient)"
+              strokeWidth="13"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+
+          {!isSidebarCollapsed && (
+            <span className="text-xl font-bold tracking-tight text-white leading-none">
+              WorkTracker <span className="text-xs font-semibold text-blue-400">Pro</span>
             </span>
           )}
         </div>
 
-        <nav className="space-y-1">
-          {menuItems.map(({ label, to, icon: Icon }) => {
-            const active = location.pathname === to;
+        {/* MENU NHÓM THEO ROLE */}
+        <div className="space-y-1">
+          {!isSidebarCollapsed && (
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">
+              {currentConfig.portalLabel}
+            </p>
+          )}
+
+          {currentConfig.navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              location.pathname === item.path ||
+              (item.altPath && location.pathname.startsWith(item.altPath));
+
             return (
-              <Link
-                key={to}
-                to={to}
-                title={open ? undefined : label}
-                className={clsx(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
-                  active
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition font-medium',
+                  isActive
+                    ? 'font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60',
+                  isSidebarCollapsed && 'justify-center space-x-0'
                 )}
+                title={isSidebarCollapsed ? item.label : undefined}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                {open && <span className="truncate">{label}</span>}
-              </Link>
+                <Icon className="w-5 h-5 text-center shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1">{item.label}</span>}
+
+                {item.hasBadge && unreadCount > 0 && (
+                  <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </NavLink>
             );
           })}
-        </nav>
-      </div>
+        </div>
 
-      <div className="space-y-2 border-t border-slate-800/80 pt-3">
-        {open && user && (
-          <div className="space-y-1.5 px-1 pb-1">
-            <p className="truncate text-xs font-semibold text-white">{user.email}</p>
-            <RoleBadge role={user.role} />
+        {/* RECENTLY VIEWED JOBS (KẾT NỐI ZUSTAND PERSIST + REACT QUERY REAL DATA) */}
+        {!isSidebarCollapsed && currentConfig.showRecentJobs && (
+          <div className="space-y-1 pt-2.5 border-t border-slate-800/80">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">
+              Recently Viewed Jobs
+            </p>
+
+            {displayRecentJobs.length === 0 ? (
+              <p className="px-3 py-1 text-xs text-slate-500 italic">No recent jobs</p>
+            ) : (
+              displayRecentJobs.map((job) => {
+                const colorStyle = getStatusColor(job.status);
+                return (
+                  <div
+                    key={job.id}
+                    onClick={() => handleJobClick(job)}
+                    className="px-3 py-1.5 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5 transition-colors"
+                  >
+                    <div className={cn('w-2.5 h-2.5 rounded shrink-0', colorStyle.dot)}></div>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-semibold text-slate-200 truncate leading-tight" title={job.job_name}>
+                        {job.job_name}
+                      </p>
+                      <span className={cn('text-[9px] font-bold tracking-wider', colorStyle.text)}>
+                        {job.status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            <Link
+              to="/manager/jobs"
+              className="inline-block px-3 pt-1 text-[11px] font-medium text-blue-400 hover:underline"
+            >
+              View all jobs →
+            </Link>
           </div>
         )}
+      </div>
+
+      {/* USER PROFILE FOOTER */}
+      <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="relative shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-xs border border-slate-700">
+              {displayUser.full_name ? displayUser.full_name.substring(0, 2).toUpperCase() : (displayUser.email ? displayUser.email.substring(0, 2).toUpperCase() : 'US')}
+            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
+          </div>
+
+          {!isSidebarCollapsed && (
+            <div className="truncate">
+              <p className="text-xs font-bold text-white leading-tight truncate">
+                {displayUser.full_name || displayUser.email || 'User'}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {displayUser.role || 'MANAGER'}
+              </p>
+            </div>
+          )}
+        </div>
 
         <button
-          type="button"
-          onClick={logout}
-          title={open ? undefined : 'Logout'}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-slate-800/60 hover:text-white"
+          onClick={toggleSidebar}
+          className="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
         >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {open && <span>Logout</span>}
-        </button>
-
-        <button
-          type="button"
-          onClick={onToggle}
-          title={open ? 'Collapse sidebar' : 'Expand sidebar'}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-slate-800/60 hover:text-white"
-        >
-          <ChevronsLeft
-            className={clsx('h-4 w-4 shrink-0 transition-transform', !open && 'rotate-180')}
-          />
-          {open && <span>Collapse</span>}
+          {isSidebarCollapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
+          )}
         </button>
       </div>
     </aside>
