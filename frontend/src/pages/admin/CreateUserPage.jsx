@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ export function CreateUserPage() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm({ resolver: zodResolver(createUserSchema) });
 
@@ -84,11 +85,18 @@ export function CreateUserPage() {
           user will be forced to change this password on first login.
         </p>
 
-        <SelectDropdown
-          label="Role"
-          options={roleOptions}
-          error={errors.role?.message}
-          {...register('role')}
+        <Controller
+          name="role"
+          control={control}
+          render={({ field }) => (
+            <SelectDropdown
+              label="Role"
+              options={roleOptions}
+              value={field.value}
+              onChange={field.onChange}
+              error={errors.role?.message}
+            />
+          )}
         />
 
         <button

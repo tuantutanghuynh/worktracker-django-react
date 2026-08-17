@@ -1,15 +1,15 @@
-import { useState } from "react";
-import {Outlet} from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/common/layout/Sidebar';
 import Header from '../components/common/layout/Header';
 
+// Sidebar/Header now read collapsed state from useUIStore themselves
+// (shared with Manager/Employee layouts), so this layout no longer owns
+// that state locally.
 export default function AdminLayout(){
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-
     return(
         <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
 
-            <Sidebar open={sidebarOpen} onToggle={()=> setSidebarOpen(p => !p)}/>
+            <Sidebar />
 
             <div className="flex flex-1 flex-col overflow-hidden">
                 <Header />

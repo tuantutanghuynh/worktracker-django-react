@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -53,6 +53,7 @@ export function SearchUserPage() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm({ resolver: zodResolver(editUserSchema) });
 
@@ -191,11 +192,18 @@ export function SearchUserPage() {
           <div className="space-y-5">
             <form onSubmit={handleSubmit(onSubmitEdit)} className="space-y-3">
               <InputField label="Email" error={errors.email?.message} {...register('email')} />
-              <SelectDropdown
-                label="Role"
-                options={roleOptions}
-                error={errors.role?.message}
-                {...register('role')}
+              <Controller
+                name="role"
+                control={control}
+                render={({ field }) => (
+                  <SelectDropdown
+                    label="Role"
+                    options={roleOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.role?.message}
+                  />
+                )}
               />
               <button
                 type="submit"

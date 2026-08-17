@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -48,6 +48,7 @@ export function DepartmentsPage() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm({ resolver: zodResolver(departmentSchema) });
 
@@ -179,12 +180,19 @@ export function DepartmentsPage() {
             error={errors.description?.message}
             {...register('description')}
           />
-          <SelectDropdown
-            label="Manager"
-            placeholder="No manager"
-            options={managerOptions}
-            error={errors.manager?.message}
-            {...register('manager')}
+          <Controller
+            name="manager"
+            control={control}
+            render={({ field }) => (
+              <SelectDropdown
+                label="Manager"
+                placeholder="No manager"
+                options={managerOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.manager?.message}
+              />
+            )}
           />
           <div className="flex justify-end gap-2 pt-2">
             <button

@@ -10,6 +10,7 @@ import AdminLayout from "../layouts/AdminLayout"
 import { DepartmentsPage } from "../pages/admin/DepartmentsPage"
 import { CreateUserPage } from "../pages/admin/CreateUserPage"
 import { SearchUserPage } from "../pages/admin/SearchUserPage"
+import { JobsPage } from "../pages/admin/JobsPage"
 
 export function AppRouter() {
     return (
@@ -29,6 +30,7 @@ export function AppRouter() {
                             <Route path="departments" element={<DepartmentsPage />} />
                             <Route path="users/create" element={<CreateUserPage />} />
                             <Route path="users/search" element={<SearchUserPage />} />
+                            <Route path="jobs" element={<JobsPage />} />
                         </Route>
                     </Route>
 

@@ -31,6 +31,15 @@ const ROUTE_LABELS = {
   settings: 'System Settings',
 };
 
+// Mỗi role có Home/Notifications/Profile/Settings khác nhau — Header dùng
+// chung cho cả 3 role nên không được hardcode path /manager/... như bản
+// gốc (mới chỉ có Manager làm), phải tra theo role hiện tại.
+const ROLE_LINKS = {
+  ADMIN: { home: '/admin', notifications: '/admin/audit-logs', profile: '/admin', settings: '/admin' },
+  MANAGER: { home: '/manager/dashboard', notifications: '/manager/notifications', profile: '/manager/profile', settings: '/manager/settings' },
+  EMPLOYEE: { home: '/employee/dashboard', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
+};
+
 export default function Header({ onOpenSearchModal }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -43,6 +52,7 @@ export default function Header({ onOpenSearchModal }) {
   // Lấy thông tin user đăng nhập từ useAuth (Zustand Store)
   const { user, logout } = useAuth();
   const displayUser = user || { email: 'manager@worktracker.vn', role: 'MANAGER' };
+  const roleLinks = ROLE_LINKS[displayUser.role] || ROLE_LINKS.MANAGER;
 
   // Đóng Dropdown khi click ra ngoài vùng menu
   useEffect(() => {
@@ -89,7 +99,7 @@ export default function Header({ onOpenSearchModal }) {
 
         {/* Thanh Breadcrumb Động */}
         <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 overflow-hidden">
-          <Link to="/manager/dashboard" className="hover:text-blue-600 transition-colors shrink-0">
+          <Link to={roleLinks.home} className="hover:text-blue-600 transition-colors shrink-0">
             Home
           </Link>
           {breadcrumbs.map((crumb) => (
@@ -126,7 +136,7 @@ export default function Header({ onOpenSearchModal }) {
 
         {/* Biểu tượng Chuông Thông báo */}
         <Link
-          to="/manager/notifications"
+          to={roleLinks.notifications}
           className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           title="Notifications Center"
         >
@@ -166,7 +176,7 @@ export default function Header({ onOpenSearchModal }) {
 
               <div className="py-1">
                 <Link
-                  to="/manager/profile"
+                  to={roleLinks.profile}
                   onClick={() => setUserDropdownOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                 >
@@ -175,7 +185,7 @@ export default function Header({ onOpenSearchModal }) {
                 </Link>
 
                 <Link
-                  to="/manager/settings"
+                  to={roleLinks.settings}
                   onClick={() => setUserDropdownOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                 >

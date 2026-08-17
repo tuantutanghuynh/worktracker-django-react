@@ -1,11 +1,10 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutGrid,
   Briefcase,
   Users,
   Clock,
-  Lock,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -15,7 +14,11 @@ import {
   Bell,
   User,
   Kanban,
-  MessageSquare
+  MessageSquare,
+  Building2,
+  UserPlus,
+  Search,
+  ScrollText,
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
@@ -60,9 +63,13 @@ const MENU_CONFIG = {
   ADMIN: {
     portalLabel: 'Admin Portal',
     navItems: [
-      { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/admin/users', label: 'User Management', icon: Users },
-      { path: '/admin/settings', label: 'System Settings', icon: Settings },
+      { path: '/admin', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/admin/clients', label: 'Clients', icon: Building2 },
+      { path: '/admin/jobs', label: 'Jobs', icon: Briefcase },
+      { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
+      { path: '/admin/users/search', label: 'Search Users', icon: Search },
+      { path: '/admin/departments', label: 'Departments', icon: Users },
+      { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
     ],
     showRecentJobs: false,
   },
