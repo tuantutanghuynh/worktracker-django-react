@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { resetPassword as resetPasswordApi } from "../api/authApi"
+import { resetPassword as resetPasswordApi } from "../../api/authApi"
 
 // Wraps the "reset password" form flow: exchanges a reset token for a
 // new password, then sends the user back to Login on success.

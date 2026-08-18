@@ -1,5 +1,5 @@
 import { useAuth } from "../../hooks/useAuth"
-import { useProfile } from "../../hooks/useProfile"
+import { useProfile } from "../../hooks/queries/employee/useProfile"
 import { ProfileFormCard } from "../../components/common/profile/ProfileFormCard"
 import { AvatarUploadCard } from "../../components/common/profile/AvatarUploadCard"
 import { AccountSecurityCard } from "../../components/common/profile/AccountSecurityCard"

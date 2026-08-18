@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { forgotPassword as forgotPasswordApi } from "../api/authApi"
+import { forgotPassword as forgotPasswordApi } from "../../api/authApi"
 
 // Wraps the "forgot password" form flow. The backend always replies
 // with the same generic message whether the email exists or not

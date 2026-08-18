@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Link } from "react-router-dom"
-import { useLogin } from "../../hooks/useLogin"
+import { useLogin } from "../../hooks/authentication/useLogin"
 
 // Login page — dark glassmorphism theme (frontend-design-system.md
 // ). Purely presentational: form state comes from react-hook-form,

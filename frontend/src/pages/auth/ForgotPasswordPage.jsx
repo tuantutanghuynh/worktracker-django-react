@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Link } from "react-router-dom"
-import { useForgotPassword } from "../../hooks/useForgotPassword"
+import { useForgotPassword } from "../../hooks/authentication/useForgotPassword"
 
 // Forgot-password page — same dark glassmorphism shell as LoginPage. On
 // success shows a generic confirmation (backend always replies the same

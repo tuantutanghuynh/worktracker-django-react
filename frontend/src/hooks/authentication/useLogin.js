@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { login as loginApi } from "../api/authApi"
-import { useAuth } from "./useAuth"
+import { login as loginApi } from "../../api/authApi"
+import { useAuth } from "../useAuth"
 
 // Wraps the login form flow: calls the API, updates auth state on
 // success, and navigates to the dashboard. Exposes loading/error state

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { changePassword as changePasswordApi } from "../api/authApi"
-import { useAuth } from "./useAuth"
+import { changePassword as changePasswordApi } from "../../api/authApi"
+import { useAuth } from "../useAuth"
 
 // Wraps the "change password" flow — used both for a voluntary change
 // and the forced first-login change gated by must_change_password.

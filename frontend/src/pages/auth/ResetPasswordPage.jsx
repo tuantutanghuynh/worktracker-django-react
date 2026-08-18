@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useSearchParams } from "react-router-dom"
-import { useResetPassword } from "../../hooks/useResetPassword"
+import { useResetPassword } from "../../hooks/authentication/useResetPassword"
 
 // Reset-password page — the token comes from the emailed link's URL
 // query string (?token=...), not typed by the user. Only the new

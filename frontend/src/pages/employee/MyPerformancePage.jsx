@@ -1,9 +1,10 @@
-import { useMyPerformance } from "../../hooks/useMyPerformance"
+import { useMyPerformance } from "../../hooks/queries/employee/useMyPerformance"
 import StatCard from "../../components/common/cards/StatCard"
 import LineChartCard from "../../components/common/charts/LineChartCard"
 import HorizontalBarChartCard from "../../components/common/charts/HorizontalBarChartCard"
 import DonutChartCard from "../../components/common/charts/DonutChartCard"
 import { AlertTriangle, ListChecks, TrendingUp, Clock } from "lucide-react"
+import { getErrorMessage } from "../../utils/errorMessages"
 
 // Employee My Performance (Ngày 9) — 4 StatCard + 3 charts, all backed by
 // real data from the same PersonalKPIView used by Dashboard. "Task
@@ -17,8 +18,9 @@ export function MyPerformancePage() {
     }
 
     if (error) {
-        return <p className="text-xs text-rose-500">{error}</p>
+        return <p className="text-xs text-rose-500">{getErrorMessage(error, "Failed to load performance data")}</p>
     }
+
 
     const ratePercent = kpi?.completion_rate?.rate != null
         ? `${Math.round(kpi.completion_rate.rate * 100)}%`

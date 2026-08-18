@@ -1,5 +1,6 @@
 import { useAuth } from "../../hooks/useAuth"
-import { useDashboard } from "../../hooks/useDashboard"
+import { useDashboard } from "../../hooks/queries/employee/useDashboard"
+import { getErrorMessage } from "../../utils/errorMessages"
 import StatCard from "../../components/common/cards/StatCard"
 import DonutChartCard from "../../components/common/charts/DonutChartCard"
 import { AlertTriangle, Clock, TrendingUp } from "lucide-react"
@@ -10,14 +11,14 @@ import { AlertTriangle, Clock, TrendingUp } from "lucide-react"
 // both show an explicit "coming soon" placeholder instead of mock data.
 export function DashboardPage() {
     const { user } = useAuth()
-    const { kpi, loading, error } = useDashboard()
+    const { data: kpi, isLoading: loading, error } = useDashboard()
 
     if (loading) {
         return <p className="text-xs text-slate-400">Loading dashboard...</p>
     }
 
     if (error) {
-        return <p className="text-xs text-rose-500">{error}</p>
+        return <p className="text-xs text-rose-500">{getErrorMessage(error, "Failed to load dashboard")}</p>
     }
 
     const completed = kpi?.completion_rate?.completed ?? 0

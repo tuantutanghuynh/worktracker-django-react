@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { useChangePassword } from "../../hooks/useChangePassword"
+import { useChangePassword } from "../../hooks/authentication/useChangePassword"
 
 // Change-password page — used both for a voluntary password change and
 // the forced first-login change gated by must_change_password (FR-04).
