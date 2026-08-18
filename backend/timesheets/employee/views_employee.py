@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from accounts.permissions import HasPermission
-from timesheets.employee.serializers_employee import EmployeeLogWorkSerializer
+from timesheets.employee.serializers_employee import EmployeeLogWorkSerializer, EmployeeLogWorkListSerializer
 from system.services.audit_manager_service import snapshot, log_action
 from timesheets.services.daily_total_manager_service import rebuild_daily_user_timesheet
 from timesheets.models import LogWork
@@ -80,3 +80,20 @@ class EmployeeVoidLogWorkView(APIView):
             )
 
         return Response(EmployeeLogWorkSerializer(log_work).data, status=status.HTTP_200_OK)
+
+# Returns the calling user's own log_work history, newest first — powers
+# the Timesheet page's list table. No filtering/pagination at this layer
+# (dataset per user is small); FilterToolbar filters client-side, same
+# approach as NotificationListView.
+class EmployeeMyLogWorkListView(APIView):
+    permission_classes = [HasPermission]
+    required_permission = "timesheet:view"
+
+    def get(self, request):
+        log_works = (
+            LogWork.objects.filter(user=request.user)
+            .select_related("task", "task__job")
+            .order_by("-work_date", "-created_at")
+        )
+        serializer = EmployeeLogWorkListSerializer(log_works, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

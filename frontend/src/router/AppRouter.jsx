@@ -16,6 +16,8 @@ import { DashboardPage } from "../pages/employee/DashboardPage"
 import { MyPerformancePage } from "../pages/employee/MyPerformancePage"
 import { NotificationsPage } from "../pages/employee/NotificationsPage"
 import { MyTasksPage } from "../pages/employee/MyTasksPage"
+import { TimesheetPage } from "../pages/employee/TimesheetPage"
+
 
 
 // Manager (Long) — lazy load, chỉ tải khi thật sự vào /manager/*
@@ -81,9 +83,8 @@ export function AppRouter() {
                             {/* Sidebar's EMPLOYEE nav config (pulled from LongNguyen) links
                                 under /employee/*, not the flat paths above — alias the pages
                                 that exist so those nav items resolve instead of hitting the
-                                catch-all redirect. Other /employee/* nav items (my-tasks,
-                                timesheet, my-performance, notifications) still fall through
-                                to "*" → home until Phase 3 builds those pages. */}
+                                catch-all redirect. All of Phase 3's nav items (my-tasks,
+                                timesheet, my-performance, notifications) now have a page. */}
                             <Route path="/employee/dashboard" element={<DashboardPage />} />
                             <Route path="/employee/profile" element={<ProfilePage />} />
                             <Route path="/my-performance" element={<MyPerformancePage />} />
@@ -92,7 +93,7 @@ export function AppRouter() {
                             <Route path="/employee/notifications" element={<NotificationsPage />} />
                             <Route path="/my-tasks" element={<MyTasksPage />} />
                             <Route path="/employee/my-tasks" element={<MyTasksPage />} />
-
+                            <Route path="/employee/timesheet" element={<TimesheetPage />} />
 
                         </Route>
 

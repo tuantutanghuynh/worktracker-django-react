@@ -7,6 +7,7 @@ from rest_framework.exceptions import PermissionDenied
 from system.services.audit_manager_service import log_action, snapshot
 
 from timesheets.models import LogWork, DailyUserTimesheet, TimeLock
+from tasks.models import Task
 
 # This file holds the EMPLOYEE-only serializers for the timesheets app:
 # EmployeeLogWorkSerializer validates and creates a log_work entry, applying
@@ -113,3 +114,26 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             )
 
             return log_work
+
+# Task rút gọn — chỉ đủ thông tin để hiển thị 1 dòng trong bảng Timesheet
+# (không cần full EmployeeTaskListSerializer, tránh over-fetch).
+class EmployeeLogWorkTaskMiniSerializer(serializers.ModelSerializer):
+    job_name = serializers.CharField(source="job.job_name", read_only=True)
+
+    class Meta:
+        model = Task
+        fields = ["id", "title", "job_name"]
+
+
+# Liệt kê log work của chính user — dùng cho trang Timesheet (bảng chính),
+# khác EmployeeLogWorkSerializer (dùng để TẠO, không có nested task).
+class EmployeeLogWorkListSerializer(serializers.ModelSerializer):
+    task = EmployeeLogWorkTaskMiniSerializer(read_only=True)
+
+    class Meta:
+        model = LogWork
+        fields = [
+            "id", "task", "work_date", "hours_spent", "description",
+            "review_status", "review_note", "reviewed_at",
+            "adjustment_reason", "created_at",
+        ]
