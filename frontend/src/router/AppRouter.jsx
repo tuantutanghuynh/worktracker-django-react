@@ -13,6 +13,10 @@ import { ChangePasswordPage } from "../pages/auth/ChangePasswordPage"
 import { EmployeeLayout } from "../layouts/EmployeeLayout"
 import { ProfilePage } from "../pages/employee/ProfilePage"
 import { DashboardPage } from "../pages/employee/DashboardPage"
+import { MyPerformancePage } from "../pages/employee/MyPerformancePage"
+import { NotificationsPage } from "../pages/employee/NotificationsPage"
+import { MyTasksPage } from "../pages/employee/MyTasksPage"
+
 
 // Manager (Long) — lazy load, chỉ tải khi thật sự vào /manager/*
 import ManagerLayout from "../layouts/ManagerLayout"
@@ -82,6 +86,14 @@ export function AppRouter() {
                                 to "*" → home until Phase 3 builds those pages. */}
                             <Route path="/employee/dashboard" element={<DashboardPage />} />
                             <Route path="/employee/profile" element={<ProfilePage />} />
+                            <Route path="/my-performance" element={<MyPerformancePage />} />
+                            <Route path="/employee/my-performance" element={<MyPerformancePage />} />
+                            <Route path="/notifications" element={<NotificationsPage />} />
+                            <Route path="/employee/notifications" element={<NotificationsPage />} />
+                            <Route path="/my-tasks" element={<MyTasksPage />} />
+                            <Route path="/employee/my-tasks" element={<MyTasksPage />} />
+
+
                         </Route>
 
                         <Route element={<ProtectedRoute allowedRoles={["MANAGER", "ADMIN"]} />}>

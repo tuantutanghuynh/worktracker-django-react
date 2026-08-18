@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 import managerReportService from '../services/manager/managerReportService';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notificationApi';
+import { useAuthStore } from './authStore';
+
+// Picks the right backend depending on role — Manager's notification
+// routes live under /manager/system/notifications/ and are role-gated;
+// calling them as an Employee/Admin would 403.
+function isManager() {
+  const role = (useAuthStore.getState().user?.role || '').toUpperCase();
+  return role === 'MANAGER';
+}
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
@@ -17,7 +27,9 @@ export const useNotificationStore = create((set, get) => ({
   fetchNotifications: async (params = {}) => {
     set({ loading: true, error: null });
     try {
-      const data = await managerReportService.getNotifications(params);
+      const data = isManager()
+        ? await managerReportService.getNotifications(params)
+        : await getNotifications();
       const list = Array.isArray(data) ? data : data.results || [];
       const unread = list.filter((n) => !n.is_read).length;
       set({ notifications: list, unreadCount: unread, loading: false });
@@ -31,7 +43,11 @@ export const useNotificationStore = create((set, get) => ({
    */
   markAsRead: async (id) => {
     try {
-      await managerReportService.markNotificationRead(id);
+      if (isManager()) {
+        await managerReportService.markNotificationRead(id);
+      } else {
+        await markNotificationRead(id);
+      }
       set((state) => {
         const updated = state.notifications.map((n) =>
           n.id === id ? { ...n, is_read: true } : n
@@ -49,7 +65,11 @@ export const useNotificationStore = create((set, get) => ({
    */
   markAllAsRead: async () => {
     try {
-      await managerReportService.markAllNotificationsRead();
+      if (isManager()) {
+        await managerReportService.markAllNotificationsRead();
+      } else {
+        await markAllNotificationsRead();
+      }
       set((state) => ({
         notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
         unreadCount: 0,
