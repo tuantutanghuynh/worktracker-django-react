@@ -103,7 +103,7 @@ export const useNotificationStore = create((set, get) => ({
       return;
     }
 
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    const token = useAuthStore.getState().accessToken;
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const wsUrl = wsUrlOverride || `${wsProtocol}//${host}/ws/notifications/?token=${token || ''}`;

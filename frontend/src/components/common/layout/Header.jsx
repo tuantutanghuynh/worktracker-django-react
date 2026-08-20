@@ -16,11 +16,12 @@ import { useNotificationStore } from '../../../stores/useNotificationStore';
 // Bản ánh xạ Nhãn đường dẫn Breadcrumbs sang Tiếng Anh
 const ROUTE_LABELS = {
   manager: 'Manager',
+  employee: 'Employee',
   dashboard: 'Dashboard',
   jobs: 'Projects & Jobs',
   kanban: 'Kanban Board',
   team: 'Team Members',
-  timesheet: 'Timesheet Review',
+  timesheet: 'Timesheet',
   timesheets: 'Timesheets',
   review: 'Review',
   timelock: 'Period Lock',
@@ -29,6 +30,8 @@ const ROUTE_LABELS = {
   notifications: 'Notification Center',
   profile: 'My Profile',
   settings: 'System Settings',
+  'my-tasks': 'My Tasks',
+  'my-performance': 'My Performance',
 };
 
 export default function Header({ onOpenSearchModal }) {
@@ -43,6 +46,13 @@ export default function Header({ onOpenSearchModal }) {
   // Lấy thông tin user đăng nhập từ useAuth (Zustand Store)
   const { user, logout } = useAuth();
   const displayUser = user || { email: 'manager@worktracker.vn', role: 'MANAGER' };
+
+  // Header dùng chung Manager + Employee — 2 role có route gốc khác nhau,
+  // không được hardcode theo Manager cho cả 2.
+  const userRole = (displayUser.role || '').toUpperCase();
+  const isManagerOrAdmin = userRole === 'MANAGER' || userRole === 'ADMIN';
+  const homePath = isManagerOrAdmin ? '/manager/dashboard' : '/';
+  const notificationsPath = isManagerOrAdmin ? '/manager/notifications' : '/employee/notifications';
 
   // Đóng Dropdown khi click ra ngoài vùng menu
   useEffect(() => {
@@ -89,7 +99,7 @@ export default function Header({ onOpenSearchModal }) {
 
         {/* Thanh Breadcrumb Động */}
         <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 overflow-hidden">
-          <Link to="/manager/dashboard" className="hover:text-blue-600 transition-colors shrink-0">
+          <Link to={homePath} className="hover:text-blue-600 transition-colors shrink-0">
             Home
           </Link>
           {breadcrumbs.map((crumb) => (
@@ -126,7 +136,7 @@ export default function Header({ onOpenSearchModal }) {
 
         {/* Biểu tượng Chuông Thông báo */}
         <Link
-          to="/manager/notifications"
+          to={notificationsPath}
           className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           title="Notifications Center"
         >

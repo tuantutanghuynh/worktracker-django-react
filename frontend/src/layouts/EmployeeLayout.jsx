@@ -1,13 +1,21 @@
+import { useEffect } from "react"
 import { Outlet } from "react-router-dom"
 import Sidebar from "../components/common/layout/Sidebar"
 import Header from "../components/common/layout/Header"
 import Footer from "../components/common/layout/Footer"
+import { useNotificationStore } from "../stores/useNotificationStore"
 
-// Shell every Employee page renders inside. Sidebar/Header now manage
-// their own state internally (useAuth for user/logout, useUIStore for
-// the collapsed flag) instead of receiving it as props from here — this
-// layout just arranges them and lets React Router fill <Outlet />.
 export function EmployeeLayout() {
+    const fetchNotifications = useNotificationStore((state) => state.fetchNotifications)
+    const connectWebSocket = useNotificationStore((state) => state.connectWebSocket)
+    const disconnectWebSocket = useNotificationStore((state) => state.disconnectWebSocket)
+
+    useEffect(() => {
+        fetchNotifications()
+        connectWebSocket()
+        return () => disconnectWebSocket()
+    }, [fetchNotifications, connectWebSocket, disconnectWebSocket])
+
     return (
         <div className="flex h-screen overflow-hidden">
             <Sidebar />

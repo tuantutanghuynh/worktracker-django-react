@@ -12,12 +12,12 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "worktracker_core.settings")
 # Khởi tạo Django HTTP application trước
 django_asgi_app = get_asgi_application()
 
-from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 
 import system.routing
 import chat.routing
+from worktracker_core.channels_middleware import JWTAuthMiddleware
 
 combined_websocket_urlpatterns = system.routing.websocket_urlpatterns + chat.routing.websocket_urlpatterns
 
@@ -28,9 +28,10 @@ application = ProtocolTypeRouter(
 
         # WebSocket request đi vào Channels
         # AllowedHostsOriginValidator: chặn WebSocket từ origin không hợp lệ
-        # AuthMiddlewareStack: tự động load session/user từ cookie
+        # JWTAuthMiddleware: xác thực bằng JWT (?token=) — thay AuthMiddlewareStack
+        # mặc định của Channels vì app này không dùng session cookie, chỉ JWT.
         "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(
+            JWTAuthMiddleware(
                 URLRouter(combined_websocket_urlpatterns)
             )
         ),
