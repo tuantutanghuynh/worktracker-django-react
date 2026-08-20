@@ -12,6 +12,8 @@ import {
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
+import { useProfile } from '../../../hooks/queries/common/useProfile';
+import UserAvatar from '../avatar/UserAvatar';
 
 // Bản ánh xạ Nhãn đường dẫn Breadcrumbs sang Tiếng Anh
 const ROUTE_LABELS = {
@@ -73,6 +75,14 @@ export default function Header({ onOpenSearchModal }) {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const { data: profile } = useProfile();
+  const avatarUser = {
+    full_name: profile?.full_name || displayUser.full_name,
+    email: displayUser.email,
+    avatar_url: profile?.avatar_url,
+    role: displayUser.role,
   };
 
   return (
@@ -142,11 +152,9 @@ export default function Header({ onOpenSearchModal }) {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-blue-500/20 transition-all focus:outline-none cursor-pointer"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-xs border border-white">
-              {displayUser.email ? displayUser.email.substring(0, 2).toUpperCase() : 'MP'}
-            </div>
+            <UserAvatar user={avatarUser} size="sm" />
           </button>
 
           {/* Menu Dropdown Tài khoản */}

@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { chatService } from '../../../services/common/chatService';
 import { useAuth } from '../../../hooks/useAuth';
 import { cn } from '../../../utils/cn';
+import UserAvatar from '../avatar/UserAvatar';
 
 /**
  * Format timestamp hiển thị trong danh sách tin nhắn
@@ -573,17 +574,13 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                               : 'hover:bg-slate-200/60 text-slate-700 bg-transparent'
                           )}
                         >
-                          <div className="relative shrink-0">
-                            <div
-                              className={cn(
-                                'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs uppercase',
-                                isActive ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
-                              )}
-                            >
-                              {displayName.charAt(0)}
-                            </div>
-                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
-                          </div>
+                          <UserAvatar
+                            user={otherUser}
+                            name={displayName}
+                            size="sm"
+                            showStatus={true}
+                            isOnline={true}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <span
@@ -660,9 +657,12 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                     <Hash className="w-5 h-5" />
                   </div>
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 font-bold uppercase shrink-0">
-                    {(activeRoom.other_participant?.full_name || 'U').charAt(0)}
-                  </div>
+                  <UserAvatar
+                    user={activeRoom.other_participant}
+                    size="md"
+                    showStatus={true}
+                    isOnline={true}
+                  />
                 )}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -735,9 +735,12 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                       <div className={cn('flex items-end gap-2 max-w-[75%]', isMine && 'flex-row-reverse')}>
                         {/* Avatar người gửi */}
                         {!isMine && (
-                          <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[11px] font-bold uppercase shrink-0">
-                            {senderName.charAt(0)}
-                          </div>
+                          <UserAvatar
+                            user={msg.sender}
+                            name={senderName}
+                            size="xs"
+                            className="w-7 h-7 shrink-0"
+                          />
                         )}
 
                         {/* Bong bóng tin nhắn */}
@@ -967,9 +970,7 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                       className="w-full p-2.5 hover:bg-blue-50 rounded-xl flex items-center justify-between transition-colors text-left group"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs uppercase group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                          {(u.full_name || u.email).charAt(0)}
-                        </div>
+                        <UserAvatar user={u} size="sm" />
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 truncate">
                             {u.full_name || u.email}

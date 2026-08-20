@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
+import UserAvatar from '../avatar/UserAvatar';
 
 /**
  * ActivityFeedTimeline - System Activity & Event Stream Timeline Component
@@ -156,17 +157,7 @@ export default function ActivityFeedTimeline({
                 {/* Content Header */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    {item.user?.avatar_url ? (
-                      <img
-                        src={item.user.avatar_url}
-                        alt={item.user.full_name}
-                        className="w-6 h-6 rounded-full object-cover border border-slate-700"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold flex items-center justify-center border border-slate-700">
-                        {item.user?.full_name?.charAt(0) || 'U'}
-                      </div>
-                    )}
+                    <UserAvatar user={item.user} size="xs" />
                     <span className="text-xs font-bold text-slate-200">
                       {item.user?.full_name || 'System User'}
                     </span>

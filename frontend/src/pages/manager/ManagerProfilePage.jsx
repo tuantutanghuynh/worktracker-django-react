@@ -22,10 +22,28 @@ import {
   useChangePassword,
 } from '../../hooks/queries/common/useProfile';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// Helper xử lý URL Avatar an toàn (Nối trực tiếp với Backend VITE_API_BASE_URL)
+function getFullAvatarUrl(url) {
+  if (!url) return null;
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('blob:') ||
+    url.startsWith('data:')
+  ) {
+    return url;
+  }
+  const base = API_BASE.replace(/\/api\/?$/, '').replace(/\/$/, '');
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${cleanPath}`;
+}
+
 export default function ManagerProfilePage() {
   const { user } = useAuthStore();
 
-  // 🚀 TANSTACK REACT QUERY HOOKS
+  // 🚀 TANSTACK REACT QUERY HOOKS (Single Source of Truth từ Database)
   const { data: profileData, isLoading, isFetching, refetch } = useProfile();
   const updateProfileMutation = useUpdateProfile();
   const uploadAvatarMutation = useUploadAvatar();
@@ -37,6 +55,10 @@ export default function ManagerProfilePage() {
     phone: '',
   });
 
+  // Avatar Image Error Fallback state & Preview
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [imageError, setImageError] = useState(false);
+
   // Security Form state
   const [securityForm, setSecurityForm] = useState({
     currentPassword: '',
@@ -45,13 +67,14 @@ export default function ManagerProfilePage() {
   });
   const [securityError, setSecurityError] = useState('');
 
-  // Sync profile data from React Query into local form
+  // Đồng bộ thông tin từ React Query Database vào form
   useEffect(() => {
     if (profileData) {
       setProfileForm({
         fullName: profileData.full_name || '',
         phone: profileData.phone_number || '',
       });
+      setImageError(false);
     } else if (user) {
       setProfileForm({
         fullName: user.full_name || '',
@@ -59,6 +82,12 @@ export default function ManagerProfilePage() {
       });
     }
   }, [profileData, user]);
+
+  // Reset image error state whenever avatar URL changes
+  const activeAvatarUrl = avatarPreview || profileData?.avatar_url;
+  useEffect(() => {
+    setImageError(false);
+  }, [activeAvatarUrl]);
 
   // 📷 AVATAR UPLOAD VIA TANSTACK MUTATION
   const handleAvatarChange = (e) => {
@@ -70,7 +99,23 @@ export default function ManagerProfilePage() {
       return;
     }
 
-    uploadAvatarMutation.mutate(file);
+    // Tạo preview ảnh tức thì
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+    setImageError(false);
+
+    // Gửi mutation upload lên Backend
+    uploadAvatarMutation.mutate(file, {
+      onSuccess: () => {
+        // Dọn dẹp object URL preview sau khi DB đã có URL chính thức
+        setTimeout(() => {
+          setAvatarPreview(null);
+        }, 500);
+      },
+      onError: () => {
+        setAvatarPreview(null);
+      },
+    });
   };
 
   // 💾 SAVE PROFILE VIA TANSTACK MUTATION
@@ -125,10 +170,27 @@ export default function ManagerProfilePage() {
     );
   };
 
-  const currentAvatar = profileData?.avatar_url || user?.avatar_url;
-  const currentEmail = user?.email || profileData?.email || '';
-  const currentDepartment = profileData?.department || user?.department || 'Management Dept';
+  const currentAvatar = getFullAvatarUrl(activeAvatarUrl);
+  const currentEmail = user?.email || profileData?.email || 'manager@worktracker.vn';
+
+  // Format Department Name hiển thị đẹp mắt
+  const currentDepartment =
+    profileData?.department_name ||
+    (profileData?.department
+      ? typeof profileData.department === 'number'
+        ? `Department #${profileData.department}`
+        : profileData.department
+      : user?.department || 'Management Department');
+
   const currentRole = user?.role || 'MANAGER';
+
+  // Tính chữ cái viết tắt đại diện (Initials)
+  const displayName = profileForm.fullName || user?.full_name || 'Alexander Wright';
+  const nameParts = displayName.trim().split(' ').filter(Boolean);
+  const initials =
+    nameParts.length >= 2
+      ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+      : displayName.slice(0, 2).toUpperCase();
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto text-slate-800 pb-12">
@@ -170,15 +232,17 @@ export default function ManagerProfilePage() {
             <div className="relative pt-6">
               <div className="relative inline-block">
                 <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-slate-100 mx-auto flex items-center justify-center">
-                  {currentAvatar ? (
+                  {currentAvatar && !imageError ? (
                     <img
+                      key={currentAvatar}
                       src={currentAvatar}
-                      alt="Avatar"
+                      alt={displayName}
+                      onError={() => setImageError(true)}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-blue-100 text-blue-700 font-extrabold text-2xl flex items-center justify-center uppercase">
-                      {(profileForm.fullName || currentEmail || 'U').charAt(0)}
+                    <div className="w-full h-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center tracking-wider">
+                      {initials}
                     </div>
                   )}
                 </div>
@@ -192,7 +256,7 @@ export default function ManagerProfilePage() {
                   <input
                     id="avatar-upload"
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
                     onChange={handleAvatarChange}
                     className="hidden"
                     disabled={uploadAvatarMutation.isPending}
@@ -207,7 +271,7 @@ export default function ManagerProfilePage() {
               )}
 
               <h2 className="text-base font-bold text-slate-900 mt-4">
-                {profileForm.fullName || currentEmail}
+                {displayName}
               </h2>
               <p className="text-xs text-slate-400 font-medium">{currentEmail}</p>
 
@@ -272,7 +336,7 @@ export default function ManagerProfilePage() {
                   label="Full Name"
                   value={profileForm.fullName}
                   onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
-                  placeholder="e.g. John Doe"
+                  placeholder="e.g. Alexander Wright"
                   required
                 />
 
@@ -297,7 +361,7 @@ export default function ManagerProfilePage() {
                   label="Department"
                   value={currentDepartment}
                   disabled
-                  helperText="Managed via System Admin / Team Directory"
+                  helperText="Managed via System Directory"
                 />
               </div>
 

@@ -20,6 +20,7 @@ const ManagerJobDetailPage = lazy(() => import('../pages/manager/ManagerJobDetai
 const ManagerKanbanPage = lazy(() => import('../pages/manager/ManagerKanbanPage'));
 const ManagerTeamPage = lazy(() => import('../pages/manager/ManagerTeamPage'));
 const ManagerTimesheetReviewPage = lazy(() => import('../pages/manager/ManagerTimesheetReviewPage'));
+const ManagerTaskReviewPage = lazy(() => import('../pages/manager/ManagerTaskReviewPage'));
 const ManagerTimeLockPage = lazy(() => import('../pages/manager/ManagerTimeLockPage'));
 const ManagerReportsPage = lazy(() => import('../pages/manager/ManagerReportsPage'));
 const ManagerNotificationsPage = lazy(() => import('../pages/manager/ManagerNotificationsPage'));
@@ -67,6 +68,8 @@ export function AppRouter() {
                                 <Route path="jobs/:id" element={<ManagerJobDetailPage />} />
                                 <Route path="jobs/:jobId/kanban" element={<ManagerKanbanPage />} />
                                 <Route path="kanban" element={<ManagerKanbanPage />} />
+                                <Route path="tasks/review" element={<ManagerTaskReviewPage />} />
+                                <Route path="tasks-qa" element={<ManagerTaskReviewPage />} />
                                 <Route path="team" element={<ManagerTeamPage />} />
                                 <Route path="timesheet" element={<ManagerTimesheetReviewPage />} />
                                 <Route path="timesheets/review" element={<ManagerTimesheetReviewPage />} />

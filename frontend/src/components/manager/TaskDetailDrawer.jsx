@@ -28,6 +28,7 @@ import SideDrawer from '../common/drawer/SideDrawer';
 import InputField from '../common/forms/InputField';
 import SelectDropdown from '../common/forms/SelectDropdown';
 import BaseModal from '../common/modal/BaseModal';
+import UserAvatar from '../common/avatar/UserAvatar';
 import { cn } from '../../utils/cn';
 
 // Query Hooks & Stores
@@ -73,6 +74,12 @@ function formatBytes(bytes, decimals = 1) {
 export default function TaskDetailDrawer() {
   const { taskDrawerOpen, closeTaskDrawer, selectedTaskId } = useUIStore();
   const [activeTab, setActiveTab] = useState('overview');
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Reset isEditing when selectedTaskId changes
+  useEffect(() => {
+    setIsEditing(false);
+  }, [selectedTaskId]);
 
   // Form State cho Overview
   const [editFormData, setEditFormData] = useState({
@@ -530,7 +537,8 @@ export default function TaskDetailDrawer() {
 
             <div className="flex items-center gap-2">
               <span className="text-slate-500 font-semibold">Assignee:</span>
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                {task.assignee && <UserAvatar user={task.assignee} size="xs" />}
                 {task.assignee?.full_name || task.assignee?.email || 'Unassigned'}
               </span>
             </div>
@@ -572,106 +580,201 @@ export default function TaskDetailDrawer() {
 
           {/* 📌 TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
-            <form onSubmit={handleUpdateTask} className="space-y-4">
-              <InputField
-                label="Task Title *"
-                value={editFormData.title}
-                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-                placeholder="Task title..."
-                required
-              />
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Assign to Employee</label>
-                <select
-                  value={editFormData.assignee_id}
-                  onChange={(e) => setEditFormData({ ...editFormData, assignee_id: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Unassigned (Assign later) --</option>
-                  {employeeOptions.map((emp) => (
-                    <option key={emp.value} value={emp.value}>
-                      {emp.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <SelectDropdown
-                  label="Priority"
-                  value={editFormData.priority}
-                  onChange={(val) => setEditFormData({ ...editFormData, priority: val })}
-                  options={[
-                    { value: 'HIGH', label: 'High Priority' },
-                    { value: 'MEDIUM', label: 'Medium Priority' },
-                    { value: 'LOW', label: 'Low Priority' },
-                  ]}
-                />
-
-                <InputField
-                  label="Deadline"
-                  type="date"
-                  value={editFormData.deadline}
-                  onChange={(e) => setEditFormData({ ...editFormData, deadline: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Description & Acceptance Criteria</label>
-                <textarea
-                  rows={5}
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  placeholder="Detailed task instructions..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
-                />
-              </div>
-
-              {/* Task Meta Details Box */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2 text-[11px] text-slate-500">
-                <div className="flex items-center justify-between">
-                  <span>Created By:</span>
-                  <span className="font-bold text-slate-800">
-                    {task.creator?.full_name || task.creator?.email || 'System'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Created At:</span>
-                  <span className="font-semibold text-slate-700">{formatDateSafe(task.created_at, 'HH:mm - dd/MM/yyyy')}</span>
-                </div>
-                {task.completed_at && (
-                  <div className="flex items-center justify-between">
-                    <span>Completed At:</span>
-                    <span className="font-semibold text-emerald-700">{formatDateSafe(task.completed_at, 'HH:mm - dd/MM/yyyy')}</span>
+            task.status === 'COMPLETED' && !isEditing ? (
+              <div className="space-y-4 text-xs">
+                {/* Clean Completed Task Summary */}
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-extrabold text-emerald-900 text-xs">Task Completed & QA Verified</p>
+                      <p className="text-[11px] text-emerald-700 mt-0.5">
+                        Completed on {formatDateSafe(task.completed_at || task.updated_at, 'dd/MM/yyyy HH:mm')}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-
-              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
-                {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      setCancelReason('');
-                      setCancelModalOpen(true);
-                    }}
-                    className="text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
+                    onClick={() => setIsEditing(true)}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
                   >
-                    Cancel this task
+                    Edit Task
                   </button>
-                ) : <div />}
+                </div>
 
-                <button
-                  type="submit"
-                  disabled={updateTaskMutation.isPending}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{updateTaskMutation.isPending ? 'Saving...' : 'Save Changes'}</span>
-                </button>
+                {/* Key Meta Details Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Assignee</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <UserAvatar
+                        avatarUrl={task.assignee?.avatar_url || task.assignee_avatar}
+                        fullName={task.assignee?.full_name || 'Unassigned'}
+                        size="xs"
+                      />
+                      <span className="font-extrabold text-slate-900 text-xs">
+                        {task.assignee?.full_name || 'Unassigned'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Priority & Deadline</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="px-2 py-0.2 rounded bg-slate-200 text-slate-700 font-bold text-[10px]">
+                        {task.priority || 'MEDIUM'} Priority
+                      </span>
+                      <span className="font-mono font-extrabold text-slate-900 text-xs">
+                        {formatDateSafe(task.deadline)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Task Description */}
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-extrabold text-slate-900">Task Scope & Acceptance Criteria:</h4>
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-700 leading-relaxed text-xs">
+                    {task.description || <span className="italic text-slate-400">No description provided.</span>}
+                  </div>
+                </div>
+
+                {/* Meta Details Box */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2 text-[11px] text-slate-500">
+                  <div className="flex items-center justify-between">
+                    <span>Created By:</span>
+                    <span className="font-bold text-slate-800">
+                      {task.creator?.full_name || task.creator?.email || 'System'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Created At:</span>
+                    <span className="font-semibold text-slate-700">{formatDateSafe(task.created_at, 'HH:mm - dd/MM/yyyy')}</span>
+                  </div>
+                  {task.completed_at && (
+                    <div className="flex items-center justify-between">
+                      <span>Completed At:</span>
+                      <span className="font-semibold text-emerald-700">{formatDateSafe(task.completed_at, 'HH:mm - dd/MM/yyyy')}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleUpdateTask} className="space-y-4">
+                {task.status === 'COMPLETED' && (
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <span className="text-xs font-bold text-slate-700">Editing Completed Task</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="text-xs text-blue-600 font-bold hover:underline"
+                    >
+                      Cancel Edit
+                    </button>
+                  </div>
+                )}
+                <InputField
+                  label="Task Title *"
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                  placeholder="Task title..."
+                  required
+                />
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Assign to Employee</label>
+                  <select
+                    value={editFormData.assignee_id}
+                    onChange={(e) => setEditFormData({ ...editFormData, assignee_id: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Unassigned (Assign later) --</option>
+                    {employeeOptions.map((emp) => (
+                      <option key={emp.value} value={emp.value}>
+                        {emp.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectDropdown
+                    label="Priority"
+                    value={editFormData.priority}
+                    onChange={(val) => setEditFormData({ ...editFormData, priority: val })}
+                    options={[
+                      { value: 'HIGH', label: 'High Priority' },
+                      { value: 'MEDIUM', label: 'Medium Priority' },
+                      { value: 'LOW', label: 'Low Priority' },
+                    ]}
+                  />
+
+                  <InputField
+                    label="Deadline"
+                    type="date"
+                    value={editFormData.deadline}
+                    onChange={(e) => setEditFormData({ ...editFormData, deadline: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Description & Acceptance Criteria</label>
+                  <textarea
+                    rows={5}
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    placeholder="Detailed task instructions..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
+                  />
+                </div>
+
+                {/* Task Meta Details Box */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2 text-[11px] text-slate-500">
+                  <div className="flex items-center justify-between">
+                    <span>Created By:</span>
+                    <span className="font-bold text-slate-800">
+                      {task.creator?.full_name || task.creator?.email || 'System'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Created At:</span>
+                    <span className="font-semibold text-slate-700">{formatDateSafe(task.created_at, 'HH:mm - dd/MM/yyyy')}</span>
+                  </div>
+                  {task.completed_at && (
+                    <div className="flex items-center justify-between">
+                      <span>Completed At:</span>
+                      <span className="font-semibold text-emerald-700">{formatDateSafe(task.completed_at, 'HH:mm - dd/MM/yyyy')}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+                  {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCancelReason('');
+                        setCancelModalOpen(true);
+                      }}
+                      className="text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
+                    >
+                      Cancel this task
+                    </button>
+                  ) : <div />}
+
+                  <button
+                    type="submit"
+                    disabled={updateTaskMutation.isPending}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{updateTaskMutation.isPending ? 'Saving...' : 'Save Changes'}</span>
+                  </button>
+                </div>
+              </form>
+            )
           )}
 
           {/* ⏱️ TAB 2: WORK LOGS */}
@@ -702,9 +805,7 @@ export default function TaskDetailDrawer() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold text-[10px] flex items-center justify-center uppercase">
-                            {(lw.employee_name || lw.user?.email || 'U')[0]}
-                          </div>
+                          <UserAvatar user={lw.user || { full_name: lw.employee_name }} size="xs" />
                           <div>
                             <span className="font-bold text-slate-900 text-xs">
                               {lw.employee_name || lw.user?.email || 'Employee'}
@@ -767,9 +868,7 @@ export default function TaskDetailDrawer() {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-bold text-[10px] flex items-center justify-center uppercase">
-                              {(cm.user?.full_name || cm.user?.email || 'U')[0]}
-                            </div>
+                            <UserAvatar user={cm.user} size="xs" />
                             <span className="font-bold text-xs">
                               {cm.user?.full_name || cm.user?.email || 'User'}
                             </span>

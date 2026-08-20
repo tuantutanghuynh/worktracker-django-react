@@ -15,13 +15,17 @@ import {
   Bell,
   User,
   Kanban,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck,
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
 import { useRecentJobsStore } from '../../../stores/useRecentJobsStore';
 import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
+import { useManagerTasks } from '../../../hooks/queries/manager/useManagerTasks';
+import { useProfile } from '../../../hooks/queries/common/useProfile';
+import UserAvatar from '../avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
 
 // 1. BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
@@ -33,6 +37,7 @@ const MENU_CONFIG = {
       { path: '/manager/dashboard', label: 'Dashboard', icon: LayoutGrid },
       { path: '/manager/jobs', label: 'My Jobs', icon: Briefcase },
       { path: '/manager/kanban', label: 'Kanban Board', icon: Kanban },
+      { path: '/manager/tasks/review', altPath: '/manager/tasks-qa', label: 'QA Review Queue', icon: ShieldCheck, isQABadge: true },
       { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
       { path: '/manager/team', label: 'Team Members', icon: Users },
       { path: '/manager/timesheet', altPath: '/manager/timesheets/review', label: 'Timesheets', icon: Clock },
@@ -75,6 +80,7 @@ export default function Sidebar() {
   const { unreadCount } = useNotificationStore();
 
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const displayUser = user || { full_name: 'Manager User', role: 'MANAGER' };
 
   const userRole = (displayUser.role || 'MANAGER').toUpperCase();
@@ -85,6 +91,15 @@ export default function Sidebar() {
 
   // 🚀 REACT QUERY: Lấy danh sách Jobs từ Database làm dữ liệu Fallback nếu chưa có lịch sử xem
   const { data: jobResponse } = useManagerJobs({ page_size: 5 });
+
+  // 🚀 REACT QUERY: Lấy số lượng Task đang chờ duyệt QA để hiển thị badge
+  const { data: reviewingTasks } = useManagerTasks(userRole === 'MANAGER' ? { status: 'REVIEWING' } : {});
+  const pendingQACount = useMemo(() => {
+    if (!reviewingTasks) return 0;
+    if (Array.isArray(reviewingTasks)) return reviewingTasks.length;
+    if (Array.isArray(reviewingTasks.results)) return reviewingTasks.results.length;
+    return 0;
+  }, [reviewingTasks]);
 
   // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
   const displayRecentJobs = useMemo(() => {
@@ -198,6 +213,12 @@ export default function Sidebar() {
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
+
+                {item.isQABadge && pendingQACount > 0 && (
+                  <span className="bg-purple-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
+                    {pendingQACount > 99 ? '99+' : pendingQACount}
+                  </span>
+                )}
               </NavLink>
             );
           })}
@@ -248,17 +269,21 @@ export default function Sidebar() {
       {/* USER PROFILE FOOTER */}
       <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-3 min-w-0">
-          <div className="relative shrink-0">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-xs border border-slate-700">
-              {displayUser.full_name ? displayUser.full_name.substring(0, 2).toUpperCase() : (displayUser.email ? displayUser.email.substring(0, 2).toUpperCase() : 'US')}
-            </div>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A1128] absolute bottom-0 right-0"></span>
-          </div>
+          <UserAvatar
+            user={{
+              full_name: profile?.full_name || displayUser.full_name,
+              email: displayUser.email,
+              avatar_url: profile?.avatar_url,
+            }}
+            size="sm"
+            showStatus={true}
+            isOnline={true}
+          />
 
           {!isSidebarCollapsed && (
             <div className="truncate">
               <p className="text-xs font-bold text-white leading-tight truncate">
-                {displayUser.full_name || displayUser.email || 'User'}
+                {profile?.full_name || displayUser.full_name || displayUser.email || 'User'}
               </p>
               <p className="text-[10px] text-slate-400 truncate">
                 {displayUser.role || 'MANAGER'}

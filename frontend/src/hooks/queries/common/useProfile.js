@@ -6,13 +6,13 @@ import { useAuthStore } from '../../../stores/authStore';
 export const PROFILE_QUERY_KEY = ['profile', 'me'];
 
 /**
- * Hook to fetch current authenticated user profile
+ * Hook to fetch current authenticated user profile (Single Source of Truth from DB)
  */
 export function useProfile() {
   return useQuery({
     queryKey: PROFILE_QUERY_KEY,
     queryFn: profileService.getProfile,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 60 * 1000, // 1 minute fresh cache
   });
 }
 
@@ -26,6 +26,9 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: profileService.updateProfile,
     onSuccess: (data) => {
+      queryClient.setQueryData(PROFILE_QUERY_KEY, (old) =>
+        old ? { ...old, ...data } : data
+      );
       queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
       if (user) {
         setUser({ ...user, full_name: data.full_name });
@@ -44,15 +47,15 @@ export function useUpdateProfile() {
  */
 export function useUploadAvatar() {
   const queryClient = useQueryClient();
-  const { user, setUser } = useAuthStore();
 
   return useMutation({
     mutationFn: profileService.uploadAvatar,
     onSuccess: (data) => {
+      // Cập nhật tức thì React Query Cache với URL mới từ Database
+      queryClient.setQueryData(PROFILE_QUERY_KEY, (old) =>
+        old ? { ...old, avatar_url: data.avatar_url } : { avatar_url: data.avatar_url }
+      );
       queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
-      if (user) {
-        setUser({ ...user, avatar_url: data.avatar_url });
-      }
       toast.success('Avatar uploaded successfully!');
     },
     onError: (err) => {

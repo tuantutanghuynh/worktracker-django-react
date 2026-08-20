@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import DataTable from '../../components/common/table/DataTable';
 import BaseModal from '../../components/common/modal/BaseModal';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import UserAvatar from '../../components/common/avatar/UserAvatar';
 import { cn } from '../../utils/cn';
 
 import { useManagerEmployees, useAssignDepartment } from '../../hooks/queries/manager/useManagerTeam';
@@ -119,12 +120,7 @@ export default function ManagerTeamPage() {
       accessorKey: 'full_name',
       cell: (row) => (
         <div className="flex items-center gap-3">
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-xs uppercase">
-              {(row.full_name || row.email || 'U').charAt(0)}
-            </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
-          </div>
+          <UserAvatar user={row} size="sm" showStatus={true} isOnline={true} />
           <div className="min-w-0">
             <p className="font-bold text-xs text-slate-900 truncate">{row.full_name || row.email}</p>
             <p className="text-[10px] text-slate-400 truncate">{row.email}</p>
@@ -377,12 +373,7 @@ export default function ManagerTeamPage() {
               {/* Card Header */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="relative shrink-0">
-                    <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm uppercase">
-                      {(emp.full_name || emp.email || 'U').charAt(0)}
-                    </div>
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
-                  </div>
+                  <UserAvatar user={emp} size="md" showStatus={true} isOnline={true} />
                   <div>
                     <h3 className="font-bold text-sm text-slate-900">{emp.full_name || emp.email}</h3>
                     <p className="text-xs text-slate-400">{emp.email}</p>
