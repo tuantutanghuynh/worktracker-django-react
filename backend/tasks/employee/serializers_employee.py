@@ -30,10 +30,11 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'title', 'description', 'status', 'priority', 
+            'id', 'title', 'description', 'status', 'priority',
             'deadline', 'order_index', 'job_id', 'job_code', 'job_name',
-            'manager_name', 'created_at'
+            'manager_name', 'created_at', 'completed_at'
         ]
+
         
 class EmployeeTaskLogWorkSerializer(serializers.ModelSerializer):
     class Meta:
