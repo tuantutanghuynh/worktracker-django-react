@@ -778,43 +778,76 @@ const ALLOWED_TRANSITIONS = {
             </div>
           ) : (
             <div className="space-y-3">
-              {timeLocks.map((lock) => (
-                <div
-                  key={lock.id}
-                  className="p-4 rounded-xl border border-slate-200/80 hover:border-slate-300 transition flex items-center justify-between text-xs gap-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-xs">
-                          Period: Month {lock.lock_month}/{lock.lock_year}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                          LOCKED
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {lock.reason || 'Period locked by Manager for payroll processing.'}
-                      </p>
-                    </div>
-                  </div>
+              {timeLocks.map((lock) => {
+                const isLocked = lock.is_locked !== false && !lock.unlocked_at;
 
-                  <button
-                    onClick={() => {
-                      setSelectedLockToUnlock(lock);
-                      setUnlockReason('');
-                      setUnlockModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 text-xs transition cursor-pointer shrink-0"
+                return (
+                  <div
+                    key={lock.id}
+                    className={cn(
+                      "p-4 rounded-xl border transition flex items-center justify-between text-xs gap-4",
+                      isLocked
+                        ? "border-rose-200/80 bg-rose-50/20 hover:border-rose-300"
+                        : "border-emerald-200/80 bg-emerald-50/20 hover:border-emerald-300"
+                    )}
                   >
-                    <Unlock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Unlock Period</span>
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                          isLocked
+                            ? "bg-rose-50 text-rose-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        )}
+                      >
+                        {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-xs">
+                            Period: Month {lock.lock_month}/{lock.lock_year}
+                          </span>
+                          {isLocked ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              LOCKED
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              UNLOCKED
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {isLocked
+                            ? lock.lock_reason || lock.reason || 'Period locked by Manager for payroll processing.'
+                            : lock.unlock_reason
+                            ? `Unlocked: ${lock.unlock_reason}`
+                            : 'Period unlocked. Work log submissions are open.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isLocked ? (
+                      <button
+                        onClick={() => {
+                          setSelectedLockToUnlock(lock);
+                          setUnlockReason('');
+                          setUnlockModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 text-xs transition cursor-pointer shrink-0"
+                      >
+                        <Unlock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Unlock Period</span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-lg font-medium text-[11px]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Open for submissions</span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

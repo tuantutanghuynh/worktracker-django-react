@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from projects.models import Client, Job
+from projects.services.job_health_calculator_service import calculate_job_health
 from tasks.models import Task
 
 
@@ -40,6 +41,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
     client = ManagerClientMiniSerializer(read_only=True)
     task_counts = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
+    health = serializers.SerializerMethodField()
 
     class Meta:
         model = Job
@@ -54,6 +56,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             "deadline",
             "task_counts",
             "is_overdue",
+            "health",
         ]
 
     def get_task_counts(self, obj):
@@ -94,6 +97,10 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             Job.Status.COMPLETED,
             Job.Status.CANCELLED,
         ]
+
+    def get_health(self, obj):
+        task_counts = self.get_task_counts(obj)
+        return calculate_job_health(obj, task_counts=task_counts)
 
 
 class ManagerJobDetailSerializer(ManagerJobListSerializer):
@@ -183,14 +190,32 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                     "message": "Manager is not allowed to update these fields here.",
                 }
             )
-
         job = self.instance
         new_deadline = attrs.get("deadline")
 
-        if job and new_deadline and new_deadline < job.start_date:
-            raise serializers.ValidationError(
-                {"deadline": "Job deadline must not be earlier than start date."}
+        if job and new_deadline:
+            if new_deadline < job.start_date:
+                raise serializers.ValidationError(
+                    {"deadline": "Job deadline must not be earlier than start date."}
+                )
+
+            # ➕ KIỂM TRA RÀNG BUỘC TIẾN ĐỘ: Chặn rút ngắn Deadline Job nhỏ hơn Task con đang mở
+            max_task = (
+                job.tasks.exclude(status=Task.Status.CANCELLED)
+                .order_by("-deadline")
+                .first()
             )
+            
+            if max_task and max_task.deadline > new_deadline:
+                raise serializers.ValidationError(
+                    {
+                        "deadline": (
+                            f"Cannot shorten job deadline to {new_deadline} because child task "
+                            f"'{max_task.title}' has a deadline of {max_task.deadline}. "
+                            "Please adjust child task deadlines first."
+                        )
+                    }
+                )
 
         return attrs
 

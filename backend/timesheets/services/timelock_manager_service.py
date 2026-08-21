@@ -67,39 +67,51 @@ def is_global_period_locked(lock_month, lock_year):
     ).exists()
 
 
-def is_job_period_locked(job_id, lock_month, lock_year):
-    return TimeLock.objects.filter(
-        lock_scope=TimeLock.LockScope.JOB,
-        job_id=job_id,
-        lock_month=lock_month,
-        lock_year=lock_year,
-        is_locked=True,
-    ).exists()
+def is_job_period_locked(job_id, lock_month, lock_year, today=None):
+    """
+    Kiểm tra xem kỳ công của Job có bị khóa hay không.
+    Kỳ công chỉ bị khóa khi có bản ghi TimeLock trong CSDL với is_locked=True.
+    """
+    job_lock = (
+        TimeLock.objects.filter(
+            lock_scope=TimeLock.LockScope.JOB,
+            job_id=job_id,
+            lock_month=lock_month,
+            lock_year=lock_year,
+        )
+        .order_by("-id")
+        .first()
+    )
+
+    if job_lock is not None:
+        return job_lock.is_locked
+
+    return False
 
 
-def is_period_locked(job_id, lock_month, lock_year):
+def is_period_locked(job_id, lock_month, lock_year, today=None):
     """
     Một kỳ bị khóa nếu:
     - Admin đã GLOBAL lock kỳ đó
-    - hoặc Manager đã JOB lock kỳ đó
+    - hoặc Manager đã JOB lock kỳ đó (hoặc bị Tự động Khóa theo thời gian máy chủ)
     """
     return (
         is_global_period_locked(lock_month, lock_year)
-        or is_job_period_locked(job_id, lock_month, lock_year)
+        or is_job_period_locked(job_id, lock_month, lock_year, today=today)
     )
 
 
 def assert_period_open_for_job(job_id, work_date):
     """
-    Dùng trước khi Manager review/correct/void LogWork.
+    Dùng trước khi Manager review/correct/void LogWork hoặc Employee log work.
     """
     lock_month, lock_year = get_period_from_date(work_date)
 
     if is_global_period_locked(lock_month, lock_year):
-        raise TimeLockError("GLOBAL_PERIOD_IS_LOCKED")
+        raise TimeLockError("GLOBAL_PERIOD_IS_LOCKED: This period is globally locked by Admin.")
 
     if is_job_period_locked(job_id, lock_month, lock_year):
-        raise TimeLockError("JOB_PERIOD_IS_LOCKED")
+        raise TimeLockError(f"JOB_PERIOD_IS_LOCKED: Period {lock_month}/{lock_year} is locked for this project.")
 
 
 def get_job_timesheet_recipient_ids(job):
@@ -140,6 +152,21 @@ def lock_job_period(
     """
     assert_job_in_manager_scope(user, job)
     validate_month_year(lock_month, lock_year)
+
+    # ➕ KIỂM TRA RÀNG BUỘC CHỐT SỔ: Chặn khóa sổ nếu còn chấm công PENDING chưa duyệt
+    from timesheets.models import LogWork
+    pending_count = LogWork.objects.filter(
+        task__job=job,
+        work_date__month=lock_month,
+        work_date__year=lock_year,
+        review_status=LogWork.ReviewStatus.PENDING,
+    ).count()
+
+    if pending_count > 0:
+        raise TimeLockError(
+            f"Cannot lock timesheet period {lock_month}/{lock_year} because there are {pending_count} pending work log(s). "
+            "Please approve, reject, or void all pending logs before locking."
+        )
 
     clean_reason = reason.strip() if isinstance(reason, str) else reason
 

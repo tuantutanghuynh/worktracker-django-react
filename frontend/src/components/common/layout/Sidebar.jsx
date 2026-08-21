@@ -24,6 +24,7 @@ import { useNotificationStore } from '../../../stores/useNotificationStore';
 import { useRecentJobsStore } from '../../../stores/useRecentJobsStore';
 import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
 import { useManagerTasks } from '../../../hooks/queries/manager/useManagerTasks';
+import { useLogWorks } from '../../../hooks/queries/manager/useManagerTimesheets';
 import { useProfile } from '../../../hooks/queries/common/useProfile';
 import UserAvatar from '../avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
@@ -35,13 +36,22 @@ const MENU_CONFIG = {
     portalLabel: 'Manager Portal',
     navItems: [
       { path: '/manager/dashboard', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/manager/jobs', label: 'My Jobs', icon: Briefcase },
+
+      // Nhóm 1: Quản lý Dự án & Task
+      { path: '/manager/jobs', label: 'My Jobs', icon: Briefcase, hasDividerTop: true },
       { path: '/manager/kanban', label: 'Kanban Board', icon: Kanban },
       { path: '/manager/tasks/review', altPath: '/manager/tasks-qa', label: 'QA Review Queue', icon: ShieldCheck, isQABadge: true },
+
+      // Nhóm 2: Quản lý Thời công & Chốt sổ
+      { path: '/manager/timesheet', altPath: '/manager/timesheets/review', label: 'Timesheets', icon: Clock, isTimesheetBadge: true, hasDividerTop: true },
+      { path: '/manager/timelocks', altPath: '/manager/timelock', label: 'Period Locks', icon: Lock },
+
+      // Nhóm 3: Quản lý Nhân sự & Trao đổi
+      { path: '/manager/team', label: 'Team Members', icon: Users, hasDividerTop: true },
       { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
-      { path: '/manager/team', label: 'Team Members', icon: Users },
-      { path: '/manager/timesheet', altPath: '/manager/timesheets/review', label: 'Timesheets', icon: Clock },
-      { path: '/manager/reports', label: 'Reports', icon: BarChart3 },
+
+      // Nhóm 4: Báo cáo & Cài đặt
+      { path: '/manager/reports', label: 'Reports', icon: BarChart3, hasDividerTop: true },
       { path: '/manager/settings', label: 'Settings', icon: Settings },
     ],
     showRecentJobs: true,
@@ -100,6 +110,18 @@ export default function Sidebar() {
     if (Array.isArray(reviewingTasks.results)) return reviewingTasks.results.length;
     return 0;
   }, [reviewingTasks]);
+
+  // 🚀 REACT QUERY: Lấy số lượng LogWork đang chờ duyệt (PENDING) để hiển thị badge Timesheets
+  const { data: pendingLogWorksData } = useLogWorks(
+    userRole === 'MANAGER' ? { review_status: 'PENDING', page_size: 100 } : {}
+  );
+  const pendingTimesheetCount = useMemo(() => {
+    if (!pendingLogWorksData) return 0;
+    if (typeof pendingLogWorksData.count === 'number') return pendingLogWorksData.count;
+    if (Array.isArray(pendingLogWorksData)) return pendingLogWorksData.length;
+    if (Array.isArray(pendingLogWorksData.results)) return pendingLogWorksData.results.length;
+    return 0;
+  }, [pendingLogWorksData]);
 
   // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
   const displayRecentJobs = useMemo(() => {
@@ -193,33 +215,43 @@ export default function Sidebar() {
               (item.altPath && location.pathname.startsWith(item.altPath));
 
             return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition font-medium',
-                  isActive
-                    ? 'font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60',
-                  isSidebarCollapsed && 'justify-center space-x-0'
+              <React.Fragment key={item.path}>
+                {item.hasDividerTop && (
+                  <div className="my-1.5 border-t border-slate-800/80 mx-2" />
                 )}
-                title={isSidebarCollapsed ? item.label : undefined}
-              >
-                <Icon className="w-5 h-5 text-center shrink-0" />
-                {!isSidebarCollapsed && <span className="flex-1">{item.label}</span>}
+                <NavLink
+                  to={item.path}
+                  className={cn(
+                    'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition font-medium',
+                    isActive
+                      ? 'font-semibold text-white bg-blue-600 shadow-md shadow-blue-600/30'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60',
+                    isSidebarCollapsed && 'justify-center space-x-0'
+                  )}
+                  title={isSidebarCollapsed ? item.label : undefined}
+                >
+                  <Icon className="w-5 h-5 text-center shrink-0" />
+                  {!isSidebarCollapsed && <span className="flex-1">{item.label}</span>}
 
-                {item.hasBadge && unreadCount > 0 && (
-                  <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
+                  {item.hasBadge && unreadCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
 
-                {item.isQABadge && pendingQACount > 0 && (
-                  <span className="bg-purple-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
-                    {pendingQACount > 99 ? '99+' : pendingQACount}
-                  </span>
-                )}
-              </NavLink>
+                  {item.isQABadge && pendingQACount > 0 && (
+                    <span className="bg-purple-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
+                      {pendingQACount > 99 ? '99+' : pendingQACount}
+                    </span>
+                  )}
+
+                  {item.isTimesheetBadge && pendingTimesheetCount > 0 && (
+                    <span className="bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
+                      {pendingTimesheetCount > 99 ? '99+' : pendingTimesheetCount}
+                    </span>
+                  )}
+                </NavLink>
+              </React.Fragment>
             );
           })}
         </div>

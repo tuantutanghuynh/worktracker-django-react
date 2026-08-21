@@ -109,6 +109,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         "message": msg_obj,
                     },
                 )
+            else:
+                # Báo lỗi trực tiếp cho người gửi nếu kênh Job đã bị đóng băng (Archived Read-Only)
+                await self.send(
+                    text_data=json.dumps({
+                        "type": "error",
+                        "message": "This project is closed and archived as read-only. New messages are not allowed.",
+                    })
+                )
 
     async def chat_message(self, event):
         """

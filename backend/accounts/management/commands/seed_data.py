@@ -5,8 +5,9 @@ from django.db import transaction, connection
 
 from accounts.models import CustomUser, Role, Department, EmployeeProfile
 from projects.models import Client, Job
-from tasks.models import Task, TaskFollower, TaskComment
-from timesheets.models import LogWork, TimeLock
+from tasks.models import Task, TaskFollower, TaskComment, TaskAttachment
+from timesheets.models import LogWork, TimeLock, DailyUserTimesheet
+from chat.models import ChatRoom, ChatParticipant, ChatMessage
 from system.models import AuditLog, Notification
 from tasks.services.order_index_manager_service import key_between
 
@@ -27,8 +28,13 @@ class Command(BaseCommand):
         with transaction.atomic():
             if options['reset']:
                 self.stdout.write("Reset flag set. Wiping existing transactional data...")
+                ChatMessage.objects.all().delete()
+                ChatParticipant.objects.all().delete()
+                ChatRoom.objects.all().delete()
                 LogWork.objects.all().delete()
+                DailyUserTimesheet.objects.all().delete()
                 TimeLock.objects.all().delete()
+                TaskAttachment.objects.all().delete()
                 TaskComment.objects.all().delete()
                 TaskFollower.objects.all().delete()
                 Task.objects.all().delete()
@@ -36,6 +42,7 @@ class Command(BaseCommand):
                 Client.objects.all().delete()
                 AuditLog.objects.all().delete()
                 Notification.objects.all().delete()
+                EmployeeProfile.objects.all().delete()
                 CustomUser.objects.exclude(is_superuser=True).delete()
 
                 # 🚀 RESET AUTO-INCREMENT SEQUENCES BACK TO ID 1 (SQLITE & POSTGRESQL)

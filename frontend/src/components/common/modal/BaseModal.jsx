@@ -12,6 +12,7 @@ export default function BaseModal({
   title,
   description,
   children,
+  footer,
   maxWidth = 'max-w-md',
 }) {
   return (
@@ -50,6 +51,13 @@ export default function BaseModal({
 
           {/* Nội dung bên trong Modal */}
           <div className="p-5">{children}</div>
+
+          {/* Footer Modal */}
+          {footer && (
+            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+              {footer}
+            </div>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

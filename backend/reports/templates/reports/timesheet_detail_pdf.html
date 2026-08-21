@@ -2,81 +2,266 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Timesheet Detail Report</title>
+    <title>Executive Timesheet & Effort Audit Report</title>
     <style>
         @page {
-            size: A4 landscape;
-            margin: 1cm;
+            size: a4 landscape;
+            margin: 1cm 1.2cm 1.5cm 1.2cm;
+            @frame footer_frame {
+                -pdf-frame-content: footer_content;
+                bottom: 5mm;
+                left: 1.2cm;
+                right: 1.2cm;
+                height: 8mm;
+            }
         }
+        
         body {
-            font-family: sans-serif;
-            font-size: 11px;
-            color: #333;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 8pt;
+            color: #1e293b;
+            line-height: 1.3;
         }
-        h1 {
+
+        /* HEADER SECTION */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 8px;
+        }
+        .brand-title {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .brand-subtitle {
+            font-size: 7.5pt;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+        .report-title {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #059669;
+            text-align: right;
+            text-transform: uppercase;
+        }
+        .meta-text {
+            font-size: 7.5pt;
+            color: #64748b;
+            text-align: right;
+        }
+
+        /* KPI CARDS */
+        .kpi-table {
+            width: 100%;
+            border-collapse: separate;
+            margin-bottom: 14px;
+        }
+        .kpi-card {
+            width: 24%;
+            padding: 8px 10px;
+            border-radius: 4px;
             text-align: center;
-            color: #2c3e50;
         }
-        .summary-box {
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: #ecf0f1;
-            border: 1px solid #bdc3c7;
+        .kpi-card-blue {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
         }
-        table {
+        .kpi-card-green {
+            background-color: #ecfdf5;
+            border: 1px solid #a7f3d0;
+        }
+        .kpi-card-amber {
+            background-color: #fffbeb;
+            border: 1px solid #fde68a;
+        }
+        .kpi-card-rose {
+            background-color: #fff1f2;
+            border: 1px solid #fecdd3;
+        }
+        .kpi-label {
+            font-size: 7pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #475569;
+            letter-spacing: 0.5px;
+        }
+        .kpi-value {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+        .val-blue { color: #1d4ed8; }
+        .val-green { color: #047857; }
+        .val-amber { color: #b45309; }
+        .val-rose { color: #be123c; }
+
+        /* DATA TABLE */
+        .data-table {
             width: 100%;
             border-collapse: collapse;
         }
-        th, td {
-            border: 1px solid #bdc3c7;
-            padding: 6px;
+        .data-table th {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-size: 7.5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 5px;
             text-align: left;
+            border: 1px solid #0f172a;
         }
-        th {
-            background-color: #34495e;
-            color: white;
+        .data-table td {
+            padding: 5px;
+            font-size: 7.5pt;
+            border: 1px solid #cbd5e1;
+            vertical-align: middle;
+        }
+        .row-even {
+            background-color: #f8fafc;
+        }
+        .row-odd {
+            background-color: #ffffff;
+        }
+
+        /* BADGES */
+        .code-badge {
+            font-family: Courier, monospace;
+            font-weight: bold;
+            font-size: 7pt;
+            color: #1e40af;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 6.5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-approved { background-color: #dcfce7; color: #15803d; }
+        .badge-pending { background-color: #fef3c7; color: #92400e; }
+        .badge-rejected { background-color: #fee2e2; color: #b91c1c; }
+        .badge-voided { background-color: #f1f5f9; color: #64748b; }
+
+        .hours-badge {
+            font-family: Courier, monospace;
+            font-weight: bold;
+            color: #0f172a;
+            text-align: right;
         }
     </style>
 </head>
 <body>
-    <h1>Chi Tiết Nhật Ký Công Việc (Timesheet)</h1>
-    
-    <div class="summary-box">
-        <strong>Tổng số lượt báo cáo:</strong> {{ summary.total_logs }}<br>
-        <strong>Tổng số giờ làm:</strong> {{ summary.total_hours }}<br>
+
+    <!-- RUNNING FOOTER -->
+    <div id="footer_content">
+        <table style="width: 100%; border: none;">
+            <tr>
+                <td style="text-align: left; font-size: 7pt; color: #94a3b8; font-weight: bold; border: none; padding: 0;">
+                    WORKTRACKER PRO | CONFIDENTIAL | FOR INTERNAL USE ONLY
+                </td>
+                <td style="text-align: right; font-size: 7.5pt; color: #64748b; font-weight: bold; border: none; padding: 0;">
+                    Page <pdf:pagenumber> of <pdf:pagecount>
+                </td>
+            </tr>
+        </table>
     </div>
 
-    <table>
+    <!-- CORPORATE HEADER -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 55%; border: none;">
+                <div class="brand-title">WORKTRACKER PRO</div>
+                <div class="brand-subtitle">Enterprise Work & Resource Management System</div>
+            </td>
+            <td style="width: 45%; border: none;">
+                <div class="report-title">Detailed Timesheet Effort</div>
+                <div class="meta-text">
+                    Generated: {% now "Y-m-d H:i" %} &nbsp;|&nbsp; Scope: Manager Scoped
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- EXECUTIVE KPI SUMMARY CARDS -->
+    <table class="kpi-table">
+        <tr>
+            <td class="kpi-card kpi-card-blue">
+                <div class="kpi-label">Total Logs</div>
+                <div class="kpi-value val-blue">{{ summary.total_logs|default:"0" }}</div>
+            </td>
+            <td style="width: 1%; border: none;"></td>
+            <td class="kpi-card kpi-card-green">
+                <div class="kpi-label">Total Hours Logged</div>
+                <div class="kpi-value val-green">{{ summary.total_hours|default:"0" }} hrs</div>
+            </td>
+            <td style="width: 1%; border: none;"></td>
+            <td class="kpi-card kpi-card-amber">
+                <div class="kpi-label">Pending Approval</div>
+                <div class="kpi-value val-amber">{{ summary.review_status_summary.PENDING|default:"0" }} logs</div>
+            </td>
+            <td style="width: 1%; border: none;"></td>
+            <td class="kpi-card kpi-card-rose">
+                <div class="kpi-label">Rejected Logs</div>
+                <div class="kpi-value val-rose">{{ summary.review_status_summary.REJECTED|default:"0" }} logs</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- DATA TABLE -->
+    <table class="data-table">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Ngày làm</th>
-                <th>Nhân viên</th>
-                <th>Mã Job</th>           <!-- ➕ BỔ SUNG -->
-                <th>Dự án (Job)</th>
-                <th>Task</th>
-                <th>Số giờ</th>
-                <th>Trạng thái duyệt</th>
+                <th style="width: 6%;">Log ID</th>
+                <th style="width: 8%; text-align: center;">Work Date</th>
+                <th style="width: 15%;">Employee</th>
+                <th style="width: 10%;">Job Code</th>
+                <th style="width: 18%;">Project Name</th>
+                <th style="width: 21%;">Task Title</th>
+                <th style="width: 7%; text-align: right;">Hours</th>
+                <th style="width: 9%; text-align: center;">Status</th>
+                <th style="width: 6%; text-align: center;">Period</th>
             </tr>
         </thead>
         <tbody>
             {% for row in rows %}
-            <tr>
-                <td>{{ row.id }}</td>
-                <td>{{ row.work_date }}</td>
-                <td>{{ row.employee.full_name }}</td>
-                <td>{{ row.job.job_code }}</td>       <!-- ➕ BỔ SUNG -->
-                <td>{{ row.job.job_name }}</td>
-                <td>{{ row.task.title }}</td>
-                <td>{{ row.hours_spent }}</td>
-                <td>{{ row.review_status }}</td>
+            <tr class="{% cycle 'row-even' 'row-odd' %}">
+                <td class="code-badge">LW-{{ row.id }}</td>
+                <td style="text-align: center; font-family: Courier, monospace;">{{ row.work_date }}</td>
+                <td style="font-weight: bold; color: #0f172a;">
+                    {{ row.employee.full_name|default:row.user.full_name|default:"Staff" }}
+                </td>
+                <td class="code-badge">{{ row.job.job_code|default:"—" }}</td>
+                <td>{{ row.job.job_name|default:"—" }}</td>
+                <td>{{ row.task.title|default:"—" }}</td>
+                <td class="hours-badge">{{ row.hours_spent }} h</td>
+                <td style="text-align: center;">
+                    <span class="badge badge-{{ row.review_status|lower }}">
+                        {{ row.review_status }}
+                    </span>
+                </td>
+                <td style="text-align: center; font-size: 6.5pt; color: #64748b;">
+                    {{ row.locked_period_status|default:"OPEN" }}
+                </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8" style="text-align: center;">Không có dữ liệu</td>
+                <td colspan="9" style="text-align: center; padding: 20px; color: #94a3b8;">
+                    No timesheet logs found for the selected criteria.
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
 </body>
 </html>

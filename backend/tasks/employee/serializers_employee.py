@@ -58,10 +58,3 @@ class EmployeeTaskStatusUpdateSerializer(serializers.Serializer):
     """Xử lý cập nhật trạng thái khi kéo thả thẻ trên Kanban"""
     status = serializers.ChoiceField(choices=['TODO', 'IN_PROGRESS', 'REVIEWING'])
     order_index = serializers.CharField(required=False, allow_blank=True)
-
-    def validate_status(self, value):
-        if value == 'COMPLETED':
-            raise serializers.ValidationError(
-                "Employees cannot directly mark tasks as COMPLETED. Please submit the task as REVIEWING for Manager QA inspection."
-            )
-        return value

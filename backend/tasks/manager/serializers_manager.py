@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from projects.models import Job
 from tasks.models import Task, TaskComment, TaskAttachment
+from tasks.services.task_deadline_calculator_service import calculate_task_deadline_health
 
 
 class ManagerUserMiniSerializer(serializers.Serializer):
@@ -33,6 +34,7 @@ class ManagerJobMiniSerializer(serializers.ModelSerializer):
 class ManagerTaskListSerializer(serializers.ModelSerializer):
     assignee = ManagerUserMiniSerializer(read_only=True)
     is_overdue = serializers.SerializerMethodField()
+    deadline_health = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
 
@@ -47,6 +49,7 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
             "assignee",
             "order_index",
             "is_overdue",
+            "deadline_health",
             "comment_count",
             "attachment_count",
         ]
@@ -59,6 +62,9 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
                 Task.Status.CANCELLED,
             ]
         )
+
+    def get_deadline_health(self, obj):
+        return calculate_task_deadline_health(obj)
 
     def get_comment_count(self, obj):
         if hasattr(obj, "comment_count"):
@@ -111,6 +117,16 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
 
         return value
 
+    def validate_assignee_id(self, value):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user = User.objects.filter(id=value, is_active=True).select_related("role").first()
+        if not user:
+            raise serializers.ValidationError("Active assignee does not exist.")
+        if getattr(getattr(user, "role", None), "code", None) != "EMPLOYEE":
+            raise serializers.ValidationError("Assignee must have an active EMPLOYEE role.")
+        return value
+
 
 class ManagerTaskUpdateSerializer(serializers.Serializer):
     title = serializers.CharField(
@@ -135,6 +151,17 @@ class ManagerTaskUpdateSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("Task title cannot be empty.")
 
+        return value
+
+    def validate_assignee_id(self, value):
+        if value is not None:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.filter(id=value, is_active=True).select_related("role").first()
+            if not user:
+                raise serializers.ValidationError("Active assignee does not exist.")
+            if getattr(getattr(user, "role", None), "code", None) != "EMPLOYEE":
+                raise serializers.ValidationError("Assignee must have an active EMPLOYEE role.")
         return value
 
     def validate(self, attrs):

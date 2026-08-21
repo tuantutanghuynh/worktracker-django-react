@@ -550,6 +550,9 @@ class TestTimeLockServiceEdgeCases:
 
     def test_lock_previously_unlocked_period_relocks(self):
         """Khóa lại kỳ đã từng được mở khóa -> 201 Created/200 OK, is_locked=True."""
+        self.logwork.review_status = "APPROVED"
+        self.logwork.save(update_fields=["review_status"])
+
         unlocked = baker.make(
             "timesheets.TimeLock",
             job=self.job,
