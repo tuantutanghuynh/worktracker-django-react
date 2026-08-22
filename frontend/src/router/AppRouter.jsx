@@ -11,6 +11,9 @@ import { DepartmentsPage } from "../pages/admin/DepartmentsPage"
 import { CreateUserPage } from "../pages/admin/CreateUserPage"
 import { SearchUserPage } from "../pages/admin/SearchUserPage"
 import { JobsPage } from "../pages/admin/JobsPage"
+import { ClientsPage } from "../pages/admin/ClientsPage"
+import { AuditLogsPage } from "../pages/admin/AuditLogsPage"
+import { DashboardPage } from "../pages/admin/DashboardPage"
 
 export function AppRouter() {
     return (
@@ -25,12 +28,13 @@ export function AppRouter() {
 
                     <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
                         <Route path="/admin" element={<AdminLayout />}>
-                            {/* TODO: thay bằng Global Dashboard thật */}
-                            <Route index element={<div>Admin Dashboard (Phase 2)</div>} />
+                            <Route index element={<DashboardPage />} />
+                            <Route path="clients" element={<ClientsPage />} />
                             <Route path="departments" element={<DepartmentsPage />} />
                             <Route path="users/create" element={<CreateUserPage />} />
                             <Route path="users/search" element={<SearchUserPage />} />
                             <Route path="jobs" element={<JobsPage />} />
+                            <Route path="audit-logs" element={<AuditLogsPage />} />
                         </Route>
                     </Route>
 
