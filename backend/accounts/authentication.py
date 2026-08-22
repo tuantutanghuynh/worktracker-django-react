@@ -1,3 +1,5 @@
+import time
+
 from django.core.cache import cache, caches
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -54,11 +56,38 @@ def invalidate_user_active_status(user_id):
     cache.delete(f"{_ACTIVE_CACHE_PREFIX}{user_id}")
 
 
+_REAUTH_CACHE_PREFIX = "user_reauth_after:"
+# Must outlive REFRESH_TOKEN_LIFETIME (7 days, see SIMPLE_JWT in settings.py) —
+# a shorter TTL would let this cache entry expire while an old token, issued
+# before the permission change, is still otherwise valid.
+_REAUTH_CACHE_TTL = 7 * 24 * 60 * 60
+
+
+# Marks "any token issued before now must re-authenticate" for this user.
+# Used for role changes: unlike lock/unlock (is_active=False rejects
+# everything), this only invalidates tokens issued before the change —
+# a token minted *after* the new role is set (i.e. after a fresh login)
+# stays valid.
+def require_reauth(user_id):
+    cache.set(f"{_REAUTH_CACHE_PREFIX}{user_id}", int(time.time()), timeout=_REAUTH_CACHE_TTL)
+
+
+# Shared by WorkTrackerJWTAuthentication (access tokens) and
+# ReauthAwareTokenRefreshView (refresh tokens, see accounts/auth/views_auth.py)
+# — a stale refresh token must be rejected too, otherwise it would just mint
+# a fresh access token and silently defeat require_reauth().
+def is_reauth_required(user_id, issued_at):
+    reauth_after = cache.get(f"{_REAUTH_CACHE_PREFIX}{user_id}")
+    return bool(reauth_after and issued_at < reauth_after)
+
+
 # Extends BlacklistAwareJWTAuthentication with an is_active check via Redis cache (NFR-04).
 # This is the class used in DEFAULT_AUTHENTICATION_CLASSES.
 class WorkTrackerJWTAuthentication(BlacklistAwareJWTAuthentication):
 
-    # Runs blacklist check via super(), then verifies the user is still active before allowing the request.
+    # Runs blacklist check via super(), then verifies the user is still
+    # active and that this specific token predates any forced-reauth event
+    # (e.g. a role change) before allowing the request.
     def authenticate(self, request):
         result = super().authenticate(request)
         if result is None:
@@ -69,4 +98,11 @@ class WorkTrackerJWTAuthentication(BlacklistAwareJWTAuthentication):
             raise AuthenticationFailed(
                 "Account is locked or deactivated.", code="account_inactive"
             )
+
+        if is_reauth_required(user.id, validated_token.get("iat", 0)):
+            raise AuthenticationFailed(
+                "Your permissions have changed. Please log in again.",
+                code="reauth_required",
+            )
+
         return user, validated_token

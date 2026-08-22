@@ -1,6 +1,9 @@
 import { create } from 'zustand';
-import managerReportService from '../services/manager/managerReportService';
 
+// Fetch/markAsRead/markAllAsRead tạm bỏ khỏi file này — bản gốc gọi qua
+// services/manager/managerReportService (đã xoá cùng đợt dọn Manager-only
+// code). Sẽ nối lại đúng endpoint thật lúc merge với nhánh Long. Phần
+// WebSocket/local state dưới đây không phụ thuộc Manager nên giữ nguyên.
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
   unreadCount: 0,
@@ -10,54 +13,6 @@ export const useNotificationStore = create((set, get) => ({
   error: null,
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
-
-  /**
-   * Fetch initial notifications from API
-   */
-  fetchNotifications: async (params = {}) => {
-    set({ loading: true, error: null });
-    try {
-      const data = await managerReportService.getNotifications(params);
-      const list = Array.isArray(data) ? data : data.results || [];
-      const unread = list.filter((n) => !n.is_read).length;
-      set({ notifications: list, unreadCount: unread, loading: false });
-    } catch (err) {
-      set({ loading: false, error: err.message || 'Failed to fetch notifications' });
-    }
-  },
-
-  /**
-   * Mark single notification as read
-   */
-  markAsRead: async (id) => {
-    try {
-      await managerReportService.markNotificationRead(id);
-      set((state) => {
-        const updated = state.notifications.map((n) =>
-          n.id === id ? { ...n, is_read: true } : n
-        );
-        const unread = updated.filter((n) => !n.is_read).length;
-        return { notifications: updated, unreadCount: unread };
-      });
-    } catch (err) {
-      console.error('Failed to mark notification read', err);
-    }
-  },
-
-  /**
-   * Mark all notifications as read
-   */
-  markAllAsRead: async () => {
-    try {
-      await managerReportService.markAllNotificationsRead();
-      set((state) => ({
-        notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
-        unreadCount: 0,
-      }));
-    } catch (err) {
-      console.error('Failed to mark all notifications read', err);
-    }
-  },
 
   /**
    * Handle incoming real-time WS notification object

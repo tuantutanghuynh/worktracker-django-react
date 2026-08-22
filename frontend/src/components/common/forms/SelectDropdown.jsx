@@ -63,7 +63,7 @@ export default function SelectDropdown({
     <div ref={dropdownRef} className={cn("space-y-1.5 text-left relative w-full", containerClassName)}>
       {/* Label */}
       {label && (
-        <label className="block text-xs font-semibold text-slate-300">
+        <label className="block text-xs font-semibold text-slate-700">
           {label}
           {required && <span className="text-rose-500 ml-1">*</span>}
         </label>

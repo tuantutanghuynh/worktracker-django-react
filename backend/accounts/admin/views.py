@@ -24,7 +24,7 @@ from .serializers import (
     DepartmentSerializer,
 )
 from ..permissions import HasPermission
-from ..authentication import set_user_active_status
+from ..authentication import set_user_active_status, require_reauth
 from system.utils import log_audit_event
 
 
@@ -57,6 +57,29 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return UserCreateSerializer
         return UserSerializer
+
+    # Forces any already-issued token to re-authenticate the moment the
+    # role actually changes — without this, a demoted admin's existing
+    # session keeps rendering the Admin UI (client-side `user.role` is only
+    # refreshed at login) even though every write action already 403s on
+    # the backend, since HasPermission re-checks role live from the DB.
+    @transaction.atomic
+    def perform_update(self, serializer):
+        old_role_id = serializer.instance.role_id
+        old_values = UserSerializer(serializer.instance).data
+        instance = serializer.save()
+
+        if instance.role_id != old_role_id:
+            require_reauth(instance.id)
+            log_audit_event(
+                actor=self.request.user,
+                action="ROLE_CHANGED",
+                table_name="users",
+                record_id=instance.id,
+                old_values=old_values,
+                new_values=UserSerializer(instance).data,
+                request=self.request,
+            )
 
     @transaction.atomic
     def perform_destroy(self, instance):

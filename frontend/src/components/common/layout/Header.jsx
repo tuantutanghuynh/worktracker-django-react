@@ -14,29 +14,28 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
 
 // Bản ánh xạ Nhãn đường dẫn Breadcrumbs sang Tiếng Anh
+// Manager portal tạm bỏ khỏi file này — sẽ lấy nguyên bản từ nhánh Long
+// lúc merge thật, tránh 2 bản Manager khác nhau đá nhau.
 const ROUTE_LABELS = {
-  manager: 'Manager',
+  admin: 'Admin',
   dashboard: 'Dashboard',
-  jobs: 'Projects & Jobs',
-  kanban: 'Kanban Board',
-  team: 'Team Members',
-  timesheet: 'Timesheet Review',
-  timesheets: 'Timesheets',
-  review: 'Review',
-  timelock: 'Period Lock',
-  timelocks: 'Period Lock',
-  reports: 'Reports & Analytics',
+  jobs: 'Jobs',
+  clients: 'Clients',
+  departments: 'Departments',
+  users: 'Users',
+  create: 'Create',
+  search: 'Search',
+  'audit-logs': 'Audit Logs',
   notifications: 'Notification Center',
   profile: 'My Profile',
   settings: 'System Settings',
 };
 
 // Mỗi role có Home/Notifications/Profile/Settings khác nhau — Header dùng
-// chung cho cả 3 role nên không được hardcode path /manager/... như bản
-// gốc (mới chỉ có Manager làm), phải tra theo role hiện tại.
+// chung cho cả 3 role nên không được hardcode 1 path cố định, phải tra
+// theo role hiện tại.
 const ROLE_LINKS = {
   ADMIN: { home: '/admin', notifications: '/admin/audit-logs', profile: '/admin', settings: '/admin' },
-  MANAGER: { home: '/manager/dashboard', notifications: '/manager/notifications', profile: '/manager/profile', settings: '/manager/settings' },
   EMPLOYEE: { home: '/employee/dashboard', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
 };
 
@@ -51,8 +50,8 @@ export default function Header({ onOpenSearchModal }) {
 
   // Lấy thông tin user đăng nhập từ useAuth (Zustand Store)
   const { user, logout } = useAuth();
-  const displayUser = user || { email: 'manager@worktracker.vn', role: 'MANAGER' };
-  const roleLinks = ROLE_LINKS[displayUser.role] || ROLE_LINKS.MANAGER;
+  const displayUser = user || { email: 'user@worktracker.vn', role: 'EMPLOYEE' };
+  const roleLinks = ROLE_LINKS[displayUser.role] || ROLE_LINKS.EMPLOYEE;
 
   // Đóng Dropdown khi click ra ngoài vùng menu
   useEffect(() => {
@@ -165,10 +164,10 @@ export default function Header({ onOpenSearchModal }) {
               <div className="px-3 py-2.5 border-b border-slate-100">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-slate-900 truncate">
-                    {displayUser.full_name || 'Manager Account'}
+                    {displayUser.full_name || 'My Account'}
                   </span>
                   <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold text-[10px]">
-                    {displayUser.role || 'MANAGER'}
+                    {displayUser.role || 'EMPLOYEE'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 truncate mt-0.5">{displayUser.email}</p>

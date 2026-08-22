@@ -1,50 +1,29 @@
-import { useMemo } from 'react';
-import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutGrid,
   Briefcase,
   Users,
   Clock,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  ListChecks,
   TrendingUp,
   Bell,
   User,
-  Kanban,
-  MessageSquare,
+  ListChecks,
   Building2,
   UserPlus,
   Search,
   ScrollText,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
-import { useRecentJobsStore } from '../../../stores/useRecentJobsStore';
-import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
 import { cn } from '../../../utils/cn';
 
-// 1. BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
+// BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
+// Manager portal tạm bỏ khỏi file này — sẽ lấy nguyên bản từ nhánh Long
+// lúc merge thật, tránh 2 bản Manager khác nhau đá nhau.
 const MENU_CONFIG = {
-  // Cấu hình Menu dành cho MANAGER
-  MANAGER: {
-    portalLabel: 'Manager Portal',
-    navItems: [
-      { path: '/manager/dashboard', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/manager/jobs', label: 'My Jobs', icon: Briefcase },
-      { path: '/manager/kanban', label: 'Kanban Board', icon: Kanban },
-      { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
-      { path: '/manager/team', label: 'Team Members', icon: Users },
-      { path: '/manager/timesheet', altPath: '/manager/timesheets/review', label: 'Timesheets', icon: Clock },
-      { path: '/manager/reports', label: 'Reports', icon: BarChart3 },
-      { path: '/manager/settings', label: 'Settings', icon: Settings },
-    ],
-    showRecentJobs: true,
-  },
-
   // Cấu hình Menu dành cho EMPLOYEE
   EMPLOYEE: {
     portalLabel: 'Employee Portal',
@@ -56,7 +35,6 @@ const MENU_CONFIG = {
       { path: '/employee/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
       { path: '/employee/profile', label: 'Profile', icon: User },
     ],
-    showRecentJobs: false,
   },
 
   // Cấu hình Menu dành cho ADMIN
@@ -71,68 +49,19 @@ const MENU_CONFIG = {
       { path: '/admin/departments', label: 'Departments', icon: Users },
       { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
     ],
-    showRecentJobs: false,
   },
 };
 
 export default function Sidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
   const { unreadCount } = useNotificationStore();
 
   const { user } = useAuth();
-  const displayUser = user || { full_name: 'Manager User', role: 'MANAGER' };
+  const displayUser = user || { full_name: 'User', role: 'EMPLOYEE' };
 
-  const userRole = (displayUser.role || 'MANAGER').toUpperCase();
-  const currentConfig = MENU_CONFIG[userRole] || MENU_CONFIG.MANAGER;
-
-  // 🚀 ZUSTAND STORE: Danh sách Jobs xem gần nhất từ LocalStorage
-  const { recentJobs, addRecentJob } = useRecentJobsStore();
-
-  // 🚀 REACT QUERY: Lấy danh sách Jobs từ Database làm dữ liệu Fallback nếu chưa có lịch sử xem
-  const { data: jobResponse } = useManagerJobs({ page_size: 5 });
-
-  // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
-  const displayRecentJobs = useMemo(() => {
-    if (recentJobs && recentJobs.length > 0) {
-      return recentJobs;
-    }
-
-    if (!jobResponse) return [];
-    const list = Array.isArray(jobResponse)
-      ? jobResponse
-      : Array.isArray(jobResponse.results)
-      ? jobResponse.results
-      : [];
-
-    return list.slice(0, 3).map((j) => ({
-      id: j.id,
-      job_code: j.job_code || `JOB-${j.id}`,
-      job_name: j.job_name,
-      status: j.status || 'ACTIVE',
-    }));
-  }, [recentJobs, jobResponse]);
-
-  const handleJobClick = (job) => {
-    addRecentJob(job);
-    navigate(`/manager/jobs/${job.id}`);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'ACTIVE':
-        return { dot: 'bg-emerald-500', text: 'text-emerald-400' };
-      case 'PLANNING':
-        return { dot: 'bg-blue-500', text: 'text-blue-400' };
-      case 'ON_HOLD':
-        return { dot: 'bg-amber-500', text: 'text-amber-400' };
-      case 'COMPLETED':
-        return { dot: 'bg-indigo-500', text: 'text-indigo-400' };
-      default:
-        return { dot: 'bg-slate-500', text: 'text-slate-400' };
-    }
-  };
+  const userRole = (displayUser.role || 'EMPLOYEE').toUpperCase();
+  const currentConfig = MENU_CONFIG[userRole] || MENU_CONFIG.EMPLOYEE;
 
   return (
     <aside
@@ -209,47 +138,6 @@ export default function Sidebar() {
             );
           })}
         </div>
-
-        {/* RECENTLY VIEWED JOBS (KẾT NỐI ZUSTAND PERSIST + REACT QUERY REAL DATA) */}
-        {!isSidebarCollapsed && currentConfig.showRecentJobs && (
-          <div className="space-y-1 pt-2.5 border-t border-slate-800/80">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">
-              Recently Viewed Jobs
-            </p>
-
-            {displayRecentJobs.length === 0 ? (
-              <p className="px-3 py-1 text-xs text-slate-500 italic">No recent jobs</p>
-            ) : (
-              displayRecentJobs.map((job) => {
-                const colorStyle = getStatusColor(job.status);
-                return (
-                  <div
-                    key={job.id}
-                    onClick={() => handleJobClick(job)}
-                    className="px-3 py-1.5 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5 transition-colors"
-                  >
-                    <div className={cn('w-2.5 h-2.5 rounded shrink-0', colorStyle.dot)}></div>
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-semibold text-slate-200 truncate leading-tight" title={job.job_name}>
-                        {job.job_name}
-                      </p>
-                      <span className={cn('text-[9px] font-bold tracking-wider', colorStyle.text)}>
-                        {job.status}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-
-            <Link
-              to="/manager/jobs"
-              className="inline-block px-3 pt-1 text-[11px] font-medium text-blue-400 hover:underline"
-            >
-              View all jobs →
-            </Link>
-          </div>
-        )}
       </div>
 
       {/* USER PROFILE FOOTER */}
@@ -268,7 +156,7 @@ export default function Sidebar() {
                 {displayUser.full_name || displayUser.email || 'User'}
               </p>
               <p className="text-[10px] text-slate-400 truncate">
-                {displayUser.role || 'MANAGER'}
+                {displayUser.role || 'EMPLOYEE'}
               </p>
             </div>
           )}

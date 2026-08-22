@@ -88,6 +88,7 @@ class Command(BaseCommand):
                 {'code': 'report:export',       'name': 'Export reports to PDF, Excel, or CSV'},
 
                 # System Settings
+                {'code': 'department:view',   'name': 'View the department in the system'},
                 {'code': 'department:create',   'name': 'Create a new department in the system'},
                 {'code': 'department:update',   'name': 'Edit department information'},
                 {'code': 'role:manage',         'name': 'Add or edit roles and assign permissions to them'},

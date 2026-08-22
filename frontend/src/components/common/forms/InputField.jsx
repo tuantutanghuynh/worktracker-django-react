@@ -43,7 +43,7 @@ const InputField = forwardRef(({
     <div className={cn("space-y-1.5 text-left w-full", containerClassName)}>
       {/* Label */}
       {label && (
-        <label htmlFor={name} className="block text-xs font-semibold text-slate-300">
+        <label htmlFor={name} className="block text-xs font-semibold text-slate-700">
           {label}
           {required && <span className="text-rose-500 ml-1">*</span>}
         </label>

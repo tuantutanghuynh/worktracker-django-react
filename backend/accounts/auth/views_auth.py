@@ -6,7 +6,11 @@ import time
 import redis
 from django.core.cache import caches
 from django.core.mail import send_mail
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from system.utils import log_audit_event
+from ..authentication import is_reauth_required
 from .serializers_auth import LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer, ChangePasswordSerializer
 
 blacklist_cache = caches["blacklist"]
@@ -20,6 +24,32 @@ blacklist_cache = caches["blacklist"]
 # satisfy must_change_password on CustomUser). Deliberately uses plain
 # IsAuthenticated, not HasPermission, so it is never blocked by the
 # must_change_password gate in permissions.py — see that file for why.
+
+
+# Wraps the default refresh endpoint with the same reauth check used for
+# access tokens (WorkTrackerJWTAuthentication). Without this, a refresh
+# token issued before a role change would just keep minting fresh access
+# tokens forever, since TokenRefreshView never goes through our custom
+# authentication class — require_reauth() alone would do nothing.
+class ReauthAwareTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        raw_refresh = request.data.get("refresh")
+        if raw_refresh:
+            try:
+                token = RefreshToken(raw_refresh)
+            except TokenError:
+                token = None  # invalid/expired — let the parent view produce the normal error response
+
+            if token is not None:
+                user_id = token.get("user_id")
+                issued_at = token.get("iat", 0)
+                if user_id and is_reauth_required(user_id, issued_at):
+                    return Response(
+                        {"detail": "Your permissions have changed. Please log in again.", "code": "reauth_required"},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+
+        return super().post(request, *args, **kwargs)
 
 
 # Public endpoint: verifies email/password and issues an access + refresh token pair.
