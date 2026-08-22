@@ -4,10 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Search } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
+import SortableHeader from '../../components/common/table/SortableHeader';
+import { useDebounce } from '../../hooks/useDebounce';
+import { useOrdering } from '../../hooks/useOrdering';
 import { listClients, createClient, updateClient, deleteClient, restoreClient } from '../../api/clients';
 
 const clientSchema = z.object({
@@ -39,10 +42,16 @@ export function ClientsPage() {
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState(null); // null | { mode: 'create' } | { mode: 'edit', client }
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const [ordering, toggleSort] = useOrdering();
 
+  // Server-side search + sort — ClientViewSet.get_queryset() handles
+  // ?search= (OR across name/tax_code/email) and OrderingFilter handles
+  // ?ordering=. queryKey includes both so a new combination refetches.
   const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => listClients(),
+    queryKey: ['clients', { search: debouncedSearch, ordering }],
+    queryFn: () => listClients({ search: debouncedSearch || undefined, ordering: ordering || undefined }),
   });
 
   const {
@@ -137,15 +146,26 @@ export function ClientsPage() {
         </button>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name, tax code, email..."
+          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3">Client Name</th>
-              <th className="px-4 py-3">Tax Code</th>
-              <th className="px-4 py-3">Contact Email</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <SortableHeader label="Client Name" sortKey="client_name" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Tax Code" sortKey="tax_code" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Contact Email" sortKey="contact_email" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} />
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -159,7 +179,7 @@ export function ClientsPage() {
             {!isLoading && clients.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
-                  No clients yet.
+                  {search ? 'No clients match your search.' : 'No clients yet.'}
                 </td>
               </tr>
             )}

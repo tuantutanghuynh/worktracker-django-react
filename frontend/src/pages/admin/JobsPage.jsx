@@ -4,12 +4,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import SortableHeader from '../../components/common/table/SortableHeader';
 import PriorityBadge from '../../components/common/badges/PriorityBadge';
 import StatusBadge from '../../components/common/badges/StatusBadge';
+import { useDebounce } from '../../hooks/useDebounce';
+import { useOrdering } from '../../hooks/useOrdering';
 import { listJobs, createJob } from '../../api/jobs';
 import { listClients } from '../../api/clients';
 import { listUsers } from '../../api/users';
@@ -45,10 +48,16 @@ const jobSchema = z
 export function JobsPage() {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const [ordering, toggleSort] = useOrdering();
 
+  // Server-side search + sort — JobViewSet.get_queryset() handles ?search=
+  // (OR across job name/client name/manager email) and OrderingFilter
+  // handles ?ordering= (including __ lookups like client__client_name).
   const { data: jobs = [], isLoading } = useQuery({
-    queryKey: ['jobs'],
-    queryFn: () => listJobs(),
+    queryKey: ['jobs', { search: debouncedSearch, ordering }],
+    queryFn: () => listJobs({ search: debouncedSearch || undefined, ordering: ordering || undefined }),
   });
 
   // Only active clients — the backend rejects assigning a job to an
@@ -140,16 +149,27 @@ export function JobsPage() {
         </button>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search job, client, manager..."
+          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3">Job</th>
-              <th className="px-4 py-3">Client</th>
-              <th className="px-4 py-3">Manager</th>
-              <th className="px-4 py-3">Priority</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Deadline</th>
+              <SortableHeader label="Job" sortKey="job_name" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Client" sortKey="client__client_name" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Priority" sortKey="priority" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Deadline" sortKey="deadline" ordering={ordering} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -163,7 +183,7 @@ export function JobsPage() {
             {!isLoading && jobs.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
-                  No jobs yet.
+                  {search ? 'No jobs match your search.' : 'No jobs yet.'}
                 </td>
               </tr>
             )}

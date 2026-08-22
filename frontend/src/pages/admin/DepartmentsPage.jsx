@@ -4,11 +4,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import SortableHeader from '../../components/common/table/SortableHeader';
+import { useDebounce } from '../../hooks/useDebounce';
+import { useOrdering } from '../../hooks/useOrdering';
 import {
   listDepartments,
   createDepartment,
@@ -28,10 +31,15 @@ export function DepartmentsPage() {
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState(null); // null | { mode: 'create' } | { mode: 'edit', department }
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const [ordering, toggleSort] = useOrdering();
 
+  // Server-side search + sort — DepartmentViewSet.get_queryset() handles
+  // ?search= (name or manager email) and OrderingFilter handles ?ordering=.
   const { data: departments = [], isLoading } = useQuery({
-    queryKey: ['departments'],
-    queryFn: () => listDepartments(),
+    queryKey: ['departments', { search: debouncedSearch, ordering }],
+    queryFn: () => listDepartments({ search: debouncedSearch || undefined, ordering: ordering || undefined }),
   });
 
   // Managers double as the dropdown options and the lookup table used to
@@ -112,14 +120,25 @@ export function DepartmentsPage() {
         </button>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name, manager..."
+          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">Manager</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <SortableHeader label="Name" sortKey="name" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Description" sortKey="description" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} />
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -133,7 +152,7 @@ export function DepartmentsPage() {
             {!isLoading && departments.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
-                  No departments yet.
+                  {search ? 'No departments match your search.' : 'No departments yet.'}
                 </td>
               </tr>
             )}

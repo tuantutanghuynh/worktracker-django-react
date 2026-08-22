@@ -2,7 +2,8 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from rest_framework import viewsets, status
+from django.db.models import Q
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -30,6 +31,8 @@ from system.utils import log_audit_event
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['email', 'role__code', 'is_active']
 
     def get_queryset(self):
         qs = CustomUser.objects.select_related("role", "profile").all()
@@ -265,8 +268,17 @@ class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
-    queryset = Department.objects.select_related("manager").all()
     serializer_class = DepartmentSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['name', 'description', 'manager__email']
+
+    def get_queryset(self):
+        qs = Department.objects.select_related("manager").all()
+        if search := self.request.query_params.get("search"):
+            qs = qs.filter(
+                Q(name__icontains=search) | Q(manager__email__icontains=search)
+            )
+        return qs
 
     def get_permissions(self):
         if self.action == "create":

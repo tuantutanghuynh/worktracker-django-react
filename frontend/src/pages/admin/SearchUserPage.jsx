@@ -8,8 +8,10 @@ import { Search, Lock, Unlock } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import SortableHeader from '../../components/common/table/SortableHeader';
 import RoleBadge from '../../components/common/badges/RoleBadge';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useOrdering } from '../../hooks/useOrdering';
 import {
   listUsers,
   updateUser,
@@ -36,15 +38,31 @@ const resetPasswordSchema = z.object({
 // Admin page to find a user by email and modify their email/role/status/password.
 export function SearchUserPage() {
   const queryClient = useQueryClient();
+  const [viewMode, setViewMode] = useState('search'); // 'search' | 'all'
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [ordering, toggleSort] = useOrdering();
 
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['users', { email: debouncedSearch }],
-    queryFn: () => listUsers({ email: debouncedSearch }),
-    enabled: debouncedSearch.length > 0,
+  // Server-side search + sort — UserViewSet.get_queryset() handles ?email=
+  // and OrderingFilter handles ?ordering= (role__code, is_active...).
+  const { data: searchResults = [], isLoading: isSearching } = useQuery({
+    queryKey: ['users', { email: debouncedSearch, ordering }],
+    queryFn: () => listUsers({ email: debouncedSearch, ordering: ordering || undefined }),
+    enabled: viewMode === 'search' && debouncedSearch.length > 0,
   });
+
+  // "Account List" tab — fetches everyone at once (no backend pagination
+  // yet), only enabled while that tab is active so switching to Search
+  // doesn't trigger a needless full-table fetch.
+  const { data: allUsers = [], isLoading: isLoadingAll } = useQuery({
+    queryKey: ['users', { ordering }],
+    queryFn: () => listUsers({ ordering: ordering || undefined }),
+    enabled: viewMode === 'all',
+  });
+
+  const rows = viewMode === 'all' ? allUsers : searchResults;
+  const isLoading = viewMode === 'all' ? isLoadingAll : isSearching;
 
   const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: listRoles });
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
@@ -117,51 +135,75 @@ export function SearchUserPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-bold text-slate-900">Search Users</h1>
-
-      <div className="relative max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by email..."
-          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-        />
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-slate-900">Search Users</h1>
+        <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setViewMode('search')}
+            className={`rounded-md px-3 py-1.5 transition-colors ${
+              viewMode === 'search' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('all')}
+            className={`rounded-md px-3 py-1.5 transition-colors ${
+              viewMode === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Account List
+          </button>
+        </div>
       </div>
+
+      {viewMode === 'search' && (
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by email..."
+            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Status</th>
+              <SortableHeader label="Email" sortKey="email" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Role" sortKey="role__code" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {!debouncedSearch && (
+            {viewMode === 'search' && !debouncedSearch && (
               <tr>
                 <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
                   Type an email to search.
                 </td>
               </tr>
             )}
-            {debouncedSearch && isLoading && (
+            {(viewMode === 'all' || debouncedSearch) && isLoading && (
               <tr>
                 <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
-                  Searching...
+                  Loading...
                 </td>
               </tr>
             )}
-            {debouncedSearch && !isLoading && users.length === 0 && (
+            {(viewMode === 'all' || debouncedSearch) && !isLoading && rows.length === 0 && (
               <tr>
                 <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
                   No users found.
                 </td>
               </tr>
             )}
-            {users.map((u) => (
+            {rows.map((u) => (
               <tr key={u.id} onClick={() => openUser(u)} className="cursor-pointer hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-slate-900">{u.email}</td>
                 <td className="px-4 py-3">{u.role_detail && <RoleBadge role={u.role_detail.code} />}</td>

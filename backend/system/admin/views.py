@@ -6,7 +6,7 @@ from django.core.cache import cache
 DASHBOARD_CACHE_KEY = 'admin:dashboard'
 DASHBOARD_CACHE_TTL = 30  # seconds — dashboard data cũ tối đa 30 giây
 
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -23,6 +23,8 @@ import openpyxl
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'user__email', 'action', 'table_name', 'record_id', 'severity']
 
     def get_permissions(self):
         return [HasPermission('audit:view')]

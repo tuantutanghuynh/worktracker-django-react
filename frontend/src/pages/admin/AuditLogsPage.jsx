@@ -4,7 +4,9 @@ import { Search } from 'lucide-react';
 import SideDrawer from '../../components/common/drawer/SideDrawer';
 import AuditDiffViewer from '../../components/common/drawer/AuditDiffViewer';
 import SeverityBadge from '../../components/common/badges/SeverityBadge';
+import SortableHeader from '../../components/common/table/SortableHeader';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useOrdering } from '../../hooks/useOrdering';
 import { listAuditLogs } from '../../api/auditLogs';
 import { listUsers } from '../../api/users';
 
@@ -14,10 +16,18 @@ export function AuditLogsPage() {
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebounce(keyword, 400);
   const [selectedLog, setSelectedLog] = useState(null);
+  const [ordering, toggleSort] = useOrdering();
 
+  // Server-side keyword search (already existed) + sort — OrderingFilter
+  // handles ?ordering= (default stays -created_at when none is chosen,
+  // set via AuditLog.get_queryset()'s own .order_by()).
   const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['audit-logs', { keyword: debouncedKeyword }],
-    queryFn: () => listAuditLogs(debouncedKeyword ? { keyword: debouncedKeyword } : {}),
+    queryKey: ['audit-logs', { keyword: debouncedKeyword, ordering }],
+    queryFn: () =>
+      listAuditLogs({
+        keyword: debouncedKeyword || undefined,
+        ordering: ordering || undefined,
+      }),
   });
 
   // AuditLogSerializer only returns the actor's raw user id — fetch the
@@ -43,14 +53,14 @@ export function AuditLogsPage() {
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3">Time</th>
-              <th className="px-4 py-3">Actor</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Table</th>
-              <th className="px-4 py-3">Record</th>
-              <th className="px-4 py-3">Severity</th>
+              <SortableHeader label="Time" sortKey="created_at" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Actor" sortKey="user__email" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Action" sortKey="action" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Table" sortKey="table_name" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Record" sortKey="record_id" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader label="Severity" sortKey="severity" ordering={ordering} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.db import transaction
-from rest_framework import viewsets, status
+from django.db.models import Q
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -12,6 +13,8 @@ from system.utils import log_audit_event
 
 class ClientViewSet(viewsets.ModelViewSet):
     serializer_class = ClientSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['client_name', 'tax_code', 'contact_email', 'is_active', 'created_at']
 
     def get_queryset(self):
         qs = Client.objects.all()
@@ -20,6 +23,14 @@ class ClientViewSet(viewsets.ModelViewSet):
             qs = qs.filter(client_name__icontains=name)
         if (is_active := params.get('is_active')) not in (None, ''):
             qs = qs.filter(is_active=is_active.lower() == 'true')
+        # Single quick-search box on the frontend — ORs across the 3 fields
+        # shown in the Clients table, unlike ?name= which only matches one.
+        if search := params.get('search'):
+            qs = qs.filter(
+                Q(client_name__icontains=search) |
+                Q(tax_code__icontains=search) |
+                Q(contact_email__icontains=search)
+            )
         return qs
 
     def get_permissions(self):
@@ -96,6 +107,23 @@ class ClientViewSet(viewsets.ModelViewSet):
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
+    filter_backends = [filters.OrderingFilter]
+    # __ lookups let OrderingFilter sort by a related row's field (e.g. the
+    # client's name) even though Job only stores client_id/manager_id.
+    ordering_fields = [
+        'job_name', 'client__client_name', 'manager__email',
+        'status', 'priority', 'deadline', 'start_date',
+    ]
+
+    def get_queryset(self):
+        qs = Job.objects.select_related('client', 'manager').all()
+        if search := self.request.query_params.get('search'):
+            qs = qs.filter(
+                Q(job_name__icontains=search) |
+                Q(client__client_name__icontains=search) |
+                Q(manager__email__icontains=search)
+            )
+        return qs
 
     def get_permissions(self):
         if self.action == 'create':
