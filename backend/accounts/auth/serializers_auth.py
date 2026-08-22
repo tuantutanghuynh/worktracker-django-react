@@ -7,6 +7,8 @@ import re
 from datetime import timedelta
 from django.utils import timezone
 from accounts.models import PasswordReset, RolePermission
+from django.db import transaction
+
 
 User = get_user_model()
 
@@ -172,7 +174,9 @@ class ResetPasswordSerializer(serializers.Serializer):
         self.reset_record = reset
         return attrs
 
-    # Applies the new password and marks the reset token as used to prevent reuse.
+    # Đọc lại record CÓ khoá (select_for_update) ngay trong transaction —
+    # validate() ở trên chỉ kiểm tra sơ bộ cho UX, không đủ để chặn race
+    # condition giữa 2 request cùng dùng 1 token gần như đồng thời.
     def apply_new_password(self):
         if self.reset_record is None:
             raise RuntimeError(
@@ -180,15 +184,23 @@ class ResetPasswordSerializer(serializers.Serializer):
                 "Ensure that validate() is called and passed before calling this method."
             )
 
-        user = User.objects.filter(email=self.reset_record.email).first()
-        user.set_password(self.validated_data["new_password"])
-        user.save()
+        with transaction.atomic():
+            reset = PasswordReset.objects.select_for_update().get(pk=self.reset_record.pk)
 
-        self.reset_record.is_used = True
-        self.reset_record.save()
+            if reset.is_used:
+                raise serializers.ValidationError("This reset link has already been used.")
+            if reset.expires_at < timezone.now():
+                raise serializers.ValidationError("This reset link has expired.")
+
+            user = User.objects.filter(email=reset.email).first()
+            user.set_password(self.validated_data["new_password"])
+            user.save()
+
+            reset.is_used = True
+            reset.save()
 
         return user
-    
+
 # Used by an already-authenticated user to set a new password (e.g. to
 # satisfy must_change_password). Unlike ResetPasswordSerializer, there is
 # no token here — request.user is already known, so this instead requires

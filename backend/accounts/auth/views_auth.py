@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 import time
 import redis
 from django.core.cache import caches
@@ -110,6 +111,22 @@ class ChangePasswordView(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.apply_new_password()
+
+        # Thu hồi mọi session: blacklist toàn bộ refresh token của user này
+        # (cùng model OutstandingToken/BlacklistedToken của simplejwt, dùng
+        # cho "logout everywhere"), cộng thêm access token hiện tại — access
+        # token không tự mất hiệu lực chỉ vì refresh token bị blacklist.
+        for outstanding in OutstandingToken.objects.filter(user=request.user):
+            BlacklistedToken.objects.get_or_create(token=outstanding)
+
+        token = request.auth
+        jti = token["jti"]
+        ttl = token["exp"] - int(time.time())
+        if ttl > 0:
+            try:
+                blacklist_cache.set(f"blacklist:{jti}", "1", timeout=ttl)
+            except redis.exceptions.RedisError:
+                pass  # best-effort — đổi mật khẩu vẫn đã thành công, không rollback vì lỗi Redis
 
         log_audit_event(
             actor=request.user,
