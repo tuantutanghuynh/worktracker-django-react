@@ -32,17 +32,24 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    # Not a CustomUser field — EmployeeProfile.department is what actually
+    # holds this, so it's declared explicitly and popped off before the
+    # CustomUser is built.
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(), required=False, allow_null=True, write_only=True
+    )
 
     class Meta:
         model = CustomUser
-        fields = ['email', 'password', 'role', 'is_active']
+        fields = ['email', 'password', 'role', 'is_active', 'department']
 
     def create(self, validated_data):
         password = validated_data.pop('password')
+        department = validated_data.pop('department', None)
         user = CustomUser(**validated_data)
         user.set_password(password)
         user.save()
-        EmployeeProfile.objects.create(user=user)
+        EmployeeProfile.objects.create(user=user, full_name=user.email, department=department)
         return user
 
 

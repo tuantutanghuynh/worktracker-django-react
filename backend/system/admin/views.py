@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Q
 from django.utils import timezone
 from django.core.cache import cache
 
@@ -7,14 +7,13 @@ DASHBOARD_CACHE_KEY = 'admin:dashboard'
 DASHBOARD_CACHE_TTL = 30  # seconds — dashboard data cũ tối đa 30 giây
 
 from rest_framework import viewsets, filters
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from accounts.models import CustomUser
+from accounts.models import CustomUser, Department
 from accounts.permissions import HasPermission
 from projects.models import Client, Job
-from tasks.models import Task
-from timesheets.models import LogWork
 from ..models import AuditLog
 from .serializers import AuditLogSerializer
 from django.http import HttpResponse
@@ -36,6 +35,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         if actor:
             queryset = queryset.filter(user_id=actor)
 
+        if actor_role := self.request.query_params.get('actor_role'):
+            queryset = queryset.filter(user__role__code=actor_role)
+
         action = self.request.query_params.get('action')
         if action:
             queryset = queryset.filter(action=action)
@@ -56,11 +58,30 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(record_id=record_id)
 
         if keyword := self.request.query_params.get('keyword'):
+            # 'create' phải khớp cả dòng action=CREATE, không chỉ tìm chữ
+            # "create" nằm lẫn đâu đó trong nội dung old/new_values.
             queryset = queryset.filter(
-                Q(old_values__icontains=keyword) | Q(new_values__icontains=keyword)
+                Q(old_values__icontains=keyword)
+                | Q(new_values__icontains=keyword)
+                | Q(action__icontains=keyword)
+                | Q(table_name__icontains=keyword)
             )
 
         return queryset
+
+    # Powers the Action/Table filter dropdowns on the frontend with the
+    # values actually present in the table, instead of a hardcoded list
+    # that would drift as new action types get added across the app.
+    @action(detail=False, methods=["get"], url_path="filters")
+    def filter_options(self, request):
+        return Response({
+            'actions': list(
+                AuditLog.objects.order_by('action').values_list('action', flat=True).distinct()
+            ),
+            'tables': list(
+                AuditLog.objects.order_by('table_name').values_list('table_name', flat=True).distinct()
+            ),
+        })
 
 
 class DashboardView(APIView):
@@ -77,17 +98,14 @@ class DashboardView(APIView):
 
         active_clients = Client.objects.filter(is_active=True).count()
         running_jobs   = Job.objects.filter(status='ACTIVE').count()
-        total_users    = CustomUser.objects.filter(is_active=True).count()
+        total_users    = CustomUser.objects.count()
+        active_accounts = CustomUser.objects.filter(is_active=True).count()
+        locked_accounts = CustomUser.objects.filter(is_active=False).count()
+        departments_without_manager = Department.objects.filter(manager__isnull=True).count()
         overdue_jobs   = Job.objects.filter(
             deadline__lt=today,
             status__in=['PLANNING', 'ACTIVE', 'ON_HOLD'],
         ).count()
-
-        total_hours = (
-            LogWork.objects
-            .filter(review_status='APPROVED')
-            .aggregate(total=Sum('hours_spent'))['total'] or 0
-        )
 
         jobs_by_status = {
             s: Job.objects.filter(status=s).count()
@@ -101,30 +119,36 @@ class DashboardView(APIView):
             'total':    Client.objects.count(),
         }
 
-        task_status = {
-            s: Task.objects.filter(status=s).count()
-            for s in ['TODO', 'IN_PROGRESS', 'REVIEWING', 'COMPLETED', 'CANCELLED']
-        }
-
+        # IAM/security activity — table_name kept explicit alongside action
+        # so this stays correct even if the same action name is ever reused
+        # against a different table_name elsewhere.
         audit_today = AuditLog.objects.filter(created_at__date=today)
         audit_summary_today = {
-            'account_created':   audit_today.filter(action='CREATE', table_name='users').count(),
-            'account_locked':    audit_today.filter(action='LOCK_ACCOUNT').count(),
-            'role_changed':      audit_today.filter(action='ASSIGN_ROLE').count(),
-            'deadline_changed':  audit_today.filter(action='UPDATE', table_name='jobs').count(),
-            'timesheet_locked':  audit_today.filter(action='LOCK_TIMESHEET').count(),
+            'account_created':  audit_today.filter(action='CREATE', table_name='users').count(),
+            'account_locked':   audit_today.filter(action='LOCK_ACCOUNT', table_name='users').count(),
+            'role_changed':     audit_today.filter(action='ROLE_CHANGED', table_name='users').count(),
+            'password_reset':   audit_today.filter(action='RESET_PASSWORD', table_name='users').count(),
         }
 
+        # Quick-glance feed of the most recent sensitive IAM actions — mirrors
+        # the severity now set on ROLE_CHANGED/LOCK_ACCOUNT/UNLOCK_ACCOUNT/
+        # RESET_PASSWORD in accounts/admin/views.py.
+        recent_security_events = AuditLog.objects.filter(
+            severity__in=[AuditLog.Severity.CRITICAL, AuditLog.Severity.WARNING]
+        ).order_by('-created_at')[:5]
+
         data = {
-            'active_clients':      active_clients,
-            'running_jobs':        running_jobs,
-            'total_work_hours':    total_hours,
-            'total_users':         total_users,
-            'overdue_jobs':        overdue_jobs,
-            'jobs_by_status':      jobs_by_status,
-            'clients_overview':    clients_overview,
-            'task_status':         task_status,
-            'audit_summary_today': audit_summary_today,
+            'active_clients':               active_clients,
+            'running_jobs':                 running_jobs,
+            'total_users':                  total_users,
+            'active_accounts':              active_accounts,
+            'locked_accounts':              locked_accounts,
+            'departments_without_manager':  departments_without_manager,
+            'overdue_jobs':                 overdue_jobs,
+            'jobs_by_status':               jobs_by_status,
+            'clients_overview':             clients_overview,
+            'audit_summary_today':          audit_summary_today,
+            'recent_security_events':       AuditLogSerializer(recent_security_events, many=True).data,
         }
         cache.set(DASHBOARD_CACHE_KEY, data, timeout=DASHBOARD_CACHE_TTL)
         return Response(data)

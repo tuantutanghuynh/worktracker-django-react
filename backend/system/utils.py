@@ -9,11 +9,13 @@
 # └─────────────────────────────────────────────────────────────────────┘
 from system.models import AuditLog
 
-def log_audit_event(actor, action, table_name, record_id, old_values=None, new_values=None, request=None):
+# severity thêm dưới dạng keyword argument optional (mặc định None -> NORMAL)
+# để không phá vỡ các nhánh khác đang gọi log_audit_event() theo signature cũ.
+def log_audit_event(actor, action, table_name, record_id, old_values=None, new_values=None, request=None, severity=None):
     ip_address = None
     if request is not None:
         ip_address = request.META.get('REMOTE_ADDR')
-        
+
     AuditLog.objects.create(
         user=actor,
         action=action,
@@ -22,4 +24,5 @@ def log_audit_event(actor, action, table_name, record_id, old_values=None, new_v
         old_values=old_values,
         new_values=new_values,
         ip_address=ip_address,
+        severity=severity or AuditLog.Severity.NORMAL,
     )

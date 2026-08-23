@@ -96,7 +96,7 @@ export function DepartmentsPage() {
       toast.success('Department deleted.');
       setDeleteTarget(null);
     },
-    onError: () => toast.error('Delete failed.'),
+    onError: (err) => toast.error(err.response?.data?.detail || 'Delete failed.'),
   });
 
   function onSubmit(data) {

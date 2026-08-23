@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import { createUser, listRoles } from '../../api/users';
+import { listDepartments } from '../../api/departments';
 
 // Same password-strength rules as ChangePasswordPage/ResetPasswordPage —
 // the backend's UserCreateSerializer.password has no strength validation
@@ -19,6 +20,7 @@ const createUserSchema = z.object({
     .regex(/[0-9]/, 'Must contain a number')
     .regex(/[^A-Za-z0-9]/, 'Must contain a special symbol'),
   role: z.string().min(1, 'Role is required'),
+  department: z.string().optional(),
 });
 
 // Admin page to create a new user with a default password. The backend
@@ -27,6 +29,12 @@ const createUserSchema = z.object({
 export function CreateUserPage() {
   const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: listRoles });
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+
+  const { data: departments = [] } = useQuery({ queryKey: ['departments', {}], queryFn: () => listDepartments() });
+  const departmentOptions = [
+    { value: '', label: 'No Department' },
+    ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+  ];
 
   const {
     register,
@@ -40,13 +48,13 @@ export function CreateUserPage() {
     mutationFn: (payload) => createUser(payload),
     onSuccess: () => {
       toast.success('User created. They must change this password on first login.');
-      reset({ email: '', password: '', role: '' });
+      reset({ email: '', password: '', role: '', department: '' });
     },
     onError: (err) => {
       const data = err.response?.data;
       const msg =
-        data?.email?.[0] || data?.password?.[0] || data?.role?.[0] || data?.detail ||
-        'Failed to create user.';
+        data?.email?.[0] || data?.password?.[0] || data?.role?.[0] || data?.department?.[0] ||
+        data?.detail || 'Failed to create user.';
       toast.error(msg);
     },
   });
@@ -56,6 +64,7 @@ export function CreateUserPage() {
       email: data.email,
       password: data.password,
       role: Number(data.role),
+      department: data.department ? Number(data.department) : null,
     });
   }
 
@@ -95,6 +104,20 @@ export function CreateUserPage() {
               value={field.value}
               onChange={field.onChange}
               error={errors.role?.message}
+            />
+          )}
+        />
+
+        <Controller
+          name="department"
+          control={control}
+          render={({ field }) => (
+            <SelectDropdown
+              label="Department (optional)"
+              options={departmentOptions}
+              value={field.value}
+              onChange={field.onChange}
+              error={errors.department?.message}
             />
           )}
         />

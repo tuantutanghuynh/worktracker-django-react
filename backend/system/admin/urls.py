@@ -6,8 +6,10 @@ router = DefaultRouter()
 
 # ── AUDIT LOGS ────────────────────────────────────────────────────────────────
 # GET /api/admin/audit-logs/        → Danh sách audit log, chỉ đọc (quyền: audit:view)
-#     Filter params: ?actor=, ?action=, ?table_name=, ?date_from=, ?date_to=, ?record_id=, ?keyword=
+#     Filter params: ?actor=, ?actor_role=, ?action=, ?table_name=, ?date_from=, ?date_to=, ?record_id=, ?keyword=
 # GET /api/admin/audit-logs/{id}/   → Chi tiết 1 audit log
+# GET /api/admin/audit-logs/filters/ → { actions: [...], tables: [...] } — giá trị action/table_name
+#     thực tế đang có trong bảng, dùng để đổ vào 2 dropdown filter phía frontend
 router.register('audit-logs', AuditLogViewSet, basename='auditlog')
 
 urlpatterns = router.urls + [

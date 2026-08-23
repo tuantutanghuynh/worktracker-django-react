@@ -18,8 +18,10 @@ import {
   lockUser,
   unlockUser,
   resetUserPassword,
+  assignUserDepartment,
   listRoles,
 } from '../../api/users';
+import { listDepartments } from '../../api/departments';
 
 const editUserSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -67,6 +69,13 @@ export function SearchUserPage() {
   const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: listRoles });
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
 
+  const { data: departments = [] } = useQuery({ queryKey: ['departments', {}], queryFn: () => listDepartments() });
+  const departmentNameById = Object.fromEntries(departments.map((d) => [d.id, d.name]));
+  const departmentOptions = [
+    { value: '', label: 'No Department' },
+    ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+  ];
+
   const {
     register,
     handleSubmit,
@@ -112,6 +121,22 @@ export function SearchUserPage() {
       toast.success(selectedUser.is_active ? 'Account locked.' : 'Account unlocked.');
     },
     onError: () => toast.error('Failed to change account status.'),
+  });
+
+  // department=null clears the assignment — same endpoint handles both
+  // "assign to X" and "remove from department" (assign-department action
+  // on UserViewSet just writes whatever it's given to profile.department).
+  const departmentMutation = useMutation({
+    mutationFn: (departmentId) => assignUserDepartment(selectedUser.id, departmentId),
+    onSuccess: (_data, departmentId) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setSelectedUser((prev) => ({
+        ...prev,
+        profile: { ...prev.profile, department: departmentId },
+      }));
+      toast.success(departmentId ? 'Department assigned.' : 'Removed from department.');
+    },
+    onError: () => toast.error('Failed to update department.'),
   });
 
   const resetPasswordMutation = useMutation({
@@ -178,27 +203,33 @@ export function SearchUserPage() {
             <tr>
               <SortableHeader label="Email" sortKey="email" ordering={ordering} onSort={toggleSort} />
               <SortableHeader label="Role" sortKey="role__code" ordering={ordering} onSort={toggleSort} />
+              <SortableHeader
+                label="Department"
+                sortKey="profile__department__name"
+                ordering={ordering}
+                onSort={toggleSort}
+              />
               <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {viewMode === 'search' && !debouncedSearch && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
                   Type an email to search.
                 </td>
               </tr>
             )}
             {(viewMode === 'all' || debouncedSearch) && isLoading && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {(viewMode === 'all' || debouncedSearch) && !isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
                   No users found.
                 </td>
               </tr>
@@ -207,6 +238,9 @@ export function SearchUserPage() {
               <tr key={u.id} onClick={() => openUser(u)} className="cursor-pointer hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-slate-900">{u.email}</td>
                 <td className="px-4 py-3">{u.role_detail && <RoleBadge role={u.role_detail.code} />}</td>
+                <td className="px-4 py-3 text-slate-500">
+                  {u.profile?.department ? departmentNameById[u.profile.department] || `#${u.profile.department}` : '—'}
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={
@@ -255,6 +289,19 @@ export function SearchUserPage() {
                 {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
+
+            <div className="space-y-1.5 border-t border-slate-100 pt-3">
+              <SelectDropdown
+                label="Department"
+                options={departmentOptions}
+                value={selectedUser.profile?.department ? String(selectedUser.profile.department) : ''}
+                onChange={(val) => departmentMutation.mutate(val ? Number(val) : null)}
+                disabled={departmentMutation.isPending}
+              />
+              <p className="text-[11px] text-slate-400">
+                Select &quot;No Department&quot; to remove this user from their current department.
+              </p>
+            </div>
 
             <div className="flex items-center justify-between border-t border-slate-100 pt-3">
               <span className="text-xs text-slate-500">

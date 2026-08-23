@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
-  Search,
   Bell,
   User,
   Settings,
@@ -9,6 +8,7 @@ import {
   ChevronRight,
   Menu,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
@@ -35,18 +35,20 @@ const ROUTE_LABELS = {
 // chung cho cả 3 role nên không được hardcode 1 path cố định, phải tra
 // theo role hiện tại.
 const ROLE_LINKS = {
-  ADMIN: { home: '/admin', notifications: '/admin/audit-logs', profile: '/admin', settings: '/admin' },
+  ADMIN: { home: '/admin', notifications: '/admin/notifications', profile: '/admin', settings: '/admin' },
   EMPLOYEE: { home: '/employee/dashboard', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
 };
 
-export default function Header({ onOpenSearchModal }) {
+export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toggleSidebar } = useUIStore();
-  const { unreadCount } = useNotificationStore();
+  const { notifications, unreadCount, markAsRead } = useNotificationStore();
 
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const notifDropdownRef = useRef(null);
 
   // Lấy thông tin user đăng nhập từ useAuth (Zustand Store)
   const { user, logout } = useAuth();
@@ -58,6 +60,9 @@ export default function Header({ onOpenSearchModal }) {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setUserDropdownOpen(false);
+      }
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target)) {
+        setNotifDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -118,34 +123,62 @@ export default function Header({ onOpenSearchModal }) {
         </nav>
       </div>
 
-      {/* Bên Phải: Nút Tìm kiếm, Chuông thông báo & Avatar User */}
+      {/* Bên Phải: Chuông thông báo & Avatar User */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Nút Mở Modal Tìm kiếm Quick Search (Ctrl + K) */}
-        <button
-          onClick={onOpenSearchModal}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 transition-colors"
-          title="Quick Search (Ctrl + K)"
-        >
-          <Search className="w-4 h-4 text-slate-400" />
-          <span className="hidden md:inline font-medium">Search jobs, tasks...</span>
-          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 rounded shadow-2xs">
-            Ctrl K
-          </kbd>
-        </button>
+        {/* Biểu tượng Chuông Thông báo + Dropdown xem nhanh */}
+        <div className="relative" ref={notifDropdownRef}>
+          <button
+            onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
+            className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            title="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
 
-        {/* Biểu tượng Chuông Thông báo */}
-        <Link
-          to={roleLinks.notifications}
-          className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          title="Notifications Center"
-        >
-          <Bell className="w-5 h-5" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
+          {notifDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 z-50 animate-slide-in-top overflow-hidden">
+              <div className="px-3.5 py-2.5 border-b border-slate-100">
+                <span className="text-sm font-bold text-slate-900">Notifications</span>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                {notifications.length === 0 && (
+                  <p className="px-3.5 py-6 text-center text-xs text-slate-400">No notifications yet.</p>
+                )}
+                {notifications.slice(0, 8).map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => !n.is_read && markAsRead(n.id)}
+                    className={`w-full text-left px-3.5 py-2.5 hover:bg-slate-50 transition-colors ${n.is_read ? '' : 'bg-blue-50/60'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-800 truncate">{n.title}</span>
+                      {!n.is_read && <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0" />}
+                    </div>
+                    {n.content && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.content}</p>}
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              <Link
+                to={roleLinks.notifications}
+                onClick={() => setNotifDropdownOpen(false)}
+                className="block px-3.5 py-2.5 text-center text-xs font-semibold text-blue-600 hover:bg-slate-50 border-t border-slate-100"
+              >
+                View all notifications
+              </Link>
+            </div>
           )}
-        </Link>
+        </div>
 
         {/* Avatar Người dùng & Dropdown Menu */}
         <div className="relative" ref={dropdownRef}>

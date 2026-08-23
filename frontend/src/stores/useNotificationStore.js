@@ -1,9 +1,11 @@
 import { create } from 'zustand';
+import { listNotifications, markNotificationRead } from '../api/notifications';
 
-// Fetch/markAsRead/markAllAsRead tạm bỏ khỏi file này — bản gốc gọi qua
-// services/manager/managerReportService (đã xoá cùng đợt dọn Manager-only
-// code). Sẽ nối lại đúng endpoint thật lúc merge với nhánh Long. Phần
-// WebSocket/local state dưới đây không phụ thuộc Manager nên giữ nguyên.
+// fetch/markAsRead go through /api/notifications/ (system.employee.urls_employee)
+// — that route is shared by every authenticated role, not Manager-only, so it's
+// safe to use here. There is no bulk "mark all read" endpoint on that shared
+// route (only Manager's separate viewset has one), so markAllAsRead below just
+// fires markNotificationRead for each currently-unread item.
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
   unreadCount: 0,
@@ -13,6 +15,54 @@ export const useNotificationStore = create((set, get) => ({
   error: null,
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  /**
+   * Fetch the caller's own notifications from the API.
+   */
+  fetchNotifications: async (params = {}) => {
+    set({ loading: true, error: null });
+    try {
+      const list = await listNotifications(params);
+      const unread = list.filter((n) => !n.is_read).length;
+      set({ notifications: list, unreadCount: unread, loading: false });
+    } catch (err) {
+      set({ loading: false, error: err.message || 'Failed to fetch notifications' });
+    }
+  },
+
+  /**
+   * Mark a single notification as read.
+   */
+  markAsRead: async (id) => {
+    try {
+      await markNotificationRead(id);
+      set((state) => {
+        const updated = state.notifications.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+        const unread = updated.filter((n) => !n.is_read).length;
+        return { notifications: updated, unreadCount: unread };
+      });
+    } catch (err) {
+      console.error('Failed to mark notification read', err);
+    }
+  },
+
+  /**
+   * Mark every currently-unread notification as read (no bulk endpoint
+   * on the shared route, so this fires one request per unread item).
+   */
+  markAllAsRead: async () => {
+    const unreadIds = get().notifications.filter((n) => !n.is_read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    try {
+      await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
+      set((state) => ({
+        notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
+        unreadCount: 0,
+      }));
+    } catch (err) {
+      console.error('Failed to mark all notifications read', err);
+    }
+  },
 
   /**
    * Handle incoming real-time WS notification object

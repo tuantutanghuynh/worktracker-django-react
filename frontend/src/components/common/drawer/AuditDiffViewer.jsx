@@ -64,6 +64,11 @@ export default function AuditDiffViewer({
   });
 
   const filteredItems = diffItems.filter(item => showUnchanged || item.status !== 'unchanged');
+  // Many audit actions (CREATE, DELETE, LOCK/UNLOCK, RESET_PASSWORD...) only
+  // ever log a partial new_values (or none at all), so no field can ever be
+  // "unchanged" for them — the toggle would have zero visible effect. Only
+  // show it when there's actually something for it to hide.
+  const hasUnchangedFields = diffItems.some((item) => item.status === 'unchanged');
 
   const severityConfigs = {
     CRITICAL: { label: 'Critical', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', icon: AlertTriangle },
@@ -124,16 +129,18 @@ export default function AuditDiffViewer({
           </div>
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowUnchanged(!showUnchanged)}
-            className="text-xs px-3.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-semibold transition-colors cursor-pointer"
-          >
-            {showUnchanged ? 'Hide Unchanged Fields' : 'Show All Fields'}
-          </button>
-        </div>
+        {/* View Mode Toggle — only rendered when there's an unchanged field to hide/show */}
+        {hasUnchangedFields && (
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowUnchanged(!showUnchanged)}
+              className="text-xs px-3.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-semibold transition-colors cursor-pointer"
+            >
+              {showUnchanged ? 'Hide Unchanged Fields' : 'Show All Fields'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 4 Metadata Cards */}

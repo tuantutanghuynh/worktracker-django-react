@@ -2,9 +2,10 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, RestrictedError
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from system.security.permissions_manager import ROLE_PERMISSION_CACHE_KEY
@@ -26,16 +27,17 @@ from .serializers import (
 )
 from ..permissions import HasPermission
 from ..authentication import set_user_active_status, require_reauth
+from system.models import AuditLog
 from system.utils import log_audit_event
 
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['email', 'role__code', 'is_active']
+    ordering_fields = ['email', 'role__code', 'is_active', 'profile__department__name']
 
     def get_queryset(self):
-        qs = CustomUser.objects.select_related("role", "profile").all()
+        qs = CustomUser.objects.select_related("role", "profile", "profile__department").all()
         params = self.request.query_params
         if email := params.get("email"):
             qs = qs.filter(email__icontains=email)
@@ -82,6 +84,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 old_values=old_values,
                 new_values=UserSerializer(instance).data,
                 request=self.request,
+                severity=AuditLog.Severity.WARNING,
             )
 
     @transaction.atomic
@@ -115,6 +118,7 @@ class UserViewSet(viewsets.ModelViewSet):
             old_values=old_values,
             new_values={"is_active": False},
             request=request,
+            severity=AuditLog.Severity.WARNING,
         )
         return Response({"detail": "User locked."}, status=status.HTTP_200_OK)
 
@@ -132,6 +136,7 @@ class UserViewSet(viewsets.ModelViewSet):
             record_id=user.id,
             new_values={"is_active": True},
             request=request,
+            severity=AuditLog.Severity.WARNING,
         )
         return Response({"detail": "User unlocked."}, status=status.HTTP_200_OK)
 
@@ -161,6 +166,7 @@ class UserViewSet(viewsets.ModelViewSet):
             record_id=user.id,
             new_values={"must_change_password": True},
             request=request,
+            severity=AuditLog.Severity.WARNING,
         )
         return Response({"detail": "Password reset."}, status=status.HTTP_200_OK)
 
@@ -317,7 +323,19 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         old_values = DepartmentSerializer(instance).data
         record_id = instance.id
-        instance.delete()
+
+        # EmployeeProfile.department is on_delete=RESTRICT (accounts/models.py)
+        # — deleting a department that still has employees assigned raises
+        # this instead of silently cascading, so surface it as a proper 400
+        # instead of letting it bubble up as an unhandled 500.
+        try:
+            instance.delete()
+        except RestrictedError:
+            employee_count = instance.employees.count()
+            raise ValidationError(
+                {"detail": f"Cannot delete department: {employee_count} employee(s) are still assigned to it."}
+            )
+
         log_audit_event(
             actor=self.request.user,
             action="DELETE",
