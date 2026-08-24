@@ -37,8 +37,8 @@ class JobSerializer(serializers.ModelSerializer):
         return value
         
     def validate(self,data):
-        start_date = data.get('start_date')
-        deadline = data.get('deadline')
+        start_date = data.get('start_date', self.instance.start_date if self.instance else None)
+        deadline = data.get('deadline', self.instance.deadline if self.instance else None)
         if start_date and deadline and deadline < start_date:
             raise serializers.ValidationError({'deadline':'Deadline must be on or after start date.'})
         return data

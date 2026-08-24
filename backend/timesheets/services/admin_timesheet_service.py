@@ -1,0 +1,248 @@
+from calendar import monthrange
+from datetime import date
+from decimal import Decimal
+
+from django.conf import settings
+from django.db.models import Count, Q, Sum, Max
+
+from accounts.models import CustomUser
+from timesheets.models import DailyUserTimesheet, LogWork, TimeLock
+from timesheets.services.manager_employee_utilization_service import calculate_working_days
+
+
+def decimal_to_float(value):
+    if value is None:
+        return 0.0
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def get_month_range(month, year):
+    start_date = date(year, month, 1)
+    last_day = monthrange(year, month)[1]
+    end_date = date(year, month, last_day)
+    return start_date, end_date
+
+
+def _daily_working_hours():
+    return getattr(settings, "DAILY_WORKING_HOURS", 8)
+
+
+def get_admin_timesheet_summary(month, year):
+    """
+    5 KPI card cho trang Timesheet Control.
+
+    "Violation" và "Missing" ở đây dùng đúng cấu hình/ràng buộc THẬT đã có
+    sẵn trong hệ thống (settings.DAILY_WORKING_HOURS, DailyUserTimesheet,
+    calculate_working_days) — không bịa ra ngưỡng 10h/12h như bản mockup
+    tĩnh, vì hệ thống chưa từng định nghĩa 2 mốc đó ở bất kỳ đâu.
+    """
+    start_date, end_date = get_month_range(month, year)
+    daily_hours = _daily_working_hours()
+
+    employee_ids = list(
+        CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True).values_list("id", flat=True)
+    )
+
+    logs_in_range = LogWork.objects.filter(
+        user_id__in=employee_ids,
+        work_date__range=(start_date, end_date),
+    ).exclude(review_status=LogWork.ReviewStatus.VOIDED)
+
+    total_logged_hours = decimal_to_float(logs_in_range.aggregate(total=Sum("hours_spent"))["total"])
+    active_employees = logs_in_range.values("user_id").distinct().count()
+
+    # Historical total across the whole system, not just the selected
+    # month — matches "Immutable records" wording in the design (a
+    # locked period stays locked regardless of which month you're viewing).
+    locked_periods_count = TimeLock.objects.filter(is_locked=True).count()
+
+    timesheet_violations = DailyUserTimesheet.objects.filter(
+        user_id__in=employee_ids,
+        work_date__range=(start_date, end_date),
+        total_hours__gt=daily_hours,
+    ).count()
+
+    working_days = calculate_working_days(start_date, end_date)
+    logged_days_by_user = dict(
+        DailyUserTimesheet.objects.filter(
+            user_id__in=employee_ids,
+            work_date__range=(start_date, end_date),
+            total_hours__gt=0,
+        )
+        .values("user_id")
+        .annotate(days=Count("id"))
+        .values_list("user_id", "days")
+    )
+    missing_timesheets = sum(
+        max(working_days - logged_days_by_user.get(uid, 0), 0) for uid in employee_ids
+    )
+
+    return {
+        "total_logged_hours": round(total_logged_hours, 1),
+        "active_employees": active_employees,
+        "locked_periods_count": locked_periods_count,
+        "timesheet_violations": timesheet_violations,
+        "missing_timesheets": missing_timesheets,
+    }
+
+
+def get_admin_employee_timesheet_list(month, year, department_id=None, manager_id=None, search=None):
+    """
+    Bảng "theo từng nhân viên" — HIGH-PERFORMANCE SUMMARY: gom nhóm bằng
+    GROUP BY thay vì N+1 query, cùng kỹ thuật với
+    manager_employee_utilization_service.get_team_workload_summary(), chỉ
+    khác là KHÔNG scope theo 1 Manager mà lấy toàn công ty.
+
+    Trả về list dict đã sort theo tên — pagination do view xử lý (dữ liệu
+    đã tổng hợp trên RAM, không còn là 1 QuerySet đơn giản để DRF tự
+    paginate ở tầng SQL).
+    """
+    start_date, end_date = get_month_range(month, year)
+    daily_hours = _daily_working_hours()
+    working_days = calculate_working_days(start_date, end_date)
+    target_hours = working_days * daily_hours
+
+    employees = CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True).select_related(
+        "profile", "profile__department"
+    )
+    if department_id:
+        employees = employees.filter(profile__department_id=department_id)
+    if manager_id:
+        employees = employees.filter(profile__department__manager_id=manager_id)
+    if search:
+        employees = employees.filter(Q(email__icontains=search) | Q(profile__full_name__icontains=search))
+    employees = employees.order_by("profile__full_name", "email")
+
+    employee_ids = list(employees.values_list("id", flat=True))
+
+    hours_by_user = dict(
+        LogWork.objects.filter(user_id__in=employee_ids, work_date__range=(start_date, end_date))
+        .exclude(review_status=LogWork.ReviewStatus.VOIDED)
+        .values("user_id")
+        .annotate(total=Sum("hours_spent"))
+        .values_list("user_id", "total")
+    )
+    last_entry_by_user = dict(
+        LogWork.objects.filter(user_id__in=employee_ids, work_date__range=(start_date, end_date))
+        .exclude(review_status=LogWork.ReviewStatus.VOIDED)
+        .values("user_id")
+        .annotate(last_date=Max("work_date"))
+        .values_list("user_id", "last_date")
+    )
+    violations_by_user = dict(
+        DailyUserTimesheet.objects.filter(
+            user_id__in=employee_ids, work_date__range=(start_date, end_date), total_hours__gt=daily_hours
+        )
+        .values("user_id")
+        .annotate(count=Count("id"))
+        .values_list("user_id", "count")
+    )
+    logged_days_by_user = dict(
+        DailyUserTimesheet.objects.filter(
+            user_id__in=employee_ids, work_date__range=(start_date, end_date), total_hours__gt=0
+        )
+        .values("user_id")
+        .annotate(days=Count("id"))
+        .values_list("user_id", "days")
+    )
+
+    results = []
+    for emp in employees:
+        logged_hours = decimal_to_float(hours_by_user.get(emp.id))
+        violations = violations_by_user.get(emp.id, 0)
+        missing_days = max(working_days - logged_days_by_user.get(emp.id, 0), 0)
+
+        if violations > 0:
+            status = "OVER_LIMIT"
+        elif missing_days > 0:
+            status = "MISSING"
+        elif target_hours > 0 and logged_hours < target_hours * 0.8:
+            status = "WARNING"
+        else:
+            status = "NORMAL"
+
+        profile = getattr(emp, "profile", None)
+        results.append(
+            {
+                "user_id": emp.id,
+                "full_name": profile.full_name if (profile and profile.full_name) else emp.email,
+                "email": emp.email,
+                "department_id": profile.department_id if profile else None,
+                "department_name": profile.department.name if (profile and profile.department) else None,
+                "month_hours": round(logged_hours, 2),
+                "target_hours": float(target_hours),
+                "avg_per_day": round(logged_hours / working_days, 2) if working_days else 0.0,
+                "violations": violations,
+                "missing_days": missing_days,
+                "status": status,
+                "last_entry": last_entry_by_user.get(emp.id),
+            }
+        )
+
+    return results
+
+
+def get_admin_employee_timesheet_detail(user_id, month, year):
+    """
+    Compliance drill-down cho 1 nhân viên — panel bên phải.
+    """
+    start_date, end_date = get_month_range(month, year)
+    daily_hours = _daily_working_hours()
+    working_days = calculate_working_days(start_date, end_date)
+
+    logs_in_range = LogWork.objects.filter(user_id=user_id, work_date__range=(start_date, end_date)).exclude(
+        review_status=LogWork.ReviewStatus.VOIDED
+    )
+    month_hours = decimal_to_float(logs_in_range.aggregate(total=Sum("hours_spent"))["total"])
+    edited_records = logs_in_range.filter(adjusted_by__isnull=False).count()
+
+    daily_over_limit = DailyUserTimesheet.objects.filter(
+        user_id=user_id, work_date__range=(start_date, end_date), total_hours__gt=daily_hours
+    ).count()
+    daily_hard_limit = DailyUserTimesheet.objects.filter(
+        user_id=user_id, work_date__range=(start_date, end_date), total_hours__gte=24
+    ).count()
+
+    logged_days = DailyUserTimesheet.objects.filter(
+        user_id=user_id, work_date__range=(start_date, end_date), total_hours__gt=0
+    ).count()
+    missing_days = max(working_days - logged_days, 0)
+
+    # GLOBAL lock covering this period, if any — this page's Lock/Unlock
+    # button only ever creates/toggles GLOBAL scope locks (see
+    # timelock_manager_service.lock_global_period), so that's the only
+    # scope relevant to this Admin-facing panel.
+    global_lock = TimeLock.objects.filter(
+        lock_scope=TimeLock.LockScope.GLOBAL, job__isnull=True, lock_month=month, lock_year=year
+    ).select_related("locked_by", "unlocked_by").first()
+
+    locked_period_edits = 0
+    if global_lock and global_lock.locked_at:
+        locked_period_edits = logs_in_range.filter(updated_at__gt=global_lock.locked_at).count()
+
+    return {
+        "month_hours": round(month_hours, 2),
+        "working_days": working_days,
+        "avg_per_day": round(month_hours / working_days, 2) if working_days else 0.0,
+        "edited_records": edited_records,
+        "daily_over_limit_count": daily_over_limit,
+        "daily_hard_limit_count": daily_hard_limit,
+        "locked_period_edits": locked_period_edits,
+        "missing_days": missing_days,
+        "global_lock": (
+            {
+                "id": global_lock.id,
+                "is_locked": global_lock.is_locked,
+                "locked_by": global_lock.locked_by.email if global_lock.locked_by else None,
+                "locked_at": global_lock.locked_at,
+                "lock_reason": global_lock.lock_reason,
+                "unlocked_by": global_lock.unlocked_by.email if global_lock.unlocked_by else None,
+                "unlocked_at": global_lock.unlocked_at,
+                "unlock_reason": global_lock.unlock_reason,
+            }
+            if global_lock
+            else None
+        ),
+    }

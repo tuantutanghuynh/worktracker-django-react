@@ -78,6 +78,31 @@ class IsManagerRole(BasePermission):
         return get_user_role_code(user) == MANAGER_ROLE_CODE
 
 
+class IsAdminRole(BasePermission):
+    """
+    Chỉ cho phép user có role ADMIN.
+
+    Dùng cho toàn bộ ViewSet trong accounts/admin/, projects/admin/,
+    system/admin/ — các endpoint này trả về dữ liệu KHÔNG scoped (toàn bộ
+    Client/Job/User/AuditLog trong hệ thống), khác với endpoint riêng của
+    Manager/Employee vốn tự scope theo user. Chỉ check permission code
+    (HasPermission) là không đủ vì một permission code như "client:view"
+    hay "report:export" có thể được seed cho cả MANAGER — nếu thiếu check
+    role ở đây, một tài khoản Manager có permission đó sẽ gọi thẳng được
+    endpoint admin/ và thấy dữ liệu toàn hệ thống, bỏ qua scoping riêng.
+    """
+
+    message = "Only Admin role is allowed."
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+
+        if not user or not user.is_authenticated:
+            return False
+
+        return get_user_role_code(user) == ADMIN_ROLE_CODE
+
+
 class IsAdminOrManagerRole(BasePermission):
     """
     Dùng cho một số endpoint cho phép cả Admin và Manager.

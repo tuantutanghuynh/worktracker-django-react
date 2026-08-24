@@ -4,7 +4,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 
 from tasks.models import Task
 from timesheets.models import TimeLock
-from system.models import Notification
+from system.models import AuditLog, Notification
 from system.services.audit_manager_service import snapshot, log_action
 from system.services.notification_manager_service import notify
 
@@ -216,6 +216,192 @@ def lock_job_period(
         )
 
     return time_lock
+
+
+def get_global_timesheet_recipient_ids(exclude_user=None):
+    """
+    Người nhận notification khi Admin GLOBAL lock/unlock — mọi ADMIN và
+    MANAGER đang active, vì đây là hành động ảnh hưởng công việc của toàn
+    bộ Manager (Employee sẽ chỉ thấy khi họ cố log/sửa giờ và bị chặn).
+    """
+    from accounts.models import CustomUser
+
+    recipient_ids = list(
+        CustomUser.objects.filter(
+            role__code__in=["ADMIN", "MANAGER"], is_active=True
+        ).values_list("id", flat=True)
+    )
+    exclude_id = exclude_user.id if exclude_user else None
+    return [uid for uid in recipient_ids if uid != exclude_id]
+
+
+def lock_global_period(
+    *,
+    user,
+    lock_month,
+    lock_year,
+    reason=None,
+    request=None,
+):
+    """
+    Admin lock kỳ công toàn hệ thống.
+
+    Scope:
+        TimeLock.LockScope.GLOBAL (job=None) — chặn edit LogWork ở MỌI
+        job trong tháng/năm đó, không chỉ 1 job như lock_job_period().
+    """
+    validate_month_year(lock_month, lock_year)
+
+    clean_reason = reason.strip() if isinstance(reason, str) else reason
+
+    with transaction.atomic():
+        existing_lock = (
+            TimeLock.objects.select_for_update()
+            .filter(
+                lock_scope=TimeLock.LockScope.GLOBAL,
+                job__isnull=True,
+                lock_month=lock_month,
+                lock_year=lock_year,
+            )
+            .first()
+        )
+
+        if existing_lock and existing_lock.is_locked:
+            raise TimeLockError("GLOBAL_PERIOD_ALREADY_LOCKED")
+
+        if existing_lock:
+            old_values = snapshot(existing_lock)
+
+            existing_lock.is_locked = True
+            existing_lock.locked_by = user
+            existing_lock.locked_at = timezone.now()
+            existing_lock.lock_reason = clean_reason
+            existing_lock.unlocked_by = None
+            existing_lock.unlocked_at = None
+            existing_lock.unlock_reason = None
+            existing_lock.save(
+                update_fields=[
+                    "is_locked",
+                    "locked_by",
+                    "locked_at",
+                    "lock_reason",
+                    "unlocked_by",
+                    "unlocked_at",
+                    "unlock_reason",
+                    "updated_at",
+                ]
+            )
+
+            time_lock = existing_lock
+        else:
+            time_lock = TimeLock.objects.create(
+                lock_month=lock_month,
+                lock_year=lock_year,
+                lock_scope=TimeLock.LockScope.GLOBAL,
+                job=None,
+                is_locked=True,
+                locked_by=user,
+                locked_at=timezone.now(),
+                lock_reason=clean_reason,
+            )
+
+            old_values = None
+
+        log_action(
+            user=user,
+            action="LOCK_TIMESHEET",
+            table_name="time_locks",
+            record_id=time_lock.id,
+            old_values=old_values,
+            new_values=snapshot(time_lock),
+            request=request,
+            severity=AuditLog.Severity.WARNING,
+            summary=f"Locked timesheet period {lock_month}/{lock_year} company-wide (GLOBAL).",
+        )
+
+        notify(
+            recipients=get_global_timesheet_recipient_ids(exclude_user=user),
+            event_type=Notification.EventType.TIMESHEET_LOCK,
+            title="Timesheet period locked (company-wide)",
+            content=f"{user.email} locked the timesheet period {lock_month}/{lock_year} for the whole system.",
+            related_url="/admin/timesheets",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
+        )
+
+    return time_lock
+
+
+def unlock_global_period(
+    *,
+    user,
+    time_lock,
+    reason,
+    request=None,
+):
+    """
+    Admin unlock kỳ công toàn hệ thống.
+
+    Chỉ unlock được GLOBAL lock — dùng unlock_job_period() cho JOB lock.
+    """
+    if not reason or not str(reason).strip():
+        raise ValidationError(
+            {
+                "reason": "Unlock reason is required."
+            }
+        )
+
+    clean_reason = str(reason).strip()
+
+    with transaction.atomic():
+        locked_time_lock = (
+            TimeLock.objects.select_for_update(of=("self",))
+            .get(pk=time_lock.pk)
+        )
+
+        if locked_time_lock.lock_scope != TimeLock.LockScope.GLOBAL:
+            raise PermissionDenied("ADMIN_CAN_ONLY_UNLOCK_GLOBAL_SCOPE")
+
+        if not locked_time_lock.is_locked:
+            raise TimeLockError("GLOBAL_PERIOD_ALREADY_UNLOCKED")
+
+        old_values = snapshot(locked_time_lock)
+
+        locked_time_lock.is_locked = False
+        locked_time_lock.unlocked_by = user
+        locked_time_lock.unlocked_at = timezone.now()
+        locked_time_lock.unlock_reason = clean_reason
+        locked_time_lock.save(
+            update_fields=[
+                "is_locked",
+                "unlocked_by",
+                "unlocked_at",
+                "unlock_reason",
+                "updated_at",
+            ]
+        )
+
+        log_action(
+            user=user,
+            action="UNLOCK_TIMESHEET",
+            table_name="time_locks",
+            record_id=locked_time_lock.id,
+            old_values=old_values,
+            new_values=snapshot(locked_time_lock),
+            request=request,
+            severity=AuditLog.Severity.WARNING,
+            summary=f"Unlocked timesheet period {locked_time_lock.lock_month}/{locked_time_lock.lock_year} company-wide (GLOBAL).",
+        )
+
+        notify(
+            recipients=get_global_timesheet_recipient_ids(exclude_user=user),
+            event_type=Notification.EventType.TIMESHEET_UNLOCK,
+            title="Timesheet period unlocked (company-wide)",
+            content=f"{user.email} unlocked the timesheet period {locked_time_lock.lock_month}/{locked_time_lock.lock_year} for the whole system.",
+            related_url="/admin/timesheets",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
+        )
+
+    return locked_time_lock
 
 
 def unlock_job_period(
