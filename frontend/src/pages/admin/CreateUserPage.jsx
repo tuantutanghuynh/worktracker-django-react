@@ -28,7 +28,7 @@ export function CreateUserPage() {
   const { data: roles = [] } = useAdminRoles();
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
 
-  // page_size=500 opts this dropdown out of the default 15/page pagination —
+  // page_size=500 opts this dropdown out of the default 10/page pagination —
   // it needs every department, not just the first page of them.
   const { data: departmentsPage } = useAdminDepartments({ page_size: 500 });
   const departments = departmentsPage?.results || [];

@@ -27,7 +27,7 @@ import { useAdminClients } from '../../hooks/queries/admin/useAdminClients';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
 import { getErrorMessage } from '../../utils/errorMessages';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
 const PRIORITY_OPTIONS = [
   { value: 'LOW', label: 'Low' },
@@ -35,18 +35,39 @@ const PRIORITY_OPTIONS = [
   { value: 'HIGH', label: 'High' },
 ];
 
-// Mirrors JobSerializer.ALLOWED_TRANSITIONS on the backend — not enforced
-// again here, the backend is the source of truth and returns a clear 400
-// if an invalid transition is picked. Keeping every status selectable (not
-// just the currently-allowed ones) avoids this list drifting out of sync
-// with the backend's transition table.
-const STATUS_OPTIONS = [
-  { value: 'PLANNING', label: 'Planning' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'ON_HOLD', label: 'On Hold' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
+const STATUS_LABELS = {
+  PLANNING: 'Planning',
+  ACTIVE: 'Active',
+  ON_HOLD: 'On Hold',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+};
+
+const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
+
+// Bản sao ĐÚNG NGUYÊN của JobSerializer.ALLOWED_TRANSITIONS (backend, xem
+// projects/admin/serializers.py). Dropdown Status chỉ liệt kê trạng thái
+// thật sự chuyển được từ trạng thái hiện tại — trước đây hiện đủ 5 nên
+// người dùng chọn xong bấm Save mới bị backend trả lỗi 400.
+// Backend vẫn là nơi quyết định cuối cùng, đây chỉ là lớp chặn sớm cho UX.
+const ALLOWED_TRANSITIONS = {
+  PLANNING: ['ACTIVE', 'CANCELLED'],
+  ACTIVE: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
+  ON_HOLD: ['ACTIVE', 'CANCELLED'],
+  COMPLETED: ['ACTIVE'],
+  CANCELLED: ['ACTIVE'],
+};
+
+// Trạng thái hiện tại luôn nằm trong danh sách (giữ nguyên = hợp lệ), kèm
+// các trạng thái chuyển được. Trả về [] nếu chưa biết trạng thái hiện tại.
+function getStatusOptionsFor(currentStatus) {
+  if (!currentStatus) return STATUS_OPTIONS;
+  const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
+  return [currentStatus, ...allowed].map((value) => ({
+    value,
+    label: value === currentStatus ? `${STATUS_LABELS[value]} (current)` : STATUS_LABELS[value],
+  }));
+}
 
 // Mirrors JobSerializer.validate() on the backend (deadline must be on or
 // after start_date, not strictly after — matching that exactly instead of
@@ -120,7 +141,7 @@ export function JobsPage() {
   // instead of falling back to a bare numeric id (the job itself is never
   // hidden by the backend when its client goes inactive, only the name
   // lookup broke when this only fetched active clients).
-  // page_size=500 opts out of the default 15/page — needs every client.
+  // page_size=500 opts out of the default 10/page — needs every client.
   const { data: allClientsPage } = useAdminClients({ page_size: 500 });
   const allClients = allClientsPage?.results || [];
   const clientNameById = Object.fromEntries(allClients.map((c) => [c.id, c.client_name]));
@@ -294,84 +315,90 @@ export function JobsPage() {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
+      {/* table-fixed + width theo % nên bảng luôn vừa khung, không kéo ngang. */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Job" sortKey="job_name" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Client" sortKey="client__client_name" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Priority" sortKey="priority" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Deadline" sortKey="deadline" ordering={ordering} onSort={toggleSort} />
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+              <SortableHeader label="Job" sortKey="job_name" ordering={ordering} onSort={toggleSort} className="w-[21%]" />
+              <SortableHeader label="Client" sortKey="client__client_name" ordering={ordering} onSort={toggleSort} className="w-[17%]" />
+              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} className="w-[19%]" />
+              <SortableHeader label="Priority" sortKey="priority" ordering={ordering} onSort={toggleSort} className="w-[11%]" />
+              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} className="w-[12%]" />
+              <SortableHeader label="Deadline" sortKey="deadline" ordering={ordering} onSort={toggleSort} className="w-[11%]" />
+              <th className="w-[9%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && jobs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                   {search ? 'No jobs match your search.' : 'No jobs yet.'}
                 </td>
               </tr>
             )}
             {jobs.map((job) => (
               <tr key={job.id}>
-                <td className="px-4 py-3 font-medium text-slate-900">
+                <td className="px-3 py-2 font-medium text-slate-900 truncate">
                   <button
                     type="button"
                     onClick={() => openEditJob(job)}
-                    className="hover:text-blue-600 hover:underline cursor-pointer text-left"
+                    className="hover:text-blue-600 hover:underline cursor-pointer text-left truncate max-w-full"
+                    title={job.job_name}
                   >
                     {job.job_name}
                   </button>
                 </td>
-                <td className="px-4 py-3 text-slate-500">
-                  {clientNameById[job.client] || job.client}
+                {/* Nhãn "Inactive" rút thành chấm tròn + tooltip — chuỗi dài
+                    trước đây đẩy tên client/manager ra khỏi ô. */}
+                <td className="px-3 py-2 text-slate-500 truncate" title={clientNameById[job.client] || job.client}>
                   {clientActiveById[job.client] === false && (
-                    <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
-                      Inactive Client
-                    </span>
+                    <span
+                      className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-slate-400 align-middle"
+                      title="Inactive client"
+                    />
                   )}
+                  {clientNameById[job.client] || job.client}
                 </td>
-                <td className="px-4 py-3 text-slate-500">
-                  {managerEmailById[job.manager] || job.manager}
+                <td className="px-3 py-2 text-slate-500 truncate" title={managerEmailById[job.manager] || job.manager}>
                   {managers.find((m) => m.id === job.manager)?.is_active === false && (
-                    <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
-                      Inactive Manager
-                    </span>
+                    <span
+                      className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-500 align-middle"
+                      title="Inactive manager"
+                    />
                   )}
+                  {managerEmailById[job.manager] || job.manager}
                 </td>
-                <td className="px-4 py-3">
-                  <PriorityBadge priority={job.priority} />
+                <td className="px-3 py-2 truncate">
+                  <PriorityBadge priority={job.priority} className="text-[10px] px-2" />
                 </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={job.status} />
+                <td className="px-3 py-2 truncate">
+                  <StatusBadge status={job.status} className="text-[10px] px-2" />
                 </td>
-                <td className="px-4 py-3 text-slate-500">{job.deadline}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="px-3 py-2 text-slate-500 truncate">{job.deadline}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
                       onClick={() => openEditJob(job)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
                     {job.status !== 'CANCELLED' && (
                       <button
                         type="button"
                         onClick={() => setCancelTarget(job)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                       >
-                        <Ban className="h-4 w-4" />
+                        <Ban className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
@@ -505,7 +532,7 @@ export function JobsPage() {
               render={({ field }) => (
                 <SelectDropdown
                   label="Status"
-                  options={STATUS_OPTIONS}
+                  options={getStatusOptionsFor(editTarget?.status)}
                   value={field.value}
                   onChange={field.onChange}
                   error={editErrors.status?.message}
@@ -513,6 +540,16 @@ export function JobsPage() {
               )}
             />
           </div>
+
+          {editTarget && (ALLOWED_TRANSITIONS[editTarget.status] || []).length < 4 && (
+            <p className="-mt-1 text-[11px] text-slate-500">
+              From <span className="font-semibold">{STATUS_LABELS[editTarget.status]}</span> you can only move to:{' '}
+              <span className="font-semibold">
+                {(ALLOWED_TRANSITIONS[editTarget.status] || []).map((s) => STATUS_LABELS[s]).join(', ') || 'no other status'}
+              </span>
+              .
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <InputField

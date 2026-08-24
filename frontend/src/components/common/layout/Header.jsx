@@ -26,7 +26,7 @@ const ROUTE_LABELS = {
   departments: 'Departments',
   users: 'Users',
   create: 'Create',
-  search: 'Search',
+  search: 'User List',
   'audit-logs': 'Audit Logs',
   notifications: 'Notification Center',
   profile: 'My Profile',
