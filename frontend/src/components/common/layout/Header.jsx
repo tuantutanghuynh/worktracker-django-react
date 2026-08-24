@@ -34,6 +34,15 @@ const ROUTE_LABELS = {
   'my-performance': 'My Performance',
 };
 
+// Mỗi role có Home/Notifications/Profile/Settings khác nhau — Header dùng
+// chung cho cả 3 role nên không được hardcode 1 path cố định, phải tra
+// theo role hiện tại.
+const ROLE_LINKS = {
+  ADMIN: { home: '/admin', notifications: '/admin/notifications', profile: '/admin/profile', settings: '/admin/profile' },
+  MANAGER: { home: '/manager/dashboard', notifications: '/manager/notifications', profile: '/manager/profile', settings: '/manager/settings' },
+  EMPLOYEE: { home: '/', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
+};
+
 export default function Header({ onOpenSearchModal }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -47,12 +56,12 @@ export default function Header({ onOpenSearchModal }) {
   const { user, logout } = useAuth();
   const displayUser = user || { email: 'manager@worktracker.vn', role: 'MANAGER' };
 
-  // Header dùng chung Manager + Employee — 2 role có route gốc khác nhau,
-  // không được hardcode theo Manager cho cả 2.
+  // Header dùng chung Manager + Employee + Admin — 3 role có route gốc
+  // khác nhau, không được hardcode theo 1 role cho tất cả.
   const userRole = (displayUser.role || '').toUpperCase();
-  const isManagerOrAdmin = userRole === 'MANAGER' || userRole === 'ADMIN';
-  const homePath = isManagerOrAdmin ? '/manager/dashboard' : '/';
-  const notificationsPath = isManagerOrAdmin ? '/manager/notifications' : '/employee/notifications';
+  const roleLinks = ROLE_LINKS[userRole] || ROLE_LINKS.EMPLOYEE;
+  const homePath = roleLinks.home;
+  const notificationsPath = roleLinks.notifications;
 
   // Đóng Dropdown khi click ra ngoài vùng menu
   useEffect(() => {
@@ -176,7 +185,7 @@ export default function Header({ onOpenSearchModal }) {
 
               <div className="py-1">
                 <Link
-                  to="/manager/profile"
+                  to={roleLinks.profile}
                   onClick={() => setUserDropdownOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                 >
@@ -185,7 +194,7 @@ export default function Header({ onOpenSearchModal }) {
                 </Link>
 
                 <Link
-                  to="/manager/settings"
+                  to={roleLinks.settings}
                   onClick={() => setUserDropdownOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                 >

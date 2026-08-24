@@ -31,10 +31,12 @@ def admin_role(db):
     with transaction.atomic():
         role = Role.objects.create(code='ADMIN', name='Admin')
         permission_codes = [
-            'client:create', 'client:update', 'client:delete', 'client:view',
-            'job:create', 'job:update', 'job:delete', 'job:view',
-            'user:create', 'user:update', 'user:view',
-            'role:manage', 'audit:view', 'report:export',
+            'client:create', 'client:update', 'client:delete', 'client:view', 'client:export',
+            'job:create', 'job:update', 'job:delete', 'job:view', 'job:export',
+            'user:create', 'user:update', 'user:view', 'user:lock',
+            'department:view', 'department:create', 'department:update', 'department:delete',
+            'timesheet:view', 'timesheet:export',
+            'role:manage', 'audit:view', 'audit:export', 'report:export',
         ]
         for code in permission_codes:
             perm, _ = Permission.objects.get_or_create(code=code, defaults={'name': code})

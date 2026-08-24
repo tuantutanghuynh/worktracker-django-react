@@ -148,9 +148,12 @@ export function AppRouter() {
                                 <Route path="audit-logs" element={<AdminAuditLogsPage />} />
                                 <Route path="timesheets" element={<AdminTimesheetControlPage />} />
                                 <Route path="notifications" element={<AdminNotificationsPage />} />
+                                {/* Self-service profile is role-agnostic on the backend
+                                    (accounts/employee/views_employee.py uses IsAuthenticated),
+                                    so Admin reuses Tú's page as-is instead of a duplicate. */}
+                                <Route path="profile" element={<ProfilePage />} />
                             </Route>
                         </Route>
-                    </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

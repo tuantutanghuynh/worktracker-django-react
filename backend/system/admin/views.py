@@ -11,16 +11,23 @@ from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from django.db.models import Sum
+
 from accounts.models import CustomUser, Department
 from accounts.permissions import HasPermission
 from system.security.permissions_manager import IsAdminRole
 from system.pagination import AdminPageNumberPagination
 from projects.models import Client, Job
+from timesheets.models import LogWork
 from ..models import AuditLog
 from .serializers import AuditLogSerializer
 from django.http import HttpResponse
 from ..utils import log_audit_event
-import openpyxl
+from ..services.admin_report_export_service import (
+    build_xlsx_response,
+    AUDIT_LOG_HEADERS,
+    audit_log_rows,
+)
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
@@ -29,7 +36,30 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['created_at', 'user__email', 'action', 'table_name', 'record_id', 'severity']
 
     def get_permissions(self):
+        if self.action == 'export':
+            return [IsAdminRole(), HasPermission('audit:export')]
         return [IsAdminRole(), HasPermission('audit:view')]
+
+    # GET /api/admin/audit-logs/export/ — same filter params as the list
+    # endpoint (?actor=, ?actor_role=, ?action=, ?table_name=, ?severity=,
+    # ?date_from=, ?date_to=, ?record_id=, ?keyword=, ?ordering=).
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        log_audit_event(
+            actor=request.user,
+            action='EXPORT',
+            table_name='audit_logs',
+            record_id=0,
+            new_values={'filters': dict(request.query_params), 'row_count': queryset.count()},
+            request=request,
+        )
+        return build_xlsx_response(
+            sheet_title='Audit Logs',
+            headers=AUDIT_LOG_HEADERS,
+            rows=audit_log_rows(queryset),
+            filename='worktracker_audit_logs.xlsx',
+        )
 
     def get_queryset(self):
         queryset = AuditLog.objects.all().order_by('-created_at')
@@ -147,6 +177,13 @@ class DashboardView(APIView):
             'total':    Client.objects.count(),
         }
 
+        # All-time, company-wide — mirrors Manager Dashboard's "Team Work
+        # Hours" / "Pending Timesheets" cards, scoped globally instead of to
+        # one manager's team.
+        logged_work = LogWork.objects.exclude(review_status=LogWork.ReviewStatus.VOIDED)
+        total_work_hours = float(logged_work.aggregate(total=Sum('hours_spent'))['total'] or 0)
+        pending_timesheets = logged_work.filter(review_status=LogWork.ReviewStatus.PENDING).count()
+
         # IAM/security activity — table_name kept explicit alongside action
         # so this stays correct even if the same action name is ever reused
         # against a different table_name elsewhere.
@@ -161,9 +198,9 @@ class DashboardView(APIView):
         # Quick-glance feed of the most recent sensitive IAM actions — mirrors
         # the severity now set on ROLE_CHANGED/LOCK_ACCOUNT/UNLOCK_ACCOUNT/
         # RESET_PASSWORD in accounts/admin/views.py.
-        recent_security_events = AuditLog.objects.filter(
+        recent_security_events = AuditLog.objects.select_related('user').filter(
             severity__in=[AuditLog.Severity.CRITICAL, AuditLog.Severity.WARNING]
-        ).order_by('-created_at')[:5]
+        ).order_by('-created_at')[:9]
 
         data = {
             'active_clients':               active_clients,
@@ -171,6 +208,9 @@ class DashboardView(APIView):
             'active_accounts':              active_accounts,
             'locked_accounts':              locked_accounts,
             'departments_without_manager':  departments_without_manager,
+            'overdue_jobs':                 overdue_jobs,
+            'total_work_hours':             round(total_work_hours, 1),
+            'pending_timesheets':           pending_timesheets,
             'jobs_by_status':               jobs_by_status,
             'clients_overview':             clients_overview,
             'audit_summary_today':          audit_summary_today,
@@ -227,48 +267,10 @@ class DataQualityAlertsView(APIView):
         return Response(alerts)
 
 
-class AdminReportView(APIView):
-    def get_permissions(self):
-        return [IsAdminRole(), HasPermission('report:export')]
-
-    @transaction.atomic
-    def get(self, request):
-        # Filter theo khoảng thời gian tạo job (optional)
-        date_from = request.query_params.get('date_from')
-        date_to   = request.query_params.get('date_to')
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = 'Clients'
-        ws.append(['ID', 'Name', 'Tax Code', 'Contact Email', 'Is Active'])
-        for c in Client.objects.all():
-            ws.append([c.id, c.client_name, c.tax_code, c.contact_email, c.is_active])
-
-        ws2 = wb.create_sheet('Jobs')
-        ws2.append(['ID', 'Name', 'Client', 'Status', 'Priority', 'Start Date', 'Deadline'])
-        job_qs = Job.objects.select_related('client').all()
-        if date_from:
-            job_qs = job_qs.filter(created_at__date__gte=date_from)
-        if date_to:
-            job_qs = job_qs.filter(created_at__date__lte=date_to)
-        for j in job_qs:
-            ws2.append([j.id, j.job_name, j.client.client_name, j.status, j.priority,
-                        str(j.start_date), str(j.deadline)])
-        #tạo sheet user
-        ws3 = wb.create_sheet('Users')
-        ws3.append(['ID', 'Email', 'Role', 'Is Active'])
-        for u in CustomUser.objects.select_related('role').all():
-            ws3.append([u.id, u.email, u.role.code if u.role else '', u.is_active])            
-        log_audit_event(
-            actor=request.user,
-            action='EXPORT',
-            table_name='reports',
-            record_id=0,
-            request=request,
-        )
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="worktracker_report.xlsx"'
-        wb.save(response)
-        return response
+# The old single /api/admin/reports/ endpoint (one 4-sheet dump of
+# everything, ignoring whatever the user had filtered on screen) was
+# replaced by a per-resource `export` action on each admin ViewSet — see
+# ClientViewSet.export, JobViewSet.export, UserViewSet.export,
+# DepartmentViewSet.export, AuditLogViewSet.export and
+# AdminTimesheetExportView. Each reuses that list endpoint's own filters so
+# the file always matches the table the user is looking at.

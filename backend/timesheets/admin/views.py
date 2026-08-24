@@ -18,6 +18,12 @@ from timesheets.services.admin_timesheet_service import (
     get_admin_employee_timesheet_list,
     get_admin_employee_timesheet_detail,
 )
+from system.utils import log_audit_event
+from system.services.admin_report_export_service import (
+    build_xlsx_response,
+    TIMESHEET_HEADERS,
+    timesheet_rows,
+)
 from .serializers import GlobalTimeLockSerializer
 
 
@@ -104,47 +110,78 @@ ORDERING_FIELDS = {
 }
 
 
+def get_filtered_employee_rows(params):
+    """
+    Shared by the list endpoint and the export so both always apply the same
+    filters and ordering. Data is computed (not a plain QuerySet DRF can
+    filter/sort at the SQL level), so ?ordering= — the same DRF-style
+    "field"/"-field" string every other admin/ list page sends via
+    useOrdering() — is applied with Python's sort() instead of OrderingFilter.
+    """
+    month, year = _parse_month_year(params)
+
+    results = get_admin_employee_timesheet_list(
+        month,
+        year,
+        department_id=params.get("department") or None,
+        manager_id=params.get("manager") or None,
+        search=params.get("search") or None,
+    )
+
+    if status_filter := params.get("status"):
+        results = [r for r in results if r["status"] == status_filter]
+
+    if ordering := params.get("ordering"):
+        field = ordering.lstrip("-")
+        if field in ORDERING_FIELDS:
+            results.sort(
+                key=lambda r: (r[field] is None, r[field]),
+                reverse=ordering.startswith("-"),
+            )
+
+    return results
+
+
 class AdminTimesheetEmployeeListView(APIView):
     """
     GET /api/admin/timesheets/employees/?month=&year=&department=&manager=&search=&status=&ordering=&page=
-
-    Data is computed (not a plain QuerySet DRF can paginate/sort at the SQL
-    level), so both sorting and pagination are applied manually here —
-    ?ordering= uses the same DRF-style string ("field" / "-field") every
-    other admin/ list page already sends via useOrdering(), just applied
-    with Python's sort() instead of OrderingFilter.
     """
 
     def get_permissions(self):
         return [IsAdminRole(), HasPermission("timesheet:view")]
 
     def get(self, request):
-        month, year = _parse_month_year(request.query_params)
-        params = request.query_params
-
-        results = get_admin_employee_timesheet_list(
-            month,
-            year,
-            department_id=params.get("department") or None,
-            manager_id=params.get("manager") or None,
-            search=params.get("search") or None,
-        )
-
-        status_filter = params.get("status")
-        if status_filter:
-            results = [r for r in results if r["status"] == status_filter]
-
-        if ordering := params.get("ordering"):
-            field = ordering.lstrip("-")
-            if field in ORDERING_FIELDS:
-                results.sort(
-                    key=lambda r: (r[field] is None, r[field]),
-                    reverse=ordering.startswith("-"),
-                )
-
+        results = get_filtered_employee_rows(request.query_params)
         paginator = AdminPageNumberPagination()
         page = paginator.paginate_queryset(results, request, view=self)
         return paginator.get_paginated_response(page)
+
+
+class AdminTimesheetExportView(APIView):
+    """
+    GET /api/admin/timesheets/employees/export/ — same filter/ordering params
+    as the employees list, so the file matches what's on screen.
+    """
+
+    def get_permissions(self):
+        return [IsAdminRole(), HasPermission("timesheet:export")]
+
+    def get(self, request):
+        results = get_filtered_employee_rows(request.query_params)
+        log_audit_event(
+            actor=request.user,
+            action="EXPORT",
+            table_name="timesheets",
+            record_id=0,
+            new_values={"filters": dict(request.query_params), "row_count": len(results)},
+            request=request,
+        )
+        return build_xlsx_response(
+            sheet_title="Timesheet Summary",
+            headers=TIMESHEET_HEADERS,
+            rows=timesheet_rows(results),
+            filename="worktracker_timesheets.xlsx",
+        )
 
 
 class AdminTimesheetEmployeeDetailView(APIView):

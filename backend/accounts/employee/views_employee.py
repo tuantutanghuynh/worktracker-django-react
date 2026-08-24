@@ -24,17 +24,30 @@ from accounts.employee.serializers_employee import (
 
 
 
+# EmployeeProfile is only auto-created for accounts made through
+# /api/auth/users/ — Admin/Manager accounts provisioned by createsuperuser
+# or seed scripts have no profile row, and this endpoint is open to every
+# authenticated role, so create it on first access instead of 404ing them
+# out of their own profile page. full_name is NOT NULL, hence the default
+# (same fallback used by UserViewSet.assign_department).
+def get_or_create_own_profile(user):
+    profile, _ = EmployeeProfile.objects.get_or_create(
+        user=user, defaults={"full_name": user.email}
+    )
+    return profile
+
+
 # Lets any logged-in user view and edit their own profile (full_name, phone_number only).
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        profile = get_object_or_404(EmployeeProfile, user=request.user)
+        profile = get_or_create_own_profile(request.user)
         serializer = EmployeeProfileSerializer(profile)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request):
-        profile = get_object_or_404(EmployeeProfile, user=request.user)
+        profile = get_or_create_own_profile(request.user)
         serializer = EmployeeProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -47,7 +60,7 @@ class AvatarUploadView(APIView):
     parser_classes = [MultiPartParser]
 
     def patch(self, request):
-        profile = get_object_or_404(EmployeeProfile, user=request.user)
+        profile = get_or_create_own_profile(request.user)
 
         serializer = AvatarUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -9,8 +9,8 @@ import {
   unlockUser,
   resetUserPassword,
   assignUserDepartment,
+  listRoles,
 } from '../../../api/admin/users';
-import { listRoles } from '../../../api/admin/roles';
 import { getErrorMessage } from '../../../utils/errorMessages';
 
 /**

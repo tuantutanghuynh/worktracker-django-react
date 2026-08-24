@@ -1,4 +1,3 @@
-from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
@@ -8,14 +7,12 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from system.security.permissions_manager import ROLE_PERMISSION_CACHE_KEY, IsAdminRole
+from system.security.permissions_manager import IsAdminRole
 from system.pagination import AdminPageNumberPagination
 
 from ..models import (
     CustomUser,
     Role,
-    Permission,
-    RolePermission,
     Department,
     EmployeeProfile,
 )
@@ -23,7 +20,6 @@ from .serializers import (
     UserSerializer,
     UserCreateSerializer,
     RoleSerializer,
-    PermissionSerializer,
     DepartmentSerializer,
 )
 from ..permissions import HasPermission
@@ -31,6 +27,13 @@ from ..authentication import set_user_active_status, require_reauth
 from system.models import AuditLog, Notification
 from system.utils import log_audit_event
 from system.services.notification_manager_service import notify
+from system.services.admin_report_export_service import (
+    build_xlsx_response,
+    USER_HEADERS,
+    user_rows,
+    DEPARTMENT_HEADERS,
+    department_rows,
+)
 
 
 # Sends an in-app notification to every OTHER admin when one admin performs
@@ -78,6 +81,8 @@ class UserViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission("user:view")]
         if self.action == "reset_password":
             return [IsAdminRole(), HasPermission("user:reset_password")]
+        if self.action == "export":
+            return [IsAdminRole(), HasPermission("user:view")]
         # destroy is grouped with lock/unlock, not update: perform_destroy
         # below doesn't actually delete the row, it deactivates the account
         # exactly like lock() does (see its docstring comment).
@@ -89,6 +94,26 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return UserCreateSerializer
         return UserSerializer
+
+    # GET /api/auth/users/export/ — same ?email=/?role=/?department=/
+    # ?is_active=/?ordering= params as the list endpoint.
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        log_audit_event(
+            actor=request.user,
+            action="EXPORT",
+            table_name="users",
+            record_id=0,
+            new_values={"filters": dict(request.query_params), "row_count": queryset.count()},
+            request=request,
+        )
+        return build_xlsx_response(
+            sheet_title="Users",
+            headers=USER_HEADERS,
+            rows=user_rows(queryset),
+            filename="worktracker_users.xlsx",
+        )
 
     # Forces any already-issued token to re-authenticate the moment the
     # role actually changes — without this, a demoted admin's existing
@@ -271,68 +296,12 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response({"detail": "Department assigned."}, status=status.HTTP_200_OK)
 
 
-class RoleViewSet(viewsets.ModelViewSet):
+class RoleViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
 
     def get_permissions(self):
-        return [IsAdminRole(), HasPermission("role:manage")]
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        log_audit_event(
-            actor=self.request.user,
-            action="CREATE",
-            table_name="roles",
-            record_id=instance.id,
-            new_values=RoleSerializer(instance).data,
-            request=self.request,
-        )
-
-    @transaction.atomic
-    def perform_update(self, serializer):
-        old_values = RoleSerializer(self.get_object()).data
-        instance = serializer.save()
-        log_audit_event(
-            actor=self.request.user,
-            action="UPDATE",
-            table_name="roles",
-            record_id=instance.id,
-            old_values=old_values,
-            new_values=RoleSerializer(instance).data,
-            request=self.request,
-        )
-
-    @transaction.atomic
-    @action(detail=True, methods=["post"], url_path="assign-permissions")
-    def assign_permissions(self, request, pk=None):
-        role = self.get_object()
-        permission_ids = request.data.get("permission_ids", [])
-        old_ids = list(role.role_permissions.values_list("permission_id", flat=True))
-        role.role_permissions.all().delete()
-        RolePermission.objects.bulk_create(
-            [RolePermission(role=role, permission_id=pid) for pid in permission_ids]
-        )
-        cache.delete(ROLE_PERMISSION_CACHE_KEY.format(role_id=role.id))
-        log_audit_event(
-            actor=request.user,
-            action="ASSIGN_ROLE",
-            table_name="role_permissions",
-            record_id=role.id,
-            old_values={"permission_ids": old_ids},
-            new_values={"permission_ids": permission_ids},
-            request=request,
-        )
-        return Response({"detail": "Permissions assigned."}, status=status.HTTP_200_OK)
-
-
-class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Permission.objects.all()
-    serializer_class = PermissionSerializer
-
-    def get_permissions(self):
-        return [IsAdminRole(), HasPermission("role:manage")]
+        return [IsAdminRole(), HasPermission("user:view")]
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -357,7 +326,28 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission("department:view")]
         if self.action == "destroy":
             return [IsAdminRole(), HasPermission("department:delete")]
+        if self.action == "export":
+            return [IsAdminRole(), HasPermission("department:view")]
         return [IsAdminRole(), HasPermission("department:update")]
+
+    # GET /api/auth/departments/export/ — same ?search=/?ordering= as list.
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        log_audit_event(
+            actor=request.user,
+            action="EXPORT",
+            table_name="departments",
+            record_id=0,
+            new_values={"filters": dict(request.query_params), "row_count": queryset.count()},
+            request=request,
+        )
+        return build_xlsx_response(
+            sheet_title="Departments",
+            headers=DEPARTMENT_HEADERS,
+            rows=department_rows(queryset),
+            filename="worktracker_departments.xlsx",
+        )
 
     @transaction.atomic
     def perform_create(self, serializer):
