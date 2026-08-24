@@ -1,3 +1,5 @@
+import calendar
+from datetime import date
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
@@ -152,6 +154,17 @@ def lock_job_period(
     """
     assert_job_in_manager_scope(user, job)
     validate_month_year(lock_month, lock_year)
+
+    # ➕ KIỂM TRA CHỐT CHẶN: Chỉ cho phép khóa kỳ công ĐÃ KẾT THÚC (không khóa tháng đang diễn ra / tương lai)
+    _, last_day = calendar.monthrange(int(lock_year), int(lock_month))
+    period_end_date = date(int(lock_year), int(lock_month), last_day)
+    today = timezone.now().date()
+
+    if today <= period_end_date:
+        raise TimeLockError(
+            f"CANNOT_LOCK_ACTIVE_PERIOD: Period {lock_month}/{lock_year} is currently in progress (ends on {period_end_date.strftime('%d/%m/%Y')}). "
+            "You can only lock past completed periods."
+        )
 
     # ➕ KIỂM TRA RÀNG BUỘC CHỐT SỔ: Chặn khóa sổ nếu còn chấm công PENDING chưa duyệt
     from timesheets.models import LogWork

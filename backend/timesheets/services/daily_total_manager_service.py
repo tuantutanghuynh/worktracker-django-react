@@ -6,7 +6,7 @@ from rest_framework.exceptions import APIException
 from timesheets.models import DailyUserTimesheet, LogWork
 
 
-MAX_DAILY_HOURS = Decimal("24.00")
+MAX_DAILY_HOURS = Decimal("8.00")
 
 
 class DailyTotalError(APIException):
@@ -27,15 +27,17 @@ def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     Tính tổng giờ làm của 1 user trong 1 ngày.
 
     Quy ước:
-    - VOIDED không tính vào tổng giờ.
-    - PENDING / APPROVED / REJECTED vẫn tính, vì đó vẫn là log đã nhập,
-      trừ khi Manager void log đó.
+    - VOIDED và REJECTED không tính vào tổng giờ (giải phóng quota để nhân viên log lại task khác).
+    - PENDING / APPROVED được tính vào tổng giờ.
     """
     queryset = LogWork.objects.filter(
         user_id=user_id,
         work_date=work_date,
     ).exclude(
-        review_status=LogWork.ReviewStatus.VOIDED,
+        review_status__in=[
+            LogWork.ReviewStatus.VOIDED,
+            LogWork.ReviewStatus.REJECTED,
+        ],
     )
 
     if exclude_logwork_id:
@@ -48,7 +50,7 @@ def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     return normalize_hours(total)
 
 
-def assert_daily_total_not_exceed_24(
+def assert_daily_total_not_exceed_8(
     *,
     user_id,
     work_date,
@@ -56,12 +58,7 @@ def assert_daily_total_not_exceed_24(
     exclude_logwork_id=None,
 ):
     """
-    Dùng khi tạo/sửa LogWork.
-
-    Ví dụ:
-    - User đã có 20h trong ngày.
-    - Manager sửa 1 log thành 5h.
-    - Tổng mới = 25h => chặn.
+    Dùng khi tạo/sửa LogWork. Đảm bảo tổng giờ trong ngày <= 8.0h.
     """
     current_total = calculate_user_day_total(
         user_id=user_id,
@@ -74,7 +71,7 @@ def assert_daily_total_not_exceed_24(
 
     if final_total > MAX_DAILY_HOURS:
         raise DailyTotalError(
-            f"Daily total hours cannot exceed 24 hours. Current total: {current_total}, new hours: {new_hours}, final total: {final_total}."
+            f"Daily total hours cannot exceed standard 8.0 hours limit. Current total: {current_total}h, new hours: {new_hours}h, final total: {final_total}h."
         )
 
     return final_total

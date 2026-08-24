@@ -246,7 +246,7 @@ class TestManagerLogWork:
             task=self.task_A,
             user=self.employee,
             work_date=datetime.date.today(),
-            hours_spent="8.00",
+            hours_spent="4.00",
             review_status="PENDING",
         )
 
@@ -256,7 +256,7 @@ class TestManagerLogWork:
             task=self.task_B,
             user=self.employee,
             work_date=datetime.date.today(),
-            hours_spent="4.00",
+            hours_spent="2.00",
             review_status="PENDING",
         )
 
@@ -306,14 +306,14 @@ class TestManagerLogWork:
         self.client.force_authenticate(user=self.manager_A)
         url = f"/api/manager/log-works/{self.logwork_A.id}/correct/"
         payload = {
-            "hours_spent": "6.50",
+            "hours_spent": "5.50",
             "description": "Đã điều chỉnh lại giờ làm",
             "adjustment_reason": "Nhập thừa 1.5 giờ"
         }
         response = self.client.post(url, payload, format="json")
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["hours_spent"] == "6.50"
+        assert response.data["hours_spent"] == "5.50"
 
     def test_void_logwork(self):
         """Manager A hủy bỏ (void) LogWork A -> 200 OK, review_status=VOIDED."""

@@ -34,6 +34,7 @@ import {
   useUnlockTimeLock,
 } from '../../hooks/queries/manager/useManagerTimesheets';
 import { useManagerJobs } from '../../hooks/queries/manager/useManagerJobs';
+import managerTimesheetService from '../../services/manager/managerTimesheetService';
 
 function formatDateSafe(dateStr, pattern = 'dd/MM/yyyy HH:mm') {
   if (!dateStr) return 'N/A';
@@ -52,9 +53,33 @@ export default function ManagerTimeLockPage() {
   const serverMonth = today.getMonth() + 1; // 1 - 12
   const serverYear = today.getFullYear(); // e.g. 2026
 
-  // 📅 BỘ CHỌN KỲ CÔNG (PERIOD SELECTOR) - MẶC ĐỊNH LÀ KỲ HIỆN TẠI CỦA SERVER
-  const [activeMonth, setActiveMonth] = useState(serverMonth);
-  const [activeYear, setActiveYear] = useState(serverYear);
+  // 📅 TẠO DANH SÁCH KỲ CÔNG HỢP LỆ (CHỈ GỒM THÁNG HIỆN TẠI VÀ CÁC THÁNG QUÁ KHỨ - KHÔNG CÓ THÁNG TƯƠNG LAI)
+  const periodOptions = useMemo(() => {
+    const options = [];
+    for (let i = 0; i < 12; i++) {
+      let m = serverMonth - i;
+      let y = serverYear;
+      while (m <= 0) {
+        m += 12;
+        y -= 1;
+      }
+      const isCurrent = i === 0;
+      options.push({
+        value: `${y}-${m}`,
+        year: y,
+        month: m,
+        label: `Month ${String(m).padStart(2, '0')} / ${y}${isCurrent ? ' (Current - In Progress)' : ' (Past Closed Period)'}`,
+      });
+    }
+    return options;
+  }, [serverMonth, serverYear]);
+
+  // Mặc định chọn tháng vừa kết thúc (Kỳ công cần chốt sổ tính lương)
+  const defaultPrevMonth = serverMonth === 1 ? 12 : serverMonth - 1;
+  const defaultPrevYear = serverMonth === 1 ? serverYear - 1 : serverYear;
+
+  const [activeMonth, setActiveMonth] = useState(defaultPrevMonth);
+  const [activeYear, setActiveYear] = useState(defaultPrevYear);
 
   // Filters State
   const [selectedStatus, setSelectedStatus] = useState('ALL'); // 'ALL' | 'LOCKED' | 'UNLOCKED'
@@ -71,7 +96,11 @@ export default function ManagerTimeLockPage() {
     isLoading: locksLoading,
     isFetching: locksFetching,
     refetch: refetchLocks,
-  } = useTimeLocks();
+  } = useTimeLocks({
+    lock_month: activeMonth,
+    lock_year: activeYear,
+    page_size: 100,
+  });
 
   const {
     data: jobsResponse,
@@ -203,7 +232,7 @@ export default function ManagerTimeLockPage() {
     );
   };
 
-  // 🔒 XỬ LÝ KHÓA HÀNG LOẠT (BATCH LOCK ALL JOBS)
+  // 🔒 XỬ LÝ KHÓA HÀNG LOẠT (BATCH LOCK ALL JOBS - SINGLE CLEAN TOAST FEEDBACK)
   const handleBatchLockAll = async () => {
     const openJobs = jobRows.filter((r) => !r.is_locked);
     if (openJobs.length === 0) {
@@ -212,11 +241,16 @@ export default function ManagerTimeLockPage() {
     }
 
     setIsBatchLocking(true);
+    const toastId = toast.loading(
+      `Locking ${openJobs.length} project(s) for Month ${String(activeMonth).padStart(2, '0')}/${activeYear}...`
+    );
+
     let successCount = 0;
+    const failedJobs = [];
 
     for (const r of openJobs) {
       try {
-        await createLockMutation.mutateAsync({
+        await managerTimesheetService.createTimeLock({
           job_id: r.job_id,
           lock_month: activeMonth,
           lock_year: activeYear,
@@ -224,15 +258,28 @@ export default function ManagerTimeLockPage() {
         });
         successCount++;
       } catch (err) {
-        console.error('Failed to lock job:', r.job_code, err);
+        failedJobs.push({ job_code: r.job_code, error: err });
       }
     }
 
     setIsBatchLocking(false);
+    toast.dismiss(toastId);
     refetchLocks();
-    toast.success(
-      `Successfully locked ${successCount} project(s) for Month ${String(activeMonth).padStart(2, '0')}/${activeYear}!`
-    );
+
+    // 🎯 PHẢN HỒI KẾT QUẢ TỔNG HỢP DUY NHẤT (1 SINGLE TOAST)
+    if (successCount === openJobs.length) {
+      toast.success(
+        `Successfully locked all ${successCount} project(s) for Month ${String(activeMonth).padStart(2, '0')}/${activeYear}!`
+      );
+    } else if (successCount > 0) {
+      toast.warning(
+        `Locked ${successCount}/${openJobs.length} project(s). ${failedJobs.length} project(s) skipped (e.g. unreviewed work logs).`
+      );
+    } else {
+      toast.error(
+        `Could not lock ${openJobs.length} project(s). Please approve or reject all pending work logs before locking.`
+      );
+    }
   };
 
   // 🔓 XỬ LÝ MỞ KHÓA (UNLOCK VỚI LÝ DO AUDIT)
@@ -308,23 +355,23 @@ export default function ManagerTimeLockPage() {
       header: 'Lock Status',
       accessorKey: 'is_locked',
       cell: (row) => {
-        if (row.lock_type === 'MANUAL_LOCKED') {
+        if (row.lock_type === 'MANUAL_LOCKED' || row.is_locked) {
           return (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
-              <Lock className="w-3 h-3" /> LOCKED (Period Closed)
+              <Lock className="w-3 h-3" /> LOCKED
             </span>
           );
         }
         if (row.lock_type === 'GRACE_UNLOCKED') {
           return (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
-              <Unlock className="w-3 h-3" /> UNLOCKED (Grace Window)
+              <Unlock className="w-3 h-3" /> UNLOCKED
             </span>
           );
         }
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Unlock className="w-3 h-3" /> OPEN (Ready to Lock)
+            <Unlock className="w-3 h-3" /> OPEN
           </span>
         );
       },
@@ -377,26 +424,46 @@ export default function ManagerTimeLockPage() {
                 <Unlock className="w-3.5 h-3.5" />
                 <span>Unlock</span>
               </button>
+            ) : isCurrentPeriod ? (
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-lg text-xs font-semibold cursor-not-allowed"
+                  title="Current month is still active. Timesheet entries are open until the end of the month."
+                >
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>In Progress</span>
+                </span>
+                <button
+                  onClick={() => navigate(`/manager/timesheet?job_id=${row.job_id}&status=PENDING`)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                  title="Review pending timesheets"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Timesheet</span>
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={() => handleDirectLock(row)}
-                disabled={createLockMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
-                title="Lock this period to freeze timesheets"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span>Lock</span>
-              </button>
-            )}
+              <>
+                <button
+                  onClick={() => handleDirectLock(row)}
+                  disabled={createLockMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                  title="Lock this period to freeze timesheets"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Lock</span>
+                </button>
 
-            <button
-              onClick={() => navigate(`/manager/timesheet?job_id=${row.job_id}`)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
-              title="Review timesheets for this project"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-600" />
-              <span>Timesheet</span>
-            </button>
+                <button
+                  onClick={() => navigate(`/manager/timesheet?job_id=${row.job_id}&status=PENDING`)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                  title="Review pending timesheets before locking"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Timesheet</span>
+                </button>
+              </>
+            )}
           </div>
         );
       },
@@ -442,75 +509,67 @@ export default function ManagerTimeLockPage() {
           {/* Nút 1-Click Khóa Toàn Bộ Dự Án Của Manager */}
           <button
             onClick={handleBatchLockAll}
-            disabled={isFetching || kpis.unlockedCount === 0}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-500/20 transition cursor-pointer disabled:opacity-50"
+            disabled={isFetching || kpis.unlockedCount === 0 || isCurrentPeriod}
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-md",
+              isCurrentPeriod
+                ? "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed shadow-none"
+                : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20 cursor-pointer disabled:opacity-50"
+            )}
+            title={
+              isCurrentPeriod
+                ? `Month ${String(activeMonth).padStart(2, '0')} is currently in progress. You can only lock after the month ends.`
+                : "Lock all unlocked projects for this period"
+            }
           >
             <Lock className="w-4 h-4" />
-            <span>{isBatchLocking ? 'Locking All...' : `Lock All My Projects (Month ${String(activeMonth).padStart(2, '0')})`}</span>
+            <span>
+              {isBatchLocking
+                ? 'Locking All...'
+                : isCurrentPeriod
+                ? `In Progress (Cannot Lock Month ${String(activeMonth).padStart(2, '0')})`
+                : `Lock All My Projects (Month ${String(activeMonth).padStart(2, '0')})`}
+            </span>
           </button>
         </div>
       </div>
 
-      {/* 📅 PERIOD SWITCHER BAR (BỘ CHUYỂN KỲ CÔNG LINH HOẠT) */}
+      {/* 📅 PERIOD SWITCHER BAR (BỘ CHỌN KỲ CÔNG DẠNG SELECT DROPDOWN) */}
       <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-bold text-slate-600 uppercase tracking-wider mr-1">
-            Selected Period:
-          </span>
-
-          {[7, 8, 9, 10, 11, 12].map((m) => {
-            const isSelected = activeMonth === m && activeYear === 2026;
-            const isCurrent = serverMonth === m && serverYear === 2026;
-
-            return (
-              <button
-                key={m}
-                onClick={() => {
-                  setActiveMonth(m);
-                  setActiveYear(2026);
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer",
-                  isSelected
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                )}
-              >
-                <span>Month {String(m).padStart(2, "0")} / 2026</span>
-                {isCurrent && (
-                  <span className={cn(
-                    "text-[9px] px-1.5 py-0.2 rounded-full font-extrabold",
-                    isSelected ? "bg-white text-indigo-700" : "bg-blue-100 text-blue-700"
-                  )}>
-                    NOW
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Cảnh báo nếu kỳ đang xem là kỳ quá khứ */}
-        {isPastPeriod && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-800">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Past cutoff period — Auto-locked by system rule.</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200">
+            <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700">Select Timesheet Period:</span>
+            <select
+              value={`${activeYear}-${activeMonth}`}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split('-').map(Number);
+                setActiveYear(y);
+                setActiveMonth(m);
+              }}
+              className="bg-white border border-slate-300 rounded-lg px-3 py-1 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              {periodOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
-      </div>
 
-      {/* ℹ️ TWO-TIER CUTOFF POLICY BANNER */}
-      <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-blue-900">Two-Tier Enterprise Cutoff Policy</p>
-            <p className="text-blue-700 mt-0.5">
-              • <strong>Manager Cutoff:</strong> Default cutoff on Day 28th of every month for timesheet reporting.
-              <span className="mx-2 hidden sm:inline">|</span>
-              • <strong>Admin Grace Window:</strong> Managers can unlock &amp; correct job logs until Day 5th of next month before final corporate freeze.
-            </p>
-          </div>
+          {isCurrentPeriod && (
+            <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span>Active Month: Open for employee timesheet submissions until end of month.</span>
+            </span>
+          )}
+
+          {isPastPeriod && (
+            <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>Past Closed Period: Ready for monthly payroll freeze.</span>
+            </span>
+          )}
         </div>
       </div>
 

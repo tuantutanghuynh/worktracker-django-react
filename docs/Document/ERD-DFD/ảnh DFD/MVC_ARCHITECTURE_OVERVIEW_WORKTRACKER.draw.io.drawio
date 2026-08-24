@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Antigravity">
   <diagram id="MVC_Architecture_WorkTracker" name="MVC Architecture Overview">
-    <mxGraphModel dx="1571" dy="1713" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="850" background="#ffffff" math="0" shadow="0">
+    <mxGraphModel dx="1285" dy="1556" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="850" background="#ffffff" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -38,16 +38,16 @@
         <mxCell id="edge_view_ctrl" edge="1" parent="1" source="box_view" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=Times New Roman;fontSize=15;fontColor=#000000;strokeColor=#000000;strokeWidth=1.5;align=center;verticalAlign=bottom;" target="box_controller" value="2. HTTP Requests &lt;br&gt;(REST API / Bearer JWT) &amp;amp; WebSockets (WSS)">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="790" y="390" />
-              <mxPoint x="790" y="390" />
+              <mxPoint x="390" y="380" />
+              <mxPoint x="390" y="380" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="edge_ctrl_view" edge="1" parent="1" source="box_controller" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=Times New Roman;fontSize=15;fontColor=#000000;strokeColor=#000000;strokeWidth=1.5;align=center;verticalAlign=bottom;" target="box_view" value="5. Return Serialized JSON Responses &amp;amp; Live Events">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="390" y="380" />
-              <mxPoint x="390" y="380" />
+              <mxPoint x="790" y="370" />
+              <mxPoint x="790" y="370" />
             </Array>
           </mxGeometry>
         </mxCell>

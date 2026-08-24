@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   AlertTriangle,
@@ -16,17 +16,22 @@ import {
   Edit,
   ShieldCheck,
   Zap,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import DataTable from '../../components/common/table/DataTable';
+import PaginationBar from '../../components/common/table/PaginationBar';
 import BaseModal from '../../components/common/modal/BaseModal';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import UserAvatar from '../../components/common/avatar/UserAvatar';
 import { cn } from '../../utils/cn';
 
-import { useManagerEmployees, useAssignDepartment } from '../../hooks/queries/manager/useManagerTeam';
+import {
+  useManagerEmployees,
+  useManagerDepartments,
+  useAssignDepartment,
+} from '../../hooks/queries/manager/useManagerTeam';
 
 export default function ManagerTeamPage() {
   // View mode & filters
@@ -34,13 +39,38 @@ export default function ManagerTeamPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL'); // 'ALL' | 'OVERLOADED' | 'BALANCED' | 'AVAILABLE'
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStatusFilter]);
+
   // Modal State
   const [assignModalTarget, setAssignModalTarget] = useState(null);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
 
   // 🚀 TANSTACK REACT QUERY HOOKS
   const { data: employeesResponse, isLoading, isFetching, refetch } = useManagerEmployees();
+  const { data: departmentsData, isLoading: isDeptsLoading } = useManagerDepartments();
   const assignDepartmentMutation = useAssignDepartment();
+
+  // Danh sách phòng ban cho Dropdown
+  const departmentOptions = useMemo(() => {
+    const rawDepts = Array.isArray(departmentsData)
+      ? departmentsData
+      : departmentsData?.results || [];
+
+    return [
+      { value: '', label: '-- No Department (General Staff) --' },
+      ...rawDepts.map((d) => ({
+        value: String(d.id),
+        label: d.name,
+      })),
+    ];
+  }, [departmentsData]);
 
   // Chuẩn hóa danh sách nhân sự
   const employeesList = useMemo(() => {
@@ -49,18 +79,37 @@ export default function ManagerTeamPage() {
       : employeesResponse?.results || [];
 
     return raw.map((emp) => {
-      const activeTasks = emp.active_tasks_count || emp.tasks_count || 0;
-      const weeklyHours = parseFloat(emp.weekly_hours || emp.total_hours_this_week || (activeTasks * 7.5)) || 0;
-      const capacityRate = Math.min(Math.round((weeklyHours / 40) * 100), 160);
+      const departmentName = emp.department?.name || emp.department_name || 'General Staff';
+      const departmentId = emp.department?.id
+        ? String(emp.department.id)
+        : emp.department_id
+          ? String(emp.department_id)
+          : '';
+      const activeTasks =
+        emp.active_tasks_count !== undefined
+          ? emp.active_tasks_count
+          : emp.tasks_count || 0;
+
+      const loggedHours = parseFloat(emp.logged_hours || 0);
+      const capacityHours = parseFloat(emp.capacity_hours || 160.0);
+      const capacityRate =
+        emp.utilization_rate !== undefined && emp.utilization_rate !== null
+          ? Math.round(parseFloat(emp.utilization_rate))
+          : capacityHours > 0
+            ? Math.round((loggedHours / capacityHours) * 100)
+            : 0;
 
       let workloadStatus = 'AVAILABLE';
-      if (capacityRate > 100) workloadStatus = 'OVERLOADED';
-      else if (capacityRate >= 70) workloadStatus = 'BALANCED';
+      if (capacityRate > 100 || emp.workload_status === 'Overloaded') workloadStatus = 'OVERLOADED';
+      else if (capacityRate >= 70 || emp.workload_status === 'High') workloadStatus = 'BALANCED';
 
       return {
         ...emp,
+        departmentName,
+        departmentId,
         activeTasks,
-        weeklyHours,
+        loggedHours,
+        capacityHours,
         capacityRate,
         workloadStatus,
       };
@@ -77,12 +126,21 @@ export default function ManagerTeamPage() {
         const q = searchQuery.toLowerCase();
         const name = (emp.full_name || '').toLowerCase();
         const email = (emp.email || '').toLowerCase();
-        const dept = (emp.department_name || '').toLowerCase();
+        const dept = (emp.departmentName || '').toLowerCase();
         return name.includes(q) || email.includes(q) || dept.includes(q);
       }
       return true;
     });
   }, [employeesList, selectedStatusFilter, searchQuery]);
+
+  // Phân trang dữ liệu
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(start, start + pageSize);
+  }, [filteredEmployees, currentPage, pageSize]);
 
   // Thống kê KPI
   const kpis = useMemo(() => {
@@ -96,7 +154,7 @@ export default function ManagerTeamPage() {
 
   // Xử lý Phân bổ Phòng Ban
   const handleAssignSubmit = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!assignModalTarget) return;
 
     assignDepartmentMutation.mutate(
@@ -129,13 +187,13 @@ export default function ManagerTeamPage() {
       ),
     },
     {
-      header: 'Department / Role',
-      accessorKey: 'department_name',
+      header: 'Department',
+      accessorKey: 'departmentName',
       cell: (row) => (
         <div className="space-y-0.5 text-xs text-slate-700">
           <div className="flex items-center gap-1.5 font-semibold text-slate-800">
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>{row.department_name || 'General Staff'}</span>
+            <span>{row.departmentName}</span>
           </div>
           <p className="text-[10px] text-slate-400">{row.role || 'EMPLOYEE'}</p>
         </div>
@@ -166,7 +224,7 @@ export default function ManagerTeamPage() {
               {row.capacityRate}%
             </span>
             <span className="text-[10px] text-slate-400 font-mono font-normal">
-              {row.weeklyHours.toFixed(1)}h / 40h
+              {row.loggedHours.toFixed(1)}h / {row.capacityHours.toFixed(0)}h
             </span>
           </div>
           <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -211,7 +269,7 @@ export default function ManagerTeamPage() {
         <button
           onClick={() => {
             setAssignModalTarget(row);
-            setSelectedDepartmentId(String(row.department_id || ''));
+            setSelectedDepartmentId(row.departmentId || '');
           }}
           className="p-1.5 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-lg transition cursor-pointer"
           title="Assign Department"
@@ -364,92 +422,122 @@ export default function ManagerTeamPage() {
 
       {/* 👥 HIỂN THỊ DANH SÁCH NHÂN SỰ */}
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEmployees.map((emp) => (
-            <div
-              key={`emp-card-${emp.id || emp.user_id}`}
-              className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all space-y-4 relative group"
-            >
-              {/* Card Header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <UserAvatar user={emp} size="md" showStatus={true} isOnline={true} />
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">{emp.full_name || emp.email}</h3>
-                    <p className="text-xs text-slate-400">{emp.email}</p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold mt-0.5">
-                      <Building2 className="w-3 h-3 text-slate-400" />
-                      <span>{emp.department_name || 'General Staff'}</span>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedEmployees.map((emp) => (
+              <div
+                key={`emp-card-${emp.id || emp.user_id}`}
+                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all space-y-4 relative group"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <UserAvatar user={emp} size="md" showStatus={true} isOnline={true} />
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-sm text-slate-900 truncate">{emp.full_name || emp.email}</h3>
+                      <p className="text-xs text-slate-400 truncate">{emp.email}</p>
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold mt-0.5">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{emp.departmentName}</span>
+                      </div>
                     </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setAssignModalTarget(emp);
+                      setSelectedDepartmentId(emp.departmentId || '');
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer shrink-0"
+                    title="Assign Department"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Workload Progress Bar */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-slate-500">Workload Utilization:</span>
+                    <span
+                      className={cn(
+                        emp.workloadStatus === 'OVERLOADED' && 'text-rose-600',
+                        emp.workloadStatus === 'BALANCED' && 'text-emerald-600',
+                        emp.workloadStatus === 'AVAILABLE' && 'text-blue-600'
+                      )}
+                    >
+                      {emp.capacityRate}% ({emp.loggedHours.toFixed(1)}h / {emp.capacityHours.toFixed(0)}h)
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        emp.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
+                        emp.workloadStatus === 'BALANCED' && 'bg-emerald-500',
+                        emp.workloadStatus === 'AVAILABLE' && 'bg-blue-500'
+                      )}
+                      style={{ width: `${Math.min(emp.capacityRate, 100)}%` }}
+                    />
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setAssignModalTarget(emp);
-                    setSelectedDepartmentId(String(emp.department_id || ''));
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                  title="Assign Department"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                {/* Card Footer: Active Tasks count & Status */}
+                <div className="flex items-center justify-between pt-2 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{emp.activeTasks} Active Tasks</span>
+                  </div>
 
-              {/* Workload Progress Bar */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-500">Weekly Workload Utilization:</span>
                   <span
                     className={cn(
-                      emp.workloadStatus === 'OVERLOADED' && 'text-rose-600',
-                      emp.workloadStatus === 'BALANCED' && 'text-emerald-600',
-                      emp.workloadStatus === 'AVAILABLE' && 'text-blue-600'
+                      'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
+                      emp.workloadStatus === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200',
+                      emp.workloadStatus === 'BALANCED' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                      emp.workloadStatus === 'AVAILABLE' && 'bg-blue-50 text-blue-700 border-blue-200'
                     )}
                   >
-                    {emp.capacityRate}% ({emp.weeklyHours.toFixed(1)}h / 40h)
+                    {emp.workloadStatus}
                   </span>
                 </div>
-                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-all',
-                      emp.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
-                      emp.workloadStatus === 'BALANCED' && 'bg-emerald-500',
-                      emp.workloadStatus === 'AVAILABLE' && 'bg-blue-500'
-                    )}
-                    style={{ width: `${Math.min(emp.capacityRate, 100)}%` }}
-                  />
-                </div>
               </div>
+            ))}
+          </div>
 
-              {/* Card Footer: Active Tasks count & Status */}
-              <div className="flex items-center justify-between pt-2 text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-                  <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{emp.activeTasks} Active Tasks</span>
-                </div>
-
-                <span
-                  className={cn(
-                    'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
-                    emp.workloadStatus === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200',
-                    emp.workloadStatus === 'BALANCED' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    emp.workloadStatus === 'AVAILABLE' && 'bg-blue-50 text-blue-700 border-blue-200'
-                  )}
-                >
-                  {emp.workloadStatus}
-                </span>
-              </div>
+          {/* Phân trang cho Grid View */}
+          {totalPages > 1 && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-2xs">
+              <PaginationBar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
-          ))}
+          )}
         </div>
       ) : (
         <DataTable
           columns={columns}
-          data={filteredEmployees}
+          data={paginatedEmployees}
           isLoading={isLoading}
           emptyMessage="No team members matching the selected filters."
+          pagination={{
+            currentPage,
+            totalPages,
+            totalItems,
+            pageSize,
+            onPageChange: setCurrentPage,
+            onPageSizeChange: (newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            },
+          }}
         />
       )}
 
@@ -460,9 +548,9 @@ export default function ManagerTeamPage() {
         isOpen={Boolean(assignModalTarget)}
         onClose={() => setAssignModalTarget(null)}
         title="Assign Department"
-        subtitle="Update department assignment for employee"
-        size="md"
-        actions={
+        description="Update department assignment for employee"
+        maxWidth="max-w-md"
+        footer={
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
@@ -493,15 +581,18 @@ export default function ManagerTeamPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Assigned Department</label>
-            <input
-              type="text"
+            <label className="block text-xs font-bold text-slate-700">Assigned Department</label>
+            <select
               value={selectedDepartmentId}
               onChange={(e) => setSelectedDepartmentId(e.target.value)}
-              placeholder="e.g. Software Engineering, QA..."
-              className="w-full px-3 py-2 bg-slate-100 rounded-xl text-xs border border-transparent focus:border-blue-400 focus:bg-white focus:outline-none"
-              autoFocus
-            />
+              className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-semibold text-slate-800 rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none transition cursor-pointer"
+            >
+              {departmentOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
         </form>
       </BaseModal>

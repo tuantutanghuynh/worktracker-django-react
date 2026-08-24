@@ -7,7 +7,7 @@ from system.security.scoping_manager import scoped_logworks
 from system.services.audit_manager_service import snapshot, log_action
 
 from timesheets.services.daily_total_manager_service import (
-    assert_daily_total_not_exceed_24,
+    assert_daily_total_not_exceed_8,
     rebuild_daily_user_timesheet,
 )
 from timesheets.services.timelock_manager_service import (
@@ -270,7 +270,7 @@ def correct_logwork(
         )
 
         if hours_spent is not None:
-            assert_daily_total_not_exceed_24(
+            assert_daily_total_not_exceed_8(
                 user_id=locked_logwork.user_id,
                 work_date=locked_logwork.work_date,
                 new_hours=hours_spent,

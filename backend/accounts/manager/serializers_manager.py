@@ -23,7 +23,8 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
     avatar_url = serializers.CharField(source="profile.avatar_url", read_only=True)
     joined_date = serializers.DateField(source="profile.joined_date", read_only=True)
 
-    # ➕ Các trường tính toán động (Computed Fields) từ Service
+    # ➕ Các trường tính toán động (Computed Fields) từ Service & Annotation
+    active_tasks_count = serializers.IntegerField(read_only=True, default=0)
     logged_hours = serializers.SerializerMethodField()
     capacity_hours = serializers.SerializerMethodField()
     utilization_rate = serializers.SerializerMethodField()
@@ -40,6 +41,7 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
             "department",
             "avatar_url",
             "joined_date",
+            "active_tasks_count",
             "logged_hours",
             "capacity_hours",
             "utilization_rate",

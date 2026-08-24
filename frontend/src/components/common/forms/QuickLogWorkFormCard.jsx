@@ -37,7 +37,7 @@ export default function QuickLogWorkFormCard({
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState({});
 
-  const MAX_DAILY_LIMIT = 24.0;
+  const MAX_DAILY_LIMIT = 8.0;
   const currentTotal = Number(dailyHoursLogged) + (Number(hoursSpent) || 0);
   const isOverLimit = currentTotal > MAX_DAILY_LIMIT;
 
@@ -61,10 +61,10 @@ export default function QuickLogWorkFormCard({
     const h = Number(hoursSpent);
     if (isNaN(h) || h <= 0) {
       newErrors.hoursSpent = 'Hours spent must be greater than 0';
-    } else if (h > 24) {
-      newErrors.hoursSpent = 'Single log entry cannot exceed 24 hours';
+    } else if (h > 8.0) {
+      newErrors.hoursSpent = 'Single log entry cannot exceed standard 8.0 hours';
     } else if (isOverLimit) {
-      newErrors.hoursSpent = `Total daily hours cannot exceed 24 hours (Current: ${currentTotal.toFixed(2)}h)`;
+      newErrors.hoursSpent = `Total daily hours cannot exceed standard 8.0h limit (Current: ${currentTotal.toFixed(2)}h / 8.0h)`;
     }
 
     setErrors(newErrors);
@@ -110,7 +110,7 @@ export default function QuickLogWorkFormCard({
         )}>
           <span>Logged Today:</span>
           <strong className={isOverLimit ? "text-rose-400" : "text-emerald-400"}>
-            {dailyHoursLogged}h / 24h
+            {dailyHoursLogged}h / 8.0h
           </strong>
         </div>
       </div>

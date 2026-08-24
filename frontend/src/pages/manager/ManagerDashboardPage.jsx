@@ -61,7 +61,7 @@ export default function ManagerDashboardPage() {
 
   const { data: jobsResponse } = useManagerJobs({ page_size: 20 });
   const { data: tasksResponse } = useManagerTasks({ page_size: 50 });
-  const { data: pendingLogsResponse } = useLogWorks({ status: 'PENDING', page_size: 10 });
+  const { data: pendingLogsResponse } = useLogWorks({ review_status: 'PENDING', page_size: 200 });
   const { data: auditResponse } = useManagerAuditLogs();
 
   // Xử lý làm mới dữ liệu
@@ -79,9 +79,19 @@ export default function ManagerDashboardPage() {
     const teamHoursStr =
       dashboardData?.team_total_hours !== undefined ? `${dashboardData.team_total_hours}h` : '0h';
 
-    const pendingCount = Array.isArray(pendingLogsResponse)
-      ? pendingLogsResponse.length
-      : (pendingLogsResponse?.count ?? pendingLogsResponse?.results?.length ?? 0);
+    // 🌟 Đếm số lượng Ngày công (Daily Timesheets) duy nhất đang có logwork PENDING
+    const logsList = Array.isArray(pendingLogsResponse)
+      ? pendingLogsResponse
+      : Array.isArray(pendingLogsResponse?.results)
+      ? pendingLogsResponse.results
+      : [];
+    const uniquePendingDays = new Set();
+    logsList.forEach((lw) => {
+      const userId = lw.user?.id || lw.user_id || (typeof lw.user === 'number' ? lw.user : null);
+      const date = lw.work_date;
+      if (userId && date) uniquePendingDays.add(`${userId}_${date}`);
+    });
+    const pendingCount = uniquePendingDays.size;
 
     const teamMembersCount = Array.isArray(dashboardData?.workload_per_employee)
       ? dashboardData.workload_per_employee.length

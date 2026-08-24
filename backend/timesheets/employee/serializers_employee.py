@@ -74,7 +74,7 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                     "Contact your manager to unlock it."
                 )
 
-            # Defensive layer 2 — 24h Cap + Race Condition
+            # Defensive layer 2 — 8.0h Daily Cap + Race Condition
             DailyUserTimesheet.objects.get_or_create(
                 user=user, work_date=work_date, defaults={"total_hours": Decimal("0")}
             )
@@ -83,11 +83,11 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             )
 
             new_total = timesheet.total_hours + hours_spent
-            if new_total > 24:
+            if new_total > Decimal("8.00"):
                 raise serializers.ValidationError(
                     {
                         "hours_spent": (
-                            f"Total hours for {work_date} would exceed 24h "
+                            f"Daily limit exceeded: Total hours for {work_date} cannot exceed standard 8.0h limit "
                             f"(currently {timesheet.total_hours}h, tried to add {hours_spent}h)."
                         )
                     }

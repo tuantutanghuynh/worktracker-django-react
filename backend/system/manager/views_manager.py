@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
@@ -5,7 +6,7 @@ from rest_framework.views import APIView
 
 from system.models import AuditLog, Notification
 from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
-from system.security.scoping_manager import manager_job_ids
+from system.security.scoping_manager import manager_job_ids, scoped_audit_logs
 from system.manager.serializers_manager import ManagerAuditLogSerializer, ManagerNotificationSerializer
 
 
@@ -121,11 +122,15 @@ class ManagerAuditLogListView(APIView):
     GET /api/manager/system/audit-logs/
 
     Tra cứu Audit Log liên quan đến scope của Manager.
-    Chỉ trả log của các bản ghi thuộc job do Manager quản lý.
+    Bao gồm:
+    - Các hành động do chính Manager thực hiện.
+    - Các hành động của nhân viên trên Job/Task/Timesheet/TimeLock thuộc scope của Manager.
 
     Query Params:
-        - table_name (optional): lọc theo bảng (VD: tasks, jobs).
-        - action (optional): lọc theo loại hành động (VD: UPLOAD_TASK_ATTACHMENT).
+        - table_name (optional): lọc theo bảng (VD: tasks, jobs, log_works, time_locks, reports).
+        - action (optional): lọc theo loại hành động (VD: APPROVE, REJECT, LOCK, REPORT).
+        - severity (optional): lọc theo mức độ nghiêm trọng (CRITICAL, WARNING, NORMAL).
+        - search (optional): tìm kiếm từ khóa trong summary, action, table_name, actor.
         - record_id (optional): lọc theo ID bản ghi cụ thể.
         - date_from (optional): từ ngày (YYYY-MM-DD).
         - date_to (optional): đến ngày (YYYY-MM-DD).
@@ -139,27 +144,63 @@ class ManagerAuditLogListView(APIView):
     required_permission = "report:view"
 
     def get(self, request):
-        # Scope: chỉ các log liên quan đến user hiện tại (Manager) hoặc
-        # các hành động trên các record thuộc scope của họ.
-        # Đơn giản nhất: trả log của chính Manager đó thực hiện.
         qs = (
-            AuditLog.objects.filter(user=request.user)
+            scoped_audit_logs(request.user)
+            .select_related("user", "user__profile")
             .order_by("-created_at")
         )
 
-        # Lọc bổ sung
+        # 1. Lọc theo bảng linh hoạt
         table_name = request.query_params.get("table_name")
         if table_name:
-            qs = qs.filter(table_name=table_name)
+            table_lower = table_name.lower().strip()
+            if table_lower in ["timesheets", "timesheet", "log_works", "log_work"]:
+                qs = qs.filter(Q(table_name="log_works") | Q(table_name="timesheets"))
+            elif table_lower in ["timelocks", "timelock", "time_locks", "time_lock"]:
+                qs = qs.filter(Q(table_name="time_locks") | Q(table_name="timelocks"))
+            elif table_lower in ["users", "user", "accounts_customuser", "profile"]:
+                qs = qs.filter(
+                    Q(table_name="accounts_customuser")
+                    | Q(table_name="users")
+                    | Q(table_name="employeeprofile")
+                )
+            elif table_lower in ["reports", "report"]:
+                qs = qs.filter(table_name="reports")
+            else:
+                qs = qs.filter(table_name__icontains=table_lower)
 
+        # 2. Lọc theo hành động (Hỗ trợ từ khóa / tiền tố: APPROVE, REJECT, LOCK, UNLOCK, REPORT, CREATE, UPDATE, DELETE)
         action = request.query_params.get("action")
         if action:
-            qs = qs.filter(action=action)
+            qs = qs.filter(action__icontains=action.strip())
 
+        # 3. Lọc theo mức độ nghiêm trọng (CRITICAL, WARNING, NORMAL)
+        severity = request.query_params.get("severity")
+        if severity:
+            qs = qs.filter(severity=severity.upper().strip())
+
+        # 4. Lọc theo ID bản ghi
         record_id = request.query_params.get("record_id")
         if record_id:
-            qs = qs.filter(record_id=record_id)
+            try:
+                qs = qs.filter(record_id=int(record_id))
+            except (ValueError, TypeError):
+                pass
 
+        # 5. Tìm kiếm từ khóa (Search query)
+        search = request.query_params.get("search")
+        if search:
+            s = search.strip()
+            qs = qs.filter(
+                Q(summary__icontains=s)
+                | Q(action__icontains=s)
+                | Q(table_name__icontains=s)
+                | Q(user__email__icontains=s)
+                | Q(user__profile__full_name__icontains=s)
+                | Q(ip_address__icontains=s)
+            )
+
+        # 6. Lọc theo khoảng thời gian
         date_from = request.query_params.get("date_from")
         if date_from:
             qs = qs.filter(created_at__date__gte=date_from)

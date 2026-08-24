@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -181,7 +181,10 @@ function KanbanColumnDroppable({ column, tasks, onTaskClick, mutatingTaskId, onM
 
 export default function ManagerKanbanPage() {
   const { jobId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const paramJobId = jobId || searchParams.get('job_id') || searchParams.get('jobId') || '';
 
   // ⚡ REAL-TIME WEBSOCKET: Tự động đồng bộ Bảng Kanban thời gian thực giữa các thành viên
   useWebSocket();
@@ -190,7 +193,13 @@ export default function ManagerKanbanPage() {
   const { addRecentJob } = useRecentJobsStore();
 
   // State Bộ Lọc & Tìm Kiếm
-  const [selectedJobId, setSelectedJobId] = useState(jobId || '');
+  const [selectedJobId, setSelectedJobId] = useState(paramJobId);
+
+  useEffect(() => {
+    if (paramJobId) {
+      setSelectedJobId(paramJobId);
+    }
+  }, [paramJobId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);

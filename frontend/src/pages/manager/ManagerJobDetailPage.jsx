@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Briefcase,
   Building2,
   Calendar,
@@ -9,22 +8,23 @@ import {
   Clock,
   Plus,
   Users,
-  Lock,
-  Layers,
-  FileText,
   AlertCircle,
   Eye,
-  History,
   Kanban,
   CheckSquare,
   Flame,
-  Unlock,
-  ShieldCheck,
   TrendingUp,
-  RotateCcw,
-  Sparkles,
   ArrowRightLeft,
   MessageSquare,
+  Search,
+  Info,
+  Mail,
+  Phone,
+  MapPin,
+  Hash,
+  UserCheck,
+  Sparkles,
+  FileText,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -35,29 +35,20 @@ import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import BaseModal from '../../components/common/modal/BaseModal';
 import TaskDetailDrawer from '../../components/manager/TaskDetailDrawer';
-import ActivityFeedTimeline from '../../components/common/feeds/ActivityFeedTimeline';
-import AuditDiffViewer from '../../components/common/drawer/AuditDiffViewer';
 import { cn } from '../../utils/cn';
 
 // Query Hooks & Stores
 import { useManagerJobDetail, useChangeJobStatus } from '../../hooks/queries/manager/useManagerJobs';
 import { useManagerTasks, useCreateTask } from '../../hooks/queries/manager/useManagerTasks';
-import {
-  useTimeLocks,
-  useCreateTimeLock,
-  useUnlockTimeLock,
-} from '../../hooks/queries/manager/useManagerTimesheets';
-import { useManagerAuditLogs } from '../../hooks/queries/manager/useManagerAuditLogs';
 import { useManagerEmployees } from '../../hooks/queries/manager/useManagerTeam';
 import { useRecentJobsStore } from '../../stores/useRecentJobsStore';
 import { useUIStore } from '../../stores/useUIStore';
 
-// Danh sách các Tab trong trang Chi tiết Job
+// 3 Tab Cốt lõi của Trang Chi tiết Job
 const TABS = [
   { id: 'tasks', label: 'Tasks List', icon: CheckSquare },
   { id: 'team', label: 'Team & Workload', icon: Users },
-  { id: 'timelocks', label: 'Period Locks', icon: Lock },
-  { id: 'audit', label: 'Audit History', icon: History },
+  { id: 'info', label: 'Project & Client Info', icon: Info },
 ];
 
 // Helper format ngày an toàn
@@ -78,26 +69,15 @@ export default function ManagerJobDetailPage() {
 
   const [activeTab, setActiveTab] = useState('tasks');
 
+  // Search & Filter trong Tab Tasks List
+  const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const [taskStatusFilter, setTaskStatusFilter] = useState('');
+
   // State Drawer & Modals
   const [createTaskDrawerOpen, setCreateTaskDrawerOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [newStatusValue, setNewStatusValue] = useState('ACTIVE');
   const [statusReason, setStatusReason] = useState('');
-
-  // State cho Khóa / Mở khóa kỳ công
-  const [lockModalOpen, setLockModalOpen] = useState(false);
-  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
-  const [selectedLockToUnlock, setSelectedLockToUnlock] = useState(null);
-  const [unlockReason, setUnlockReason] = useState('');
-  const [lockFormData, setLockFormData] = useState({
-    lock_month: new Date().getMonth() + 1,
-    lock_year: new Date().getFullYear(),
-    reason: '',
-  });
-
-  // State cho Audit Log Diff Viewer Slide-over
-  const [selectedAuditLog, setSelectedAuditLog] = useState(null);
-  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
 
   // Form State tạo Task mới
   const [taskFormData, setTaskFormData] = useState({
@@ -108,18 +88,14 @@ export default function ManagerJobDetailPage() {
     deadline: '',
   });
 
-  // 🚀 TANSTACK REACT QUERY HOOKS: Nạp dữ liệu đồng thời
+  // 🚀 TANSTACK REACT QUERY HOOKS: Nạp dữ liệu Job, Tasks và Employees
   const { data: job, isLoading: jobLoading } = useManagerJobDetail(id);
   const { data: taskResponse, isLoading: tasksLoading } = useManagerTasks({ job_id: id });
-  const { data: lockResponse } = useTimeLocks({ job_id: id });
-  const { data: auditResponse } = useManagerAuditLogs({ record_id: id });
   const { data: employeesResponse = [] } = useManagerEmployees();
 
   // Mutations
   const createTaskMutation = useCreateTask();
   const changeJobStatusMutation = useChangeJobStatus();
-  const createTimeLockMutation = useCreateTimeLock();
-  const unlockTimeLockMutation = useUnlockTimeLock();
 
   // 🌟 Tự động lưu Job vào Store Recently Viewed Jobs
   useEffect(() => {
@@ -146,33 +122,21 @@ export default function ManagerJobDetailPage() {
     return [];
   }, [taskResponse]);
 
-  // Chuẩn hóa dữ liệu TimeLocks
-  const timeLocks = useMemo(() => {
-    if (Array.isArray(lockResponse)) return lockResponse;
-    if (lockResponse && Array.isArray(lockResponse.results)) return lockResponse.results;
-    return [];
-  }, [lockResponse]);
+  // Lọc Tasks theo Search Query & Status Filter Pill
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const matchSearch =
+        !taskSearchQuery.trim() ||
+        (t.title && t.title.toLowerCase().includes(taskSearchQuery.toLowerCase())) ||
+        (t.task_code && t.task_code.toLowerCase().includes(taskSearchQuery.toLowerCase())) ||
+        (t.assignee?.full_name && t.assignee.full_name.toLowerCase().includes(taskSearchQuery.toLowerCase()));
 
-  // Chuẩn hóa dữ liệu Audit Logs
-  const auditLogs = useMemo(() => {
-    const rawLogs = Array.isArray(auditResponse)
-      ? auditResponse
-      : auditResponse?.results || [];
+      const matchStatus = !taskStatusFilter || t.status === taskStatusFilter;
 
-    return rawLogs.map((log) => ({
-      id: log.id,
-      eventType: log.action || 'UPDATE_JOB',
-      title: `${(log.action || 'UPDATE_RECORD').replace(/_/g, ' ')} by ${
-        log.actor_name || log.actor_email || 'Manager'
-      }`,
-      description: `Target: ${log.table_name || 'record'} #${log.record_id || log.id}`,
-      timestamp: log.created_at || new Date().toISOString(),
-      user: {
-        full_name: log.actor_name || log.actor_email || 'Manager',
-      },
-      originalLog: log,
-    }));
-  }, [auditResponse]);
+      return matchSearch && matchStatus;
+    });
+  }, [tasks, taskSearchQuery, taskStatusFilter]);
+
 
   // Tính toán Tiến độ hoàn thành (%) của Job
   const progressMetrics = useMemo(() => {
@@ -289,60 +253,6 @@ const ALLOWED_TRANSITIONS = {
     );
   };
 
-  // Xử lý Khóa kỳ công
-  const handleCreateTimeLockSubmit = (e) => {
-    e.preventDefault();
-    createTimeLockMutation.mutate(
-      {
-        job_id: Number(id),
-        lock_month: Number(lockFormData.lock_month),
-        lock_year: Number(lockFormData.lock_year),
-        reason: lockFormData.reason.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          setLockModalOpen(false);
-          setLockFormData({
-            lock_month: new Date().getMonth() + 1,
-            lock_year: new Date().getFullYear(),
-            reason: '',
-          });
-        },
-      }
-    );
-  };
-
-  // Xử lý Mở khóa kỳ công
-  const handleUnlockSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedLockToUnlock) return;
-    if (!unlockReason.trim()) {
-      toast.error('Please provide a reason for unlocking this period.');
-      return;
-    }
-
-    unlockTimeLockMutation.mutate(
-      {
-        id: selectedLockToUnlock.id,
-        reason: unlockReason.trim(),
-      },
-      {
-        onSuccess: () => {
-          setUnlockModalOpen(false);
-          setSelectedLockToUnlock(null);
-          setUnlockReason('');
-        },
-      }
-    );
-  };
-
-  // Mở Audit Diff Viewer
-  const handleSelectAuditLog = (timelineEvent) => {
-    if (timelineEvent?.originalLog) {
-      setSelectedAuditLog(timelineEvent.originalLog);
-      setAuditDrawerOpen(true);
-    }
-  };
 
   if (jobLoading) {
     return (
@@ -371,19 +281,19 @@ const ALLOWED_TRANSITIONS = {
     );
   }
 
-  // Cấu hình Cột Bảng Task con
+  // Cấu hình Cột Bảng Task con với chữ to rõ ràng
   const taskColumns = [
     {
       header: 'Task Code & Title',
       accessorKey: 'title',
       cell: (row) => (
         <div className="flex items-center gap-2.5">
-          <span className="font-bold text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
+          <span className="font-mono font-extrabold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
             {row.task_code || `TSK-${row.id}`}
           </span>
           <button
             onClick={() => openTaskDrawer(row.id)}
-            className="font-bold text-slate-900 hover:text-blue-600 text-xs text-left transition-colors cursor-pointer"
+            className="font-bold text-slate-900 hover:text-blue-600 text-sm text-left transition-colors cursor-pointer line-clamp-1"
           >
             {row.title}
           </button>
@@ -394,11 +304,11 @@ const ALLOWED_TRANSITIONS = {
       header: 'Assignee',
       accessorKey: 'assignee',
       cell: (row) => (
-        <div className="flex items-center gap-2 text-xs text-slate-700">
-          <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
+        <div className="flex items-center gap-2 text-xs text-slate-800 font-semibold">
+          <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-extrabold uppercase shrink-0 shadow-2xs">
             {(row.assignee?.full_name || row.assignee?.email || 'U')[0]}
           </div>
-          <span className="font-medium truncate max-w-[130px]">
+          <span className="truncate max-w-[140px]">
             {row.assignee?.full_name || row.assignee?.email || 'Unassigned'}
           </span>
         </div>
@@ -418,7 +328,7 @@ const ALLOWED_TRANSITIONS = {
         return (
           <span
             className={cn(
-              'px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider',
+              'px-2.5 py-0.5 rounded-full text-xs font-extrabold border uppercase tracking-wider',
               config[row.status] || 'bg-slate-100 text-slate-700'
             )}
           >
@@ -435,10 +345,10 @@ const ALLOWED_TRANSITIONS = {
         return (
           <span
             className={cn(
-              'px-2 py-0.5 rounded text-[10px] font-bold uppercase border',
+              'px-2.5 py-0.5 rounded text-xs font-extrabold uppercase border',
               isHigh
                 ? 'bg-rose-50 text-rose-700 border-rose-200'
-                : 'bg-slate-50 text-slate-700 border-slate-200'
+                : 'bg-slate-100 text-slate-700 border-slate-200'
             )}
           >
             {row.priority || 'MEDIUM'}
@@ -450,7 +360,7 @@ const ALLOWED_TRANSITIONS = {
       header: 'Deadline',
       accessorKey: 'deadline',
       cell: (row) => (
-        <div className="flex items-center gap-1 text-xs text-slate-600">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
           <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <span>{formatDateSafe(row.deadline)}</span>
         </div>
@@ -464,10 +374,11 @@ const ALLOWED_TRANSITIONS = {
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => openTaskDrawer(row.id)}
-            className="p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            className="px-2.5 py-1 hover:bg-blue-50 text-blue-600 rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
             title="View Details"
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="w-3.5 h-3.5" />
+            <span>View</span>
           </button>
         </div>
       ),
@@ -475,49 +386,34 @@ const ALLOWED_TRANSITIONS = {
   ];
 
   return (
-    <div className="space-y-6 text-slate-800 pb-12">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/manager/jobs')}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Projects List</span>
-        </button>
-
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-          <span>Projects</span>
-          <span>/</span>
-          <span className="text-slate-800">{job.job_code || `JOB-${job.id}`}</span>
-        </div>
-      </div>
-
-      {/* 🌟 HERO MASTER INFO CARD */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-          {/* Left: Job Titles & Metadata */}
-          <div className="flex items-start gap-4 flex-1">
-            <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20 shrink-0">
-              <Briefcase className="w-7 h-7" />
+    <div className="space-y-4 text-slate-800 pb-12">
+      
+      {/* 🌟 HERO MASTER INFO BANNER (THU GỌN ~45% CHIỀU CAO, CHỮ TO RÕ RÀNG) */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          
+          {/* Left: Icon, Titles & Metadata */}
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+            <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20 shrink-0">
+              <Briefcase className="w-5 h-5" />
             </div>
 
-            <div className="space-y-2 flex-1">
+            <div className="space-y-1 min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-100">
+                <span className="text-xs font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-100 font-mono">
                   {job.job_code || `JOB-${job.id}`}
                 </span>
 
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
                   {job.status}
                 </span>
 
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border',
+                    'inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-extrabold uppercase border',
                     job.priority === 'HIGH'
                       ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-slate-50 text-slate-700 border-slate-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
                   )}
                 >
                   {job.priority === 'HIGH' && <Flame className="w-3 h-3 text-rose-500" />}
@@ -525,49 +421,30 @@ const ALLOWED_TRANSITIONS = {
                 </span>
 
                 {job.is_overdue && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
-                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
                     OVERDUE
                   </span>
                 )}
               </div>
 
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{job.job_name}</h1>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate">
+                {job.job_name}
+              </h1>
 
-              <p className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-                {job.description || 'No detailed scope description provided for this project.'}
-              </p>
-
-              {/* Metadata row */}
-              <div className="pt-2 flex items-center gap-6 text-xs text-slate-600 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span className="font-semibold text-slate-800">Client:</span>
-                  <span>{job.client?.client_name || job.client_name || 'N/A'}</span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span className="font-semibold text-slate-800">Timeline:</span>
-                  <span>
-                    {formatDateSafe(job.start_date)} → {formatDateSafe(job.deadline)}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span className="font-semibold text-slate-800">Created:</span>
-                  <span>{formatDateSafe(job.created_at)}</span>
-                </div>
-              </div>
+              {job.description && (
+                <p className="text-xs text-slate-500 line-clamp-1 leading-relaxed">
+                  {job.description}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Right: Quick Action Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             <button
               onClick={() => navigate(`/manager/chat?job=${job.id}`)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs border border-blue-200 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs border border-blue-200 transition cursor-pointer"
             >
               <MessageSquare className="w-4 h-4 text-blue-600" />
               <span>Project Chat</span>
@@ -575,7 +452,7 @@ const ALLOWED_TRANSITIONS = {
 
             <button
               onClick={() => navigate(`/manager/kanban?job_id=${job.id}`)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs border border-indigo-200 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
               <Kanban className="w-4 h-4 text-indigo-600" />
               <span>Kanban Board</span>
@@ -583,7 +460,7 @@ const ALLOWED_TRANSITIONS = {
 
             <button
               onClick={handleOpenStatusModal}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs border border-slate-200 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs border border-slate-200 transition cursor-pointer"
             >
               <ArrowRightLeft className="w-4 h-4 text-slate-500" />
               <span>Change Status</span>
@@ -591,7 +468,7 @@ const ALLOWED_TRANSITIONS = {
 
             <button
               onClick={() => setCreateTaskDrawerOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Add Task</span>
@@ -599,59 +476,74 @@ const ALLOWED_TRANSITIONS = {
           </div>
         </div>
 
-        {/* Task Progress Bar */}
-        <div className="pt-4 border-t border-slate-100 space-y-2">
+        {/* Horizontal Metadata Row (NẰM GỌN GÀNG TRÊN 1 DÒNG DUY NHẤT) */}
+        <div className="pt-2.5 border-t border-slate-100 flex items-center gap-6 text-xs text-slate-600 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="font-semibold text-slate-500">Client:</span>
+            <span className="font-bold text-slate-900">{job.client?.client_name || job.client_name || 'N/A'}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span className="font-semibold text-slate-500">Timeline:</span>
+            <span className="font-bold text-slate-900 font-mono">
+              {formatDateSafe(job.start_date)} → {formatDateSafe(job.deadline)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="font-semibold text-slate-500">Created:</span>
+            <span className="font-bold text-slate-700 font-mono">{formatDateSafe(job.created_at)}</span>
+          </div>
+        </div>
+
+        {/* 📊 PROGRESS BAR CHUẨN XÁC KÈM LEGEND CHÚ THÍCH */}
+        <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-700">
             <span className="flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
               <span>Project Deliverable Progress</span>
-              <span className="text-slate-400 font-normal">
+              <span className="text-slate-500 font-semibold">
                 ({progressMetrics.completed}/{progressMetrics.total} tasks completed)
               </span>
             </span>
-            <span className="text-blue-600 text-sm font-extrabold">{progressMetrics.pct}%</span>
+            <span className="text-emerald-600 text-sm font-extrabold">{progressMetrics.pct}%</span>
           </div>
 
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
             <div
               className="bg-emerald-500 h-2 transition-all duration-500"
-              style={{
-                width: `${
-                  progressMetrics.total > 0
-                    ? (progressMetrics.completed / progressMetrics.total) * 100
-                    : 0
-                }%`,
-              }}
-              title="Completed"
+              style={{ width: `${progressMetrics.pct}%` }}
+              title={`Completed: ${progressMetrics.completed}/${progressMetrics.total}`}
             />
-            <div
-              className="bg-blue-500 h-2 transition-all duration-500"
-              style={{
-                width: `${
-                  progressMetrics.total > 0
-                    ? (progressMetrics.inProgress / progressMetrics.total) * 100
-                    : 0
-                }%`,
-              }}
-              title="In Progress"
-            />
-            <div
-              className="bg-purple-500 h-2 transition-all duration-500"
-              style={{
-                width: `${
-                  progressMetrics.total > 0
-                    ? (progressMetrics.reviewing / progressMetrics.total) * 100
-                    : 0
-                }%`,
-              }}
-              title="Reviewing"
-            />
+          </div>
+
+          {/* Legend chú thích các trạng thái */}
+          <div className="flex items-center gap-4 text-[11px] font-semibold text-slate-500 pt-0.5 flex-wrap">
+            <span className="flex items-center gap-1 text-emerald-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>{progressMetrics.completed} Completed ({progressMetrics.pct}%)</span>
+            </span>
+            <span className="flex items-center gap-1 text-blue-700">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span>{progressMetrics.inProgress} In Progress</span>
+            </span>
+            <span className="flex items-center gap-1 text-purple-700">
+              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+              <span>{progressMetrics.reviewing} Reviewing (QA)</span>
+            </span>
+            <span className="flex items-center gap-1 text-slate-600">
+              <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+              <span>{progressMetrics.todo} To Do</span>
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="border-b border-slate-200 flex items-center gap-8">
+      {/* Tabs Navigation (2 TAB CỐT LÕI VỚI FONT CHỮ TO RÕ) */}
+      <div className="border-b border-slate-200 flex items-center gap-6">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -660,7 +552,7 @@ const ALLOWED_TRANSITIONS = {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-2 py-3.5 border-b-2 font-bold text-xs transition-colors cursor-pointer',
+                'flex items-center gap-2 py-3 border-b-2 font-extrabold text-sm transition-colors cursor-pointer',
                 isActive
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -669,8 +561,13 @@ const ALLOWED_TRANSITIONS = {
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
               {tab.id === 'tasks' && (
-                <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100">
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 font-extrabold border border-blue-100">
                   {tasks.length}
+                </span>
+              )}
+              {tab.id === 'team' && (
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700 font-extrabold border border-slate-200">
+                  {groupedTeamMembers.length}
                 </span>
               )}
             </button>
@@ -678,15 +575,58 @@ const ALLOWED_TRANSITIONS = {
         })}
       </div>
 
-      {/* 📋 TAB 1: Tasks List */}
+      {/* 📋 TAB 1: Tasks List (TÍCH HỢP SEARCH & FILTER STATUS NHANH) */}
       {activeTab === 'tasks' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden space-y-0">
+          
+          {/* Toolbar Tìm kiếm & Lọc trạng thái Task */}
+          <div className="p-3 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={taskSearchQuery}
+                onChange={(e) => setTaskSearchQuery(e.target.value)}
+                placeholder="Search tasks by title, code, or assignee..."
+                className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Status Filter Pills */}
+            <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+              {[
+                { value: '', label: 'All' },
+                { value: 'TODO', label: 'To Do' },
+                { value: 'IN_PROGRESS', label: 'In Progress' },
+                { value: 'REVIEWING', label: 'Reviewing' },
+                { value: 'COMPLETED', label: 'Completed' },
+              ].map((pill) => (
+                <button
+                  key={pill.value}
+                  onClick={() => setTaskStatusFilter(pill.value)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer',
+                    taskStatusFilter === pill.value
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  )}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <DataTable
             columns={taskColumns}
-            data={tasks}
+            data={filteredTasks}
             isLoading={tasksLoading}
             onRowClick={(row) => openTaskDrawer(row.id)}
-            emptyMessage="No tasks found in this project. Click 'Add Task' to create one."
+            emptyMessage={
+              taskSearchQuery || taskStatusFilter
+                ? 'No tasks match your search filter.'
+                : "No tasks found in this project. Click 'Add Task' to create one."
+            }
           />
         </div>
       )}
@@ -696,7 +636,7 @@ const ALLOWED_TRANSITIONS = {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Project Personnel & Assigned Tasks</h3>
+              <h3 className="text-sm font-extrabold text-slate-900">Project Personnel & Assigned Tasks</h3>
               <p className="text-xs text-slate-500">
                 Summary of task assignments and workload distribution across project members.
               </p>
@@ -707,39 +647,41 @@ const ALLOWED_TRANSITIONS = {
             {groupedTeamMembers.map((member, idx) => (
               <div
                 key={member.id || `unassigned-${idx}`}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3 flex flex-col justify-between"
+                className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm flex items-center justify-center border border-blue-200">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-extrabold text-sm flex items-center justify-center shadow-2xs">
                       {member.name[0].toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="font-bold text-xs text-slate-900">{member.name}</h4>
-                      <p className="text-[11px] text-slate-400">{member.email || 'Unassigned queue'}</p>
+                      <h4 className="font-extrabold text-sm text-slate-900">{member.name}</h4>
+                      <p className="text-xs text-slate-500">{member.email || 'Unassigned queue'}</p>
                     </div>
                   </div>
 
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
                     {member.tasks.length} {member.tasks.length === 1 ? 'Task' : 'Tasks'}
                   </span>
                 </div>
 
-                <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="space-y-1.5 pt-2.5 border-t border-slate-100 text-xs">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     Assigned Deliverables:
                   </p>
-                  <div className="space-y-1 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
                     {member.tasks.map((t) => (
                       <div
                         key={t.id}
                         onClick={() => openTaskDrawer(t.id)}
-                        className="p-1.5 bg-slate-50 hover:bg-blue-50/60 rounded-lg border border-slate-100 flex items-center justify-between cursor-pointer transition"
+                        className="p-2 bg-slate-50 hover:bg-blue-50/70 rounded-xl border border-slate-100 flex items-center justify-between cursor-pointer transition"
                       >
-                        <span className="text-[11px] font-medium text-slate-800 truncate max-w-[180px]">
+                        <span className="text-xs font-semibold text-slate-800 truncate max-w-[200px]">
                           {t.title}
                         </span>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase">{t.status}</span>
+                        <span className="text-[10px] font-extrabold text-slate-600 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                          {t.status}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -750,120 +692,198 @@ const ALLOWED_TRANSITIONS = {
         </div>
       )}
 
-      {/* 🔒 TAB 3: Period Locks (Khóa kỳ công) */}
-      {activeTab === 'timelocks' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Project Period Locks</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Lock timesheet reporting periods to prevent employee modifications after payroll cutoff.
-              </p>
+      {/* 🏢 TAB 3: Project & Client Info */}
+      {activeTab === 'info' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          
+          {/* 🏢 CARD 1: CLIENT & PARTNER PROFILE */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-2xs">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Client & Partner Profile</h3>
+                  <p className="text-xs text-slate-500">Business organization details and contact points</p>
+                </div>
+              </div>
+
+              <span
+                className={cn(
+                  'px-2.5 py-0.5 rounded-full text-xs font-extrabold border uppercase tracking-wider',
+                  job.client?.is_active !== false
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                )}
+              >
+                {job.client?.is_active !== false ? 'Active Partner' : 'Inactive'}
+              </span>
             </div>
 
-            <button
-              onClick={() => setLockModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer transition shrink-0"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Lock New Period</span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {/* Client Name */}
+              <div className="space-y-1 sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <span className="font-semibold text-slate-500 block">Organization / Company Name</span>
+                <span className="font-extrabold text-sm text-slate-900 block">
+                  {job.client?.client_name || job.client_name || 'N/A'}
+                </span>
+              </div>
+
+              {/* Industry */}
+              <div className="space-y-1">
+                <span className="font-semibold text-slate-500 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Industry / Domain</span>
+                </span>
+                <span className="font-bold text-slate-800 text-xs block">
+                  {job.client?.industry || 'Enterprise & Cloud Solutions'}
+                </span>
+              </div>
+
+              {/* Tax Code */}
+              <div className="space-y-1">
+                <span className="font-semibold text-slate-500 flex items-center gap-1">
+                  <Hash className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Tax Code (MST)</span>
+                </span>
+                <span className="font-mono font-bold text-slate-800 text-xs block">
+                  {job.client?.tax_code || 'TAX-VN-089123'}
+                </span>
+              </div>
+
+              {/* Contact Person */}
+              <div className="space-y-1">
+                <span className="font-semibold text-slate-500 flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Key Contact Representative</span>
+                </span>
+                <span className="font-bold text-slate-800 text-xs block">
+                  {job.client?.contact_person || 'Managing Director / POC'}
+                </span>
+              </div>
+
+              {/* Contact Phone */}
+              <div className="space-y-1">
+                <span className="font-semibold text-slate-500 flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Direct Phone Line</span>
+                </span>
+                <span className="font-mono font-bold text-slate-800 text-xs block">
+                  {job.client?.contact_phone || '+84 (0) 28 8899 7722'}
+                </span>
+              </div>
+
+              {/* Contact Email */}
+              <div className="space-y-1 sm:col-span-2">
+                <span className="font-semibold text-slate-500 flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Official Business Email</span>
+                </span>
+                <a
+                  href={`mailto:${job.client?.contact_email || 'partner-ops@clientorg.com'}`}
+                  className="font-bold text-blue-600 text-xs block hover:underline"
+                >
+                  {job.client?.contact_email || 'partner-ops@clientorg.com'}
+                </a>
+              </div>
+
+              {/* Head Office Address */}
+              <div className="space-y-1 sm:col-span-2">
+                <span className="font-semibold text-slate-500 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Head Office Address</span>
+                </span>
+                <span className="font-medium text-slate-700 text-xs block">
+                  {job.client?.address || 'Innovation Tower, District 1, Ho Chi Minh City, Vietnam'}
+                </span>
+              </div>
+
+              {/* Client Notes / Special Terms */}
+              {job.client?.notes && (
+                <div className="space-y-1 sm:col-span-2 bg-amber-50/50 p-3 rounded-xl border border-amber-200/60">
+                  <span className="font-bold text-amber-900 block text-[11px]">Cooperation Notes & SLA</span>
+                  <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                    {job.client.notes}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {timeLocks.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-400 space-y-2">
-              <ShieldCheck className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="font-semibold text-slate-600">No periods have been locked for this job.</p>
-              <p className="text-slate-400">All work logs remain open for regular employee timesheet submissions.</p>
+          {/* 📋 CARD 2: PROJECT SPECIFICATIONS & GOVERNANCE */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shadow-2xs">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Project Governance & Scope</h3>
+                  <p className="text-xs text-slate-500">Execution parameters, manager ownership, and timeline</p>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
+                {job.job_code || `JOB-${job.id}`}
+              </span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {timeLocks.map((lock) => {
-                const isLocked = lock.is_locked !== false && !lock.unlocked_at;
 
-                return (
-                  <div
-                    key={lock.id}
-                    className={cn(
-                      "p-4 rounded-xl border transition flex items-center justify-between text-xs gap-4",
-                      isLocked
-                        ? "border-rose-200/80 bg-rose-50/20 hover:border-rose-300"
-                        : "border-emerald-200/80 bg-emerald-50/20 hover:border-emerald-300"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-                          isLocked
-                            ? "bg-rose-50 text-rose-600"
-                            : "bg-emerald-50 text-emerald-600"
-                        )}
-                      >
-                        {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 text-xs">
-                            Period: Month {lock.lock_month}/{lock.lock_year}
-                          </span>
-                          {isLocked ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              LOCKED
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              UNLOCKED
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {isLocked
-                            ? lock.lock_reason || lock.reason || 'Period locked by Manager for payroll processing.'
-                            : lock.unlock_reason
-                            ? `Unlocked: ${lock.unlock_reason}`
-                            : 'Period unlocked. Work log submissions are open.'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {isLocked ? (
-                      <button
-                        onClick={() => {
-                          setSelectedLockToUnlock(lock);
-                          setUnlockReason('');
-                          setUnlockModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 text-xs transition cursor-pointer shrink-0"
-                      >
-                        <Unlock className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Unlock Period</span>
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-lg font-medium text-[11px]">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Open for submissions</span>
-                      </span>
-                    )}
+            <div className="space-y-4 text-xs">
+              {/* Project Manager in Charge */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shadow-2xs">
+                    {(job.manager?.full_name || 'M')[0].toUpperCase()}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Assigned Project Manager</span>
+                    <span className="font-extrabold text-xs text-slate-900 block">
+                      {job.manager?.full_name || job.manager?.email || 'Alexander Wright (Manager)'}
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  LEAD PM
+                </span>
+              </div>
 
-      {/* 📜 TAB 4: Audit History */}
-      {activeTab === 'audit' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Project Change Audit Trail</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Chronological log of operational changes, status transitions, and data edits.
-            </p>
+              {/* Timeline & Schedule Breakdown */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-100 space-y-1">
+                  <span className="font-semibold text-slate-500 block">Kickoff Start Date</span>
+                  <span className="font-mono font-bold text-slate-900 text-xs block">
+                    {formatDateSafe(job.start_date)}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-100 space-y-1">
+                  <span className="font-semibold text-slate-500 block">Target Completion</span>
+                  <span className="font-mono font-bold text-slate-900 text-xs block">
+                    {formatDateSafe(job.deadline)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Full Scope Description */}
+              <div className="space-y-1.5 pt-1">
+                <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <span>Detailed Scope Description</span>
+                </span>
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-slate-700 text-xs leading-relaxed font-normal min-h-[80px]">
+                  {job.description || 'No detailed scope description provided for this project.'}
+                </div>
+              </div>
+
+              {/* Audit Metadata */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Created: {formatDateSafe(job.created_at)}</span>
+                <span>Last Updated: {formatDateSafe(job.updated_at || job.created_at)}</span>
+              </div>
+            </div>
           </div>
 
-          <ActivityFeedTimeline events={auditLogs} onSelectEvent={handleSelectAuditLog} />
         </div>
       )}
 
@@ -1011,132 +1031,8 @@ const ALLOWED_TRANSITIONS = {
         </form>
       </BaseModal>
 
-      {/* Modal: Khóa kỳ công mới (Create TimeLock) */}
-      <BaseModal
-        isOpen={lockModalOpen}
-        onClose={() => setLockModalOpen(false)}
-        title="Lock Timesheet Period"
-        description={`Lock employee work log entries for ${job.job_name}`}
-      >
-        <form onSubmit={handleCreateTimeLockSubmit} className="space-y-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Month *</label>
-              <select
-                value={lockFormData.lock_month}
-                onChange={(e) =>
-                  setLockFormData({ ...lockFormData, lock_month: Number(e.target.value) })
-                }
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>
-                    Month {m < 10 ? `0${m}` : m}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Year *</label>
-              <select
-                value={lockFormData.lock_year}
-                onChange={(e) =>
-                  setLockFormData({ ...lockFormData, lock_year: Number(e.target.value) })
-                }
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {[2025, 2026, 2027].map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Reason / Notes</label>
-            <textarea
-              rows={3}
-              value={lockFormData.reason}
-              onChange={(e) => setLockFormData({ ...lockFormData, reason: e.target.value })}
-              placeholder="e.g. Monthly payroll review cutoff."
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setLockModalOpen(false)}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={createTimeLockMutation.isPending}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
-            >
-              {createTimeLockMutation.isPending ? 'Locking...' : 'Lock Period'}
-            </button>
-          </div>
-        </form>
-      </BaseModal>
-
-      {/* Modal: Mở khóa kỳ công (Unlock TimeLock) */}
-      <BaseModal
-        isOpen={unlockModalOpen}
-        onClose={() => setUnlockModalOpen(false)}
-        title="Unlock Timesheet Period"
-        description={`Allow employees to modify work logs for Month ${selectedLockToUnlock?.lock_month}/${selectedLockToUnlock?.lock_year}`}
-      >
-        <form onSubmit={handleUnlockSubmit} className="space-y-4 text-xs">
-          <div>
-            <label className="block font-bold text-rose-700 mb-1">
-              Reason for unlocking period *
-            </label>
-            <textarea
-              rows={3}
-              value={unlockReason}
-              onChange={(e) => setUnlockReason(e.target.value)}
-              placeholder="Explain why this period is unlocked for correction..."
-              required
-              className="w-full bg-rose-50/50 border border-rose-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
-            />
-          </div>
-
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setUnlockModalOpen(false)}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={unlockTimeLockMutation.isPending}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
-            >
-              {unlockTimeLockMutation.isPending ? 'Unlocking...' : 'Confirm Unlock'}
-            </button>
-          </div>
-        </form>
-      </BaseModal>
-
       {/* Task Detail Slide-over Drawer */}
       <TaskDetailDrawer />
-
-      {/* Audit Log Diff Viewer Slide-over Drawer */}
-      <SideDrawer
-        isOpen={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-        title="Audit Log Detail & Snapshot Diff"
-      >
-        <AuditDiffViewer auditLog={selectedAuditLog} />
-      </SideDrawer>
     </div>
   );
 }

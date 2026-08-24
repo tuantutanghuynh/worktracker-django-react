@@ -53,6 +53,8 @@ class ManagerAuditLogSerializer(serializers.ModelSerializer):
             "actor_email",
             "actor_name",
             "action",
+            "severity",
+            "summary",
             "table_name",
             "record_id",
             "old_values",

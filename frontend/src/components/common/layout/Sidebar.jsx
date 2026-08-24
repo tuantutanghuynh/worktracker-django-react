@@ -111,16 +111,24 @@ export default function Sidebar() {
     return 0;
   }, [reviewingTasks]);
 
-  // 🚀 REACT QUERY: Lấy số lượng LogWork đang chờ duyệt (PENDING) để hiển thị badge Timesheets
+  // 🚀 REACT QUERY: Lấy số lượng Daily Timesheets đang chờ duyệt (PENDING) để hiển thị badge Timesheets
   const { data: pendingLogWorksData } = useLogWorks(
-    userRole === 'MANAGER' ? { review_status: 'PENDING', page_size: 100 } : {}
+    userRole === 'MANAGER' ? { review_status: 'PENDING', page_size: 200 } : {}
   );
   const pendingTimesheetCount = useMemo(() => {
     if (!pendingLogWorksData) return 0;
-    if (typeof pendingLogWorksData.count === 'number') return pendingLogWorksData.count;
-    if (Array.isArray(pendingLogWorksData)) return pendingLogWorksData.length;
-    if (Array.isArray(pendingLogWorksData.results)) return pendingLogWorksData.results.length;
-    return 0;
+    const list = Array.isArray(pendingLogWorksData)
+      ? pendingLogWorksData
+      : Array.isArray(pendingLogWorksData.results)
+      ? pendingLogWorksData.results
+      : [];
+    const uniqueDays = new Set();
+    list.forEach((lw) => {
+      const userId = lw.user?.id || lw.user_id || (typeof lw.user === 'number' ? lw.user : null);
+      const date = lw.work_date;
+      if (userId && date) uniqueDays.add(`${userId}_${date}`);
+    });
+    return uniqueDays.size;
   }, [pendingLogWorksData]);
 
   // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs

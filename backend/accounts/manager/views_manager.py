@@ -1,15 +1,16 @@
 import calendar
 from datetime import date
-from django.db.models import Q
+from django.db.models import Count, Q
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import CustomUser, EmployeeProfile
+from accounts.models import CustomUser, Department, EmployeeProfile
 from accounts.manager.serializers_manager import (
     ManagerDepartmentAssignSerializer,
+    ManagerDepartmentMiniSerializer,
     ManagerEmployeeListSerializer,
 )
 from system.security.permissions_manager import (
@@ -21,6 +22,22 @@ from system.services.audit_manager_service import snapshot, log_action
 from timesheets.services.manager_employee_utilization_service import (
     get_team_workload_summary,
 )
+
+
+class ManagerDepartmentListView(ListAPIView):
+    """
+    GET /api/manager/accounts/departments/
+    Trả về danh sách phòng ban để Manager chọn khi gán phòng ban cho nhân viên.
+    """
+    permission_classes = [
+        IsActiveAuthenticated,
+        IsManagerRole,
+        HasPermissionCode,
+    ]
+    required_permission = "team:view"
+    serializer_class = ManagerDepartmentMiniSerializer
+    pagination_class = None
+    queryset = Department.objects.all().order_by("name")
 
 
 class ManagerTeamEmployeeListView(ListAPIView):
@@ -53,6 +70,13 @@ class ManagerTeamEmployeeListView(ListAPIView):
                 is_active=True,
             )
             .select_related("profile", "profile__department", "role")
+            .annotate(
+                active_tasks_count=Count(
+                    "assigned_tasks",
+                    filter=~Q(assigned_tasks__status="DONE"),
+                    distinct=True,
+                )
+            )
             .order_by("profile__full_name")
         )
 

@@ -54,6 +54,9 @@ export const ERROR_DICTIONARY = {
   LOGWORK_ALREADY_VOIDED: 'This work log entry has already been voided.',
   GLOBAL_PERIOD_IS_LOCKED: 'Timesheet period for this date is globally locked by Admin.',
   JOB_PERIOD_IS_LOCKED: 'Timesheet period for this project is currently locked.',
+  JOB_PERIOD_ALREADY_LOCKED: 'Timesheet period for this project is already locked.',
+  JOB_PERIOD_NOT_LOCKED: 'Timesheet period for this project is not currently locked.',
+  CANNOT_LOCK_ACTIVE_PERIOD: 'Cannot lock the current active period. You can only lock periods after the month has fully ended.',
   MAX_DAILY_HOURS_EXCEEDED: 'Logged hours exceed the maximum allowed daily total limit.',
 
   // =================================================================

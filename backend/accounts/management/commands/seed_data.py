@@ -7,6 +7,7 @@ from accounts.models import CustomUser, Role, Department, EmployeeProfile
 from projects.models import Client, Job
 from tasks.models import Task, TaskFollower, TaskComment, TaskAttachment
 from timesheets.models import LogWork, TimeLock, DailyUserTimesheet
+from timesheets.services.daily_total_manager_service import rebuild_daily_user_timesheet
 from chat.models import ChatRoom, ChatParticipant, ChatMessage
 from system.models import AuditLog, Notification
 from tasks.services.order_index_manager_service import key_between
@@ -245,22 +246,63 @@ class Command(BaseCommand):
             # -----------------------------------------------------------------
             # 5. TIMESHEETS (LOGWORK RECORDS & TIMELOCKS)
             # -----------------------------------------------------------------
-            self.stdout.write("5. Seeding LogWorks & TimeLocks...")
-            statuses_pool = [LogWork.ReviewStatus.APPROVED, LogWork.ReviewStatus.PENDING, LogWork.ReviewStatus.REJECTED]
+            self.stdout.write("5. Seeding LogWorks & TimeLocks with standard 8.0h daily cap...")
 
-            for t in created_tasks[:40]:
-                for d_offset in range(1, 3):
-                    LogWork.objects.get_or_create(
-                        task=t,
-                        user=t.assignee,
-                        work_date=today - timedelta(days=d_offset),
-                        defaults={
-                            "hours_spent": random.choice([2.0, 3.5, 4.0, 6.0, 8.0]),
-                            "description": f"Worked on feature execution for task: {t.title}",
-                            "review_status": random.choice(statuses_pool),
-                            "reviewed_by": manager_user,
-                        }
-                    )
+            hours_distribution_pool = [
+                [8.0],
+                [4.0, 4.0],
+                [5.0, 3.0],
+                [3.5, 2.5, 2.0],
+                [4.0, 2.5, 1.5],
+                [3.0, 3.0, 2.0],
+                [6.0, 2.0],
+                [7.5],
+            ]
+
+            for emp in employee_users:
+                emp_tasks = [t for t in created_tasks if t.assignee_id == emp.id]
+                if not emp_tasks:
+                    continue
+
+                for d_offset in range(1, 4):
+                    work_date = today - timedelta(days=d_offset)
+                    dist = random.choice(hours_distribution_pool)
+
+                    # Chọn số lượng task tương ứng phân bổ giờ (không trùng lặp trong ngày)
+                    num_tasks = min(len(dist), len(emp_tasks))
+                    selected_tasks = random.sample(emp_tasks, num_tasks)
+
+                    for idx, task in enumerate(selected_tasks):
+                        hours = dist[idx] if idx < len(dist) else 2.0
+
+                        if d_offset == 1:
+                            status_val = LogWork.ReviewStatus.PENDING
+                            reviewed_by_user = None
+                            review_note = None
+                        elif d_offset == 2:
+                            status_val = random.choice([LogWork.ReviewStatus.PENDING, LogWork.ReviewStatus.APPROVED])
+                            reviewed_by_user = manager_user if status_val == LogWork.ReviewStatus.APPROVED else None
+                            review_note = "Great execution, approved!" if status_val == LogWork.ReviewStatus.APPROVED else None
+                        else:
+                            status_val = random.choice([LogWork.ReviewStatus.APPROVED, LogWork.ReviewStatus.APPROVED, LogWork.ReviewStatus.REJECTED])
+                            reviewed_by_user = manager_user
+                            review_note = "Approved by manager" if status_val == LogWork.ReviewStatus.APPROVED else "Please clarify work details on this task"
+
+                        LogWork.objects.get_or_create(
+                            task=task,
+                            user=emp,
+                            work_date=work_date,
+                            defaults={
+                                "hours_spent": hours,
+                                "description": f"Worked on feature execution for task: {task.title}",
+                                "review_status": status_val,
+                                "reviewed_by": reviewed_by_user,
+                                "review_note": review_note,
+                            }
+                        )
+
+                    # Tự động cập nhật bảng DailyUserTimesheet chuẩn xác cho nhân viên và ngày đó
+                    rebuild_daily_user_timesheet(user_id=emp.id, work_date=work_date)
 
             TimeLock.objects.get_or_create(
                 job=jobs[0],

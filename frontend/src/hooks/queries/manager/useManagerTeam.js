@@ -9,7 +9,19 @@ import { getErrorMessage } from '../../../utils/errorMessages';
 export const managerTeamKeys = {
   all: ['manager-team'],
   employees: (params = {}) => [...managerTeamKeys.all, 'employees', { params }],
+  departments: () => [...managerTeamKeys.all, 'departments'],
 };
+
+/**
+ * Fetch list of departments
+ */
+export function useManagerDepartments() {
+  return useQuery({
+    queryKey: managerTeamKeys.departments(),
+    queryFn: () => managerTeamService.getDepartments(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 /**
  * Fetch list of employees with workload utilization summary

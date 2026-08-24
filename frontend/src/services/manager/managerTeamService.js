@@ -11,6 +11,14 @@ export const managerTeamService = {
   },
 
   /**
+   * Fetch list of departments for dropdown selection
+   */
+  getDepartments: async () => {
+    const response = await axiosClient.get('/manager/accounts/departments/');
+    return response.data;
+  },
+
+  /**
    * Assign employee to department
    * @param {number|string} userId - Employee User ID
    * @param {number|string} departmentId - Department ID

@@ -112,7 +112,7 @@ class ManagerLogWorkCorrectSerializer(serializers.Serializer):
         max_digits=5,
         decimal_places=2,
         min_value=Decimal("0.01"),
-        max_value=Decimal("24.00"),
+        max_value=Decimal("8.00"),
         required=False,
     )
     description = serializers.CharField(

@@ -1,10 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from accounts.models import EmployeeProfile
 from projects.models import Job
 from tasks.models import Task, TaskComment, TaskAttachment
 from timesheets.models import LogWork, TimeLock
+from system.models import AuditLog
 
 
 ADMIN_ROLE_CODE = "ADMIN"
@@ -227,3 +229,39 @@ def assert_job_in_manager_scope(user, job):
 
     if job.manager_id != user.id:
         raise PermissionError("JOB_OUT_OF_MANAGER_SCOPE")
+
+
+def scoped_audit_logs(user):
+    """
+    AuditLog queryset được bảo vệ chặt chẽ theo Scope của Manager:
+    1. Các hành động do chính Manager đó thực hiện (user=user).
+    2. Các hành động của nhân viên trên các đối tượng (Jobs, Tasks, LogWorks, TimeLocks)
+       thuộc Job do Manager đó phụ trách (job.manager_id = user.id).
+
+    CHẶN HOÀN TOÀN:
+    - Không thể xem hành động của Manager khác.
+    - Không thể xem hành động của Admin.
+    - Không thể xem hành động của Employee trên các Job thuộc Manager khác.
+    """
+    if is_admin(user):
+        return AuditLog.objects.all()
+
+    if not is_manager(user):
+        return AuditLog.objects.none()
+
+    job_ids = list(Job.objects.filter(manager_id=user.id).values_list("id", flat=True))
+    task_ids = list(Task.objects.filter(job_id__in=job_ids).values_list("id", flat=True))
+    logwork_ids = list(LogWork.objects.filter(task_id__in=task_ids).values_list("id", flat=True))
+    timelock_ids = list(TimeLock.objects.filter(job_id__in=job_ids).values_list("id", flat=True))
+
+    scope_condition = (
+        Q(user=user)
+        | (Q(table_name="jobs") & Q(record_id__in=job_ids))
+        | (Q(table_name="tasks") & Q(record_id__in=task_ids))
+        | (Q(table_name="log_works") & Q(record_id__in=logwork_ids))
+        | (Q(table_name="timesheets") & Q(record_id__in=logwork_ids))
+        | (Q(table_name="time_locks") & Q(record_id__in=timelock_ids))
+        | (Q(table_name="timelocks") & Q(record_id__in=timelock_ids))
+    )
+
+    return AuditLog.objects.filter(scope_condition).distinct()
