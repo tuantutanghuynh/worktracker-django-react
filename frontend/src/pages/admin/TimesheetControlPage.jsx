@@ -283,30 +283,30 @@ export function TimesheetControlPage() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-xs">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Employee" sortKey="full_name" ordering={ordering} onSort={toggleSort} className="w-48" />
+              <SortableHeader label="Employee" sortKey="full_name" ordering={ordering} onSort={toggleSort} className="w-52" />
               <SortableHeader label="Department" sortKey="department_name" ordering={ordering} onSort={toggleSort} className="w-36" />
               <SortableHeader label="Month Hours" sortKey="month_hours" ordering={ordering} onSort={toggleSort} className="w-48" />
-              <SortableHeader label="Avg/Day" sortKey="avg_per_day" ordering={ordering} onSort={toggleSort} className="w-24" />
+              <SortableHeader label="Avg/Day" sortKey="avg_per_day" ordering={ordering} onSort={toggleSort} className="w-20" />
               <SortableHeader label="Violations" sortKey="violations" ordering={ordering} onSort={toggleSort} className="w-24" />
               <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} className="w-28" />
               <SortableHeader label="Last Entry" sortKey="last_entry" ordering={ordering} onSort={toggleSort} className="w-28" />
-              <th className="w-10 px-3 py-2.5" />
+              <th className="w-10 px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && employees.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
                   No employees match these filters.
                 </td>
               </tr>
@@ -317,14 +317,14 @@ export function TimesheetControlPage() {
                 onClick={() => setSelectedEmployeeId(emp.user_id)}
                 className="cursor-pointer hover:bg-slate-50 transition-colors"
               >
-                <td className="px-3 py-2.5 truncate">
+                <td className="px-4 py-3 truncate">
                   <p className="truncate font-semibold text-slate-900">{emp.full_name}</p>
-                  <p className="truncate text-[10px] text-slate-400">{emp.email}</p>
+                  <p className="truncate text-[11px] text-slate-400">{emp.email}</p>
                 </td>
-                <td className="px-3 py-2.5 truncate text-slate-500">{emp.department_name || '—'}</td>
-                <td className="px-3 py-2.5">
+                <td className="px-4 py-3 truncate text-slate-500">{emp.department_name || '—'}</td>
+                <td className="px-4 py-3">
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-slate-700">
+                    <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-700">
                       <span className="truncate">{emp.month_hours}h</span>
                       <span className="shrink-0 truncate text-slate-400">Target {emp.target_hours}h</span>
                     </div>
@@ -338,17 +338,17 @@ export function TimesheetControlPage() {
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{emp.avg_per_day}h</td>
-                <td className="px-3 py-2.5 text-center">
+                <td className="px-4 py-3 text-center font-semibold text-slate-700">{emp.avg_per_day}h</td>
+                <td className="px-4 py-3 text-center">
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
                     {emp.violations}
                   </span>
                 </td>
-                <td className="px-3 py-2.5 truncate">
+                <td className="px-4 py-3 truncate">
                   <StatusPill status={emp.status} />
                 </td>
-                <td className="px-3 py-2.5 truncate text-slate-500">{emp.last_entry || '—'}</td>
-                <td className="px-3 py-2.5 text-slate-300">
+                <td className="px-4 py-3 truncate text-slate-500">{emp.last_entry || '—'}</td>
+                <td className="px-4 py-3 text-slate-300">
                   <ChevronRight className="h-4 w-4" />
                 </td>
               </tr>

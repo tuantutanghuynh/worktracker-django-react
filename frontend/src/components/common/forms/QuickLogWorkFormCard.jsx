@@ -131,6 +131,7 @@ export default function QuickLogWorkFormCard({
           leftIcon={Briefcase}
           required
           searchable
+          theme="dark"
         />
 
         {/* Date and Hours Input Row */}
@@ -143,6 +144,7 @@ export default function QuickLogWorkFormCard({
             error={errors.workDate}
             leftIcon={CalendarIcon}
             required
+            theme="dark"
           />
 
           <div className="space-y-1.5">
@@ -157,6 +159,7 @@ export default function QuickLogWorkFormCard({
                 setHoursSpent(e.target.value);
                 setErrors(prev => ({ ...prev, hoursSpent: null }));
               }}
+              theme="dark"
               error={errors.hoursSpent}
               leftIcon={Clock}
               required
