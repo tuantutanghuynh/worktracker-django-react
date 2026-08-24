@@ -66,6 +66,24 @@ export const managerReportService = {
   },
 
   /**
+   * Delete single notification
+   * @param {number|string} id - Notification ID
+   */
+  deleteNotification: async (id) => {
+    const response = await axiosClient.delete(`/manager/system/notifications/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Delete multiple notifications in batch
+   * @param {Array<number|string>} ids - Array of Notification IDs
+   */
+  deleteNotificationsBatch: async (ids) => {
+    const response = await axiosClient.post('/manager/system/notifications/delete-batch/', { ids });
+    return response.data;
+  },
+
+  /**
    * Fetch system audit log entries
    * @param {Object} params - Query params (table_name, action, record_id, date_from, date_to)
    */

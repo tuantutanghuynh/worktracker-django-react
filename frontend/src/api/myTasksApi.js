@@ -15,8 +15,10 @@ export async function getMyTaskDetail(id) {
     return data
 }
 
-export async function changeTaskStatus(id, newStatus) {
-    const { data } = await axiosClient.patch(`/employee/tasks/${id}/status/`, { status: newStatus })
+export async function changeTaskStatus(id, newStatus, reason = null) {
+    const payload = { status: newStatus }
+    if (reason) payload.reason = reason
+    const { data } = await axiosClient.patch(`/employee/tasks/${id}/status/`, payload)
     return data
 }
 

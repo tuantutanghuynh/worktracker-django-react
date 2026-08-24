@@ -64,9 +64,10 @@ class EmployeeTaskDetailSerializer(serializers.ModelSerializer):
 
 
 class EmployeeTaskStatusUpdateSerializer(serializers.Serializer):
-    """Xử lý cập nhật trạng thái khi kéo thả thẻ trên Kanban"""
+    """Xử lý cập nhật trạng thái khi kéo thả thẻ trên Kanban hoặc thu hồi task"""
     status = serializers.ChoiceField(choices=['TODO', 'IN_PROGRESS', 'REVIEWING'])
     order_index = serializers.CharField(required=False, allow_blank=True)
+    reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_status(self, value):
         if value == 'COMPLETED':

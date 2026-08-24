@@ -62,6 +62,8 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
     job_status = serializers.CharField(source="job.status", read_only=True)
     is_archived = serializers.SerializerMethodField()
 
+    participants = serializers.SerializerMethodField()
+
     class Meta:
         model = ChatRoom
         fields = [
@@ -78,6 +80,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
             "unread_count",
             "other_participant",
             "participants_count",
+            "participants",
             "is_archived",
         ]
 
@@ -111,6 +114,40 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
 
     def get_participants_count(self, obj):
         return obj.participants.count()
+
+    def get_participants(self, obj):
+        participants_qs = obj.participants.select_related(
+            "user", "user__role", "user__profile", "user__profile__department"
+        ).all()
+        result = []
+        for p in participants_qs:
+            if not p.user:
+                continue
+            profile = getattr(p.user, "profile", None)
+            dept_name = None
+            full_name = ""
+            phone_number = ""
+            if profile:
+                full_name = getattr(profile, "full_name", "") or ""
+                phone_number = getattr(profile, "phone_number", "") or ""
+                if getattr(profile, "department", None):
+                    dept_name = profile.department.name
+            
+            role_code = "EMPLOYEE"
+            if getattr(p.user, "role", None):
+                role_code = p.user.role.code if hasattr(p.user.role, "code") else str(p.user.role)
+
+            result.append({
+                "id": p.user.id,
+                "email": p.user.email,
+                "full_name": full_name or p.user.email.split("@")[0],
+                "role": role_code,
+                "department_name": dept_name or "General Staff",
+                "phone_number": phone_number,
+                "is_active": p.user.is_active,
+                "joined_at": p.joined_at,
+            })
+        return result
 
     def get_is_archived(self, obj):
         if obj.room_type == ChatRoom.RoomType.JOB and obj.job:

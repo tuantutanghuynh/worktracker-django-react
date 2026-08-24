@@ -21,7 +21,7 @@ export function useMyTasks() {
     })
 
     const statusMutation = useMutation({
-        mutationFn: ({ taskId, newStatus }) => changeTaskStatus(taskId, newStatus),
+        mutationFn: ({ taskId, newStatus, reason }) => changeTaskStatus(taskId, newStatus, reason),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: myTasksKeys.list() })
         },
@@ -30,9 +30,9 @@ export function useMyTasks() {
         },
     })
 
-    async function changeStatus(taskId, newStatus) {
+    async function changeStatus(taskId, newStatus, reason = null) {
         try {
-            await statusMutation.mutateAsync({ taskId, newStatus })
+            await statusMutation.mutateAsync({ taskId, newStatus, reason })
             return true
         } catch {
             return false

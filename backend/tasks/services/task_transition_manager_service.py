@@ -49,6 +49,7 @@ TASK_TRANSITIONS = {
     ],
     (Task.Status.REVIEWING, Task.Status.IN_PROGRESS): [
         ACTOR_JOB_MANAGER,
+        ACTOR_ASSIGNEE,
     ],
     (Task.Status.TODO, Task.Status.CANCELLED): [
         ACTOR_JOB_MANAGER,
@@ -178,6 +179,19 @@ def validate_transition(task, to_status, reason=None):
         raise InvalidTaskTransition("INVALID_TASK_STATUS_TRANSITION")
 
     if (
+        task.status == Task.Status.IN_PROGRESS
+        and to_status == Task.Status.REVIEWING
+    ):
+        from timesheets.models import LogWork
+        has_logged_work = LogWork.objects.filter(
+            task=task,
+            review_status__in=[LogWork.ReviewStatus.PENDING, LogWork.ReviewStatus.APPROVED],
+            hours_spent__gt=0,
+        ).exists()
+        if not has_logged_work:
+            raise BusinessRuleError("LOGGED_WORK_REQUIRED_BEFORE_SUBMISSION")
+
+    if (
         task.status == Task.Status.REVIEWING
         and to_status == Task.Status.IN_PROGRESS
         and not reason
@@ -249,10 +263,12 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
             from_status == Task.Status.REVIEWING
             and to_status == Task.Status.IN_PROGRESS
         ):
+            is_recall = (user == locked_task.assignee)
+            prefix = "[Submission Recalled]: " if is_recall else "[Rejection Note]: "
             TaskComment.objects.create(
                 task=locked_task,
                 user=user,
-                content=clean_reason,
+                content=f"{prefix}{clean_reason}" if clean_reason else ("Submission recalled by employee" if is_recall else "Task rejected by manager"),
                 comment_type=TaskComment.CommentType.REJECTION_NOTE,
             )
 

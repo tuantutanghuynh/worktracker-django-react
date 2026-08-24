@@ -244,7 +244,11 @@ class ManagerTaskFilter:
         return queryset.filter(
             Q(title__icontains=search)
             | Q(description__icontains=search)
-        )
+            | Q(assignee__profile__full_name__icontains=search)
+            | Q(assignee__email__icontains=search)
+            | Q(job__job_name__icontains=search)
+            | Q(job__job_code__icontains=search)
+        ).distinct()
 
     @classmethod
     def apply_ordering(cls, queryset, params):

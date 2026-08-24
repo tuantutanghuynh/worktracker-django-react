@@ -37,7 +37,7 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='status')
     def change_status(self, request, pk=None):
         """
-        API Kéo thả Kanban: Cập nhật status qua apply_transition() dùng chung —
+        API Kéo thả Kanban hoặc Thu hồi: Cập nhật status qua apply_transition() dùng chung —
         tự validate transition + đúng actor (FR-39), tự notify Manager, tự
         ghi audit log. Không tự set task.status trực tiếp.
         """
@@ -47,11 +47,13 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
 
         new_status = serializer.validated_data['status']
         order_index = serializer.validated_data.get('order_index')
+        reason = serializer.validated_data.get('reason')
 
         updated_task = apply_transition(
             user=request.user,
             task=task,
             to_status=new_status,
+            reason=reason,
             request=request,
         )
 
@@ -69,9 +71,15 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='attachments')
     def upload_deliverable(self, request, pk=None):
         """
-        API Nộp sản phẩm bàn giao (Deliverable) khi kéo task sang REVIEWING.
+        API Nộp sản phẩm bàn giao (Deliverable) khi nộp task sang REVIEWING.
         """
         task = self.get_object()
+        if task.status in [Task.Status.COMPLETED, Task.Status.CANCELLED]:
+            return Response(
+                {"error": f"Cannot upload deliverables to a task in '{task.status}' status."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response(
@@ -104,6 +112,13 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
             comments = task.comments.all().order_by('created_at')
             serializer = EmployeeTaskCommentSerializer(comments, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # 🔒 Khóa chặt comment khi task đang Reviewing hoặc Completed hoặc Cancelled
+        if task.status in [Task.Status.REVIEWING, Task.Status.COMPLETED, Task.Status.CANCELLED]:
+            return Response(
+                {"error": f"Cannot add comments to a task in '{task.status}' status. Task modifications are locked."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         content = request.data.get('content', '').strip()
         if not content:

@@ -32,11 +32,16 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("hours_spent must be greater than 0.")
         return value
 
-    # Data Isolation: rejects a task that isn't assigned to the calling user.
+    # Data Isolation & State Locking: rejects a task that isn't assigned to the caller or is locked.
     def validate_task(self, task):
         request = self.context["request"]
         if task.assignee_id != request.user.id:
             raise serializers.ValidationError("You can only log work on tasks assigned to you.")
+        if task.status in [Task.Status.REVIEWING, Task.Status.COMPLETED, Task.Status.CANCELLED]:
+            raise serializers.ValidationError(
+                f"Cannot log work on task '{task.title}' because it is in '{task.status}' status. "
+                "Please recall submission or request manager reopen before logging hours."
+            )
         return task
 
     # Runs Time Lock check (defensive layer 1), then 24h Cap + Pessimistic

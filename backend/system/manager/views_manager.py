@@ -113,6 +113,66 @@ class ManagerNotificationMarkAllReadView(APIView):
         )
 
 
+class ManagerNotificationDeleteView(APIView):
+    """
+    DELETE /api/manager/system/notifications/{id}/
+
+    Xóa một thông báo của Manager.
+    """
+
+    permission_classes = [
+        IsActiveAuthenticated,
+        IsManagerRole,
+        HasPermissionCode,
+    ]
+    required_permission = "notification:view"
+
+    def delete(self, request, notification_id):
+        deleted, _ = Notification.objects.filter(
+            pk=notification_id,
+            user=request.user,
+        ).delete()
+
+        if not deleted:
+            raise NotFound("Không tìm thấy thông báo cần xóa.")
+
+        return Response(
+            {"id": notification_id, "deleted": True},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ManagerNotificationBatchDeleteView(APIView):
+    """
+    POST /api/manager/system/notifications/delete-batch/
+
+    Xóa hàng loạt thông báo được chọn của Manager.
+    Body: { "ids": [1, 2, 3] }
+    """
+
+    permission_classes = [
+        IsActiveAuthenticated,
+        IsManagerRole,
+        HasPermissionCode,
+    ]
+    required_permission = "notification:view"
+
+    def post(self, request):
+        ids = request.data.get("ids", [])
+        if not isinstance(ids, list):
+            ids = [ids]
+
+        deleted_count, _ = Notification.objects.filter(
+            id__in=ids,
+            user=request.user,
+        ).delete()
+
+        return Response(
+            {"deleted_count": deleted_count},
+            status=status.HTTP_200_OK,
+        )
+
+
 # ============================================================
 # Audit Log API
 # ============================================================

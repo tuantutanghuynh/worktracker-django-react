@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   MessageSquare,
   Send,
@@ -18,7 +18,12 @@ import {
   Clock,
   ChevronRight,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  Sparkles,
+  Phone,
+  Mail,
+  Building2,
 } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
@@ -68,12 +73,15 @@ function formatFileSize(bytes) {
 }
 
 /**
- * Component Chat Dùng Chung Toàn Hệ Thống (WorkTracker Pro)
- * @param {Object} props
- * @param {number|string} [props.initialJobId] - ID của Job cần mở Kênh chat ngay khi mount
- * @param {string} [props.customTitle] - Tiêu đề tùy chỉnh của khung Chat
+ * Component Chat Doanh Nghiệp Toàn Diện (WorkTracker Pro Chat)
+ * Chuẩn kiến trúc Slack / Discord / MS Teams
  */
-export default function ChatContainer({ initialJobId, customTitle }) {
+export default function ChatContainer({
+  initialJobId,
+  initialDirectUserId,
+  initialRoomId,
+  customTitle,
+}) {
   const { user } = useAuth();
 
   // State quản lý danh sách phòng & phòng đang chọn
@@ -81,6 +89,10 @@ export default function ChatContainer({ initialJobId, customTitle }) {
   const [directMessages, setDirectMessages] = useState([]);
   const [activeRoom, setActiveRoom] = useState(null);
   const [loadingRooms, setLoadingRooms] = useState(true);
+
+  // State Panel Thành viên Kênh (Right Sidebar)
+  const [showMembersPanel, setShowMembersPanel] = useState(true);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
   // State tin nhắn phòng hiện tại
   const [messages, setMessages] = useState([]);
@@ -118,47 +130,84 @@ export default function ChatContainer({ initialJobId, customTitle }) {
   // ============================================================
   // 1. NẠP DANH SÁCH CÁC PHÒNG CHAT TỪ BACKEND
   // ============================================================
-  const fetchRooms = useCallback(async (autoSelectJobId = null) => {
-    try {
-      setLoadingRooms(true);
-      const data = await chatService.getRooms();
-      const channels = data.job_channels || [];
-      const dms = data.direct_messages || [];
+  const fetchRooms = useCallback(
+    async (autoSelectJobId = null, autoSelectUserId = null, autoSelectRoomId = null) => {
+      try {
+        setLoadingRooms(true);
+        const data = await chatService.getRooms();
+        let channels = data.job_channels || [];
+        let dms = data.direct_messages || [];
 
-      setJobChannels(channels);
-      setDirectMessages(dms);
-
-      // Nếu có yêu cầu mở theo initialJobId
-      if (autoSelectJobId) {
-        const targetChannel = channels.find(
-          (c) => String(c.job) === String(autoSelectJobId) || String(c.job_code) === String(autoSelectJobId)
-        );
-        if (targetChannel) {
-          setActiveRoom(targetChannel);
-          return;
+        // 1. Ưu tiên: autoSelectRoomId
+        if (autoSelectRoomId) {
+          const found = [...channels, ...dms].find(
+            (r) => String(r.id) === String(autoSelectRoomId)
+          );
+          if (found) {
+            setJobChannels(channels);
+            setDirectMessages(dms);
+            setActiveRoom(found);
+            if (dms.some((d) => d.id === found.id)) setActiveTab('DIRECT');
+            return;
+          }
         }
+
+        // 2. Ưu tiên: autoSelectUserId (Chat 1-1 với một nhân viên cụ thể)
+        if (autoSelectUserId) {
+          try {
+            const dmRoom = await chatService.startDirect(autoSelectUserId);
+            if (dmRoom?.id) {
+              setJobChannels(channels);
+              setDirectMessages(dms);
+              setActiveRoom(dmRoom);
+              setActiveTab('DIRECT');
+              return;
+            }
+          } catch (e) {
+            console.error('Could not auto-start direct room:', e);
+          }
+        }
+
+        // 3. Ưu tiên: autoSelectJobId (Kênh chat dự án)
+        if (autoSelectJobId) {
+          const targetChannel = channels.find(
+            (c) =>
+              String(c.job) === String(autoSelectJobId) ||
+              String(c.job_code) === String(autoSelectJobId)
+          );
+          if (targetChannel) {
+            setJobChannels(channels);
+            setDirectMessages(dms);
+            setActiveRoom(targetChannel);
+            setActiveTab('CHANNELS');
+            return;
+          }
+        }
+
+        setJobChannels(channels);
+        setDirectMessages(dms);
+
+        // Mặc định chọn phòng đầu tiên nếu chưa có phòng nào active
+        setActiveRoom((prev) => {
+          if (prev) {
+            const updated = [...channels, ...dms].find((r) => r.id === prev.id);
+            return updated || prev;
+          }
+          return channels[0] || dms[0] || null;
+        });
+      } catch (err) {
+        console.error('Failed to load chat rooms:', err);
+        toast.error('Failed to load chat rooms');
+      } finally {
+        setLoadingRooms(false);
       }
-
-      // Mặc định chọn phòng đầu tiên nếu chưa có phòng nào active
-      setActiveRoom((prev) => {
-        if (prev) {
-          // Cập nhật lại thông tin mới của phòng đang active
-          const updated = [...channels, ...dms].find((r) => r.id === prev.id);
-          return updated || prev;
-        }
-        return channels[0] || dms[0] || null;
-      });
-    } catch (err) {
-      console.error('Failed to load chat rooms:', err);
-      toast.error('Failed to load chat rooms');
-    } finally {
-      setLoadingRooms(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchRooms(initialJobId);
-  }, [fetchRooms, initialJobId]);
+    fetchRooms(initialJobId, initialDirectUserId, initialRoomId);
+  }, [fetchRooms, initialJobId, initialDirectUserId, initialRoomId]);
 
   // ============================================================
   // 2. NẠP LỊCH SỬ TIN NHẮN KHI ĐỔI PHÒNG CHAT
@@ -199,10 +248,6 @@ export default function ChatContainer({ initialJobId, customTitle }) {
       const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
-      socket.onopen = () => {
-        // console.log(`[WS] Connected to chat room #${activeRoom.id}`);
-      };
-
       socket.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
@@ -210,7 +255,6 @@ export default function ChatContainer({ initialJobId, customTitle }) {
           if (payload.type === 'chat_message' && payload.data) {
             const newMsg = payload.data;
             setMessages((prev) => {
-              // Tránh trùng ID
               if (prev.some((m) => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
@@ -232,21 +276,27 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                   : room
               )
             );
-            setDirectMessages((prevList) =>
-              prevList.map((room) =>
-                room.id === activeRoom.id
-                  ? {
-                      ...room,
-                      last_message: {
-                        id: newMsg.id,
-                        content: newMsg.content || `[Attachment] ${newMsg.attachment_name}`,
-                        sender_name: newMsg.sender?.full_name || 'User',
-                        created_at: newMsg.created_at,
-                      },
-                    }
-                  : room
-              )
-            );
+            setDirectMessages((prevList) => {
+              const updatedRoom = {
+                ...activeRoom,
+                last_message: {
+                  id: newMsg.id,
+                  content: newMsg.content || `[Attachment] ${newMsg.attachment_name}`,
+                  sender_name: newMsg.sender?.full_name || 'User',
+                  created_at: newMsg.created_at,
+                },
+              };
+              const exists = prevList.some((room) => room.id === activeRoom.id);
+              if (exists) {
+                return prevList.map((room) =>
+                  room.id === activeRoom.id ? updatedRoom : room
+                );
+              }
+              if (activeRoom.room_type === 'DIRECT') {
+                return [updatedRoom, ...prevList];
+              }
+              return prevList;
+            });
           } else if (payload.type === 'typing_indicator' && payload.data) {
             const { user_id, user_name, is_typing } = payload.data;
             setTypingUsers((prev) => {
@@ -299,7 +349,6 @@ export default function ChatContainer({ initialJobId, customTitle }) {
       setSending(true);
       let attachmentData = {};
 
-      // Nếu có tệp đính kèm -> Upload trước lên server nội bộ
       if (stagedFile) {
         setUploadingFile(true);
         const uploadRes = await chatService.uploadAttachment(stagedFile);
@@ -317,14 +366,34 @@ export default function ChatContainer({ initialJobId, customTitle }) {
         ...attachmentData,
       };
 
-      // Gửi qua REST API (Backend sẽ tự động lưu và broadcast qua WebSocket)
       const res = await chatService.sendMessage(activeRoom.id, payload);
 
-      // Thêm vào danh sách tin nhắn cục bộ nếu chưa được WS đẩy về
       setMessages((prev) => {
         if (prev.some((m) => m.id === res.id)) return prev;
         return [...prev, { ...res, is_mine: true }];
       });
+
+      // Cập nhật last_message trên Sidebar DMs
+      if (activeRoom.room_type === 'DIRECT') {
+        setDirectMessages((prevList) => {
+          const updatedRoom = {
+            ...activeRoom,
+            last_message: {
+              id: res.id,
+              content: res.content || `[Attachment] ${res.attachment_name}`,
+              sender_name: 'You',
+              created_at: res.created_at,
+            },
+          };
+          const exists = prevList.some((room) => room.id === activeRoom.id);
+          if (exists) {
+            return prevList.map((room) =>
+              room.id === activeRoom.id ? updatedRoom : room
+            );
+          }
+          return [updatedRoom, ...prevList];
+        });
+      }
 
       setInputText('');
       setTimeout(scrollToBottom, 50);
@@ -344,7 +413,6 @@ export default function ChatContainer({ initialJobId, customTitle }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Giới hạn 20MB
     if (file.size > 20 * 1024 * 1024) {
       toast.error('File size exceeds 20MB limit.');
       return;
@@ -355,7 +423,7 @@ export default function ChatContainer({ initialJobId, customTitle }) {
   };
 
   // ============================================================
-  // 6. XỬ LÝ MỞ CHAT 1-1 TỪ DANH BẠ NHÂN SỰ
+  // 6. XỬ LÝ MỞ CHAT 1-1 TỪ DANH BẠ HOẶC TỪ CHANNEL MEMBER
   // ============================================================
   const handleOpenDirectory = async () => {
     try {
@@ -372,12 +440,18 @@ export default function ChatContainer({ initialJobId, customTitle }) {
   };
 
   const handleStartDirectChat = async (targetUser) => {
+    if (!targetUser?.id) return;
+    if (targetUser.id === user?.id) {
+      toast.info('This is your own account.');
+      return;
+    }
+
     try {
       const room = await chatService.startDirect(targetUser.id);
       setShowDirectoryModal(false);
-      await fetchRooms();
       setActiveRoom(room);
-      toast.success(`Started conversation with ${targetUser.full_name || targetUser.email}`);
+      setActiveTab('DIRECT');
+      toast.success(`Direct conversation with ${targetUser.full_name || targetUser.email}`);
     } catch (err) {
       console.error('Failed to start DM:', err);
       toast.error('Failed to start conversation');
@@ -387,19 +461,44 @@ export default function ChatContainer({ initialJobId, customTitle }) {
   // ============================================================
   // 7. LỌC DANH SÁCH PHÒNG CHAT THEO TÌM KIẾM & TAB
   // ============================================================
-  const filteredChannels = jobChannels.filter((c) =>
-    (c.name || c.job_name || c.job_code || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredChannels = useMemo(() => {
+    return jobChannels.filter((c) =>
+      (c.name || c.job_name || c.job_code || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [jobChannels, searchQuery]);
 
-  const filteredDMs = directMessages.filter((d) => {
-    const name = d.other_participant?.full_name || d.other_participant?.email || d.name || '';
-    return name.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filteredDMs = useMemo(() => {
+    return directMessages.filter((d) => {
+      const name = d.other_participant?.full_name || d.other_participant?.email || d.name || '';
+      return name.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [directMessages, searchQuery]);
+
+  // Danh sách thành viên kênh hiện tại (được phân loại)
+  const channelParticipants = useMemo(() => {
+    if (!activeRoom || activeRoom.room_type !== 'JOB') return { leads: [], members: [] };
+    const rawList = Array.isArray(activeRoom.participants) ? activeRoom.participants : [];
+    
+    const filtered = rawList.filter((m) => {
+      if (!memberSearchQuery.trim()) return true;
+      const q = memberSearchQuery.toLowerCase();
+      return (
+        (m.full_name || '').toLowerCase().includes(q) ||
+        (m.email || '').toLowerCase().includes(q) ||
+        (m.department_name || '').toLowerCase().includes(q)
+      );
+    });
+
+    const leads = filtered.filter((m) => m.role === 'MANAGER' || m.role === 'ADMIN');
+    const members = filtered.filter((m) => m.role !== 'MANAGER' && m.role !== 'ADMIN');
+
+    return { leads, members, total: filtered.length };
+  }, [activeRoom, memberSearchQuery]);
 
   return (
     <div className="flex h-[calc(100vh-8.5rem)] bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden select-none">
       {/* ============================================================
-          CỘT TRÁI (320px): DANH SÁCH KÊNH DỰ ÁN & CHAT 1-1
+          CỘT TRÁI (310px): DANH SÁCH KÊNH DỰ ÁN & CHAT 1-1
          ============================================================ */}
       <div className="w-80 border-r border-slate-200 flex flex-col bg-slate-50/50 shrink-0">
         {/* Header danh sách */}
@@ -414,10 +513,10 @@ export default function ChatContainer({ initialJobId, customTitle }) {
             <button
               onClick={handleOpenDirectory}
               title="Start direct message with colleague"
-              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/70 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">New DM</span>
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>New DM</span>
             </button>
           </div>
 
@@ -428,13 +527,13 @@ export default function ChatContainer({ initialJobId, customTitle }) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search conversations..."
+              placeholder="Search channels or colleagues..."
               className="w-full pl-9 pr-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-xs rounded-xl border border-transparent focus:border-blue-400 focus:outline-none transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -445,19 +544,28 @@ export default function ChatContainer({ initialJobId, customTitle }) {
           <div className="flex items-center gap-1 mt-2.5 p-0.5 bg-slate-100/90 rounded-lg text-xs font-medium text-slate-600">
             <button
               onClick={() => setActiveTab('ALL')}
-              className={cn('flex-1 py-1 text-center rounded-md transition-all', activeTab === 'ALL' && 'bg-white text-blue-600 shadow-xs font-semibold')}
+              className={cn(
+                'flex-1 py-1 text-center rounded-md transition-all cursor-pointer',
+                activeTab === 'ALL' && 'bg-white text-blue-600 shadow-xs font-semibold'
+              )}
             >
               All
             </button>
             <button
               onClick={() => setActiveTab('CHANNELS')}
-              className={cn('flex-1 py-1 text-center rounded-md transition-all', activeTab === 'CHANNELS' && 'bg-white text-blue-600 shadow-xs font-semibold')}
+              className={cn(
+                'flex-1 py-1 text-center rounded-md transition-all cursor-pointer',
+                activeTab === 'CHANNELS' && 'bg-white text-blue-600 shadow-xs font-semibold'
+              )}
             >
               Channels ({jobChannels.length})
             </button>
             <button
               onClick={() => setActiveTab('DIRECT')}
-              className={cn('flex-1 py-1 text-center rounded-md transition-all', activeTab === 'DIRECT' && 'bg-white text-blue-600 shadow-xs font-semibold')}
+              className={cn(
+                'flex-1 py-1 text-center rounded-md transition-all cursor-pointer',
+                activeTab === 'DIRECT' && 'bg-white text-blue-600 shadow-xs font-semibold'
+              )}
             >
               DMs ({directMessages.length})
             </button>
@@ -474,168 +582,176 @@ export default function ChatContainer({ initialJobId, customTitle }) {
           ) : (
             <>
               {/* KHỐI 1: KÊNH DỰ ÁN (JOB CHANNELS) */}
-              {(activeTab === 'ALL' || activeTab === 'CHANNELS') && filteredChannels.length > 0 && (
+              {(activeTab === 'ALL' || activeTab === 'CHANNELS') && (
                 <div>
                   <div className="px-2.5 py-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase flex items-center justify-between">
-                    <span>Job Channels</span>
+                    <span className="flex items-center gap-1">
+                      <Hash className="w-3 h-3 text-blue-500" />
+                      <span>Project Channels</span>
+                    </span>
                     <span className="text-[10px] bg-slate-200/70 text-slate-600 px-1.5 py-0.2 rounded-full font-mono">
                       {filteredChannels.length}
                     </span>
                   </div>
                   <div className="space-y-1 mt-1">
-                    {filteredChannels.map((room) => {
-                      const isActive = activeRoom?.id === room.id;
-                      return (
-                        <button
-                          key={`job-${room.id}`}
-                          onClick={() => setActiveRoom(room)}
-                          className={cn(
-                            'w-full text-left p-2.5 rounded-xl flex items-start gap-2.5 transition-all relative',
-                            isActive
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'hover:bg-slate-200/60 text-slate-700 bg-transparent'
-                          )}
-                        >
-                          <div
+                    {filteredChannels.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 px-3 py-2 italic">No channels found</p>
+                    ) : (
+                      filteredChannels.map((room) => {
+                        const isActive = activeRoom?.id === room.id;
+                        return (
+                          <button
+                            key={`job-${room.id}`}
+                            onClick={() => setActiveRoom(room)}
                             className={cn(
-                              'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono font-bold text-xs',
-                              isActive ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
+                              'w-full text-left p-2.5 rounded-xl flex items-start gap-2.5 transition-all relative cursor-pointer',
+                              isActive
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'hover:bg-slate-200/60 text-slate-700 bg-transparent'
                             )}
                           >
-                            <Hash className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <span
-                                className={cn(
-                                  'text-xs font-semibold truncate',
-                                  isActive ? 'text-white' : 'text-slate-900'
-                                )}
-                              >
-                                {room.name || `#${room.job_code}: ${room.job_name}`}
-                              </span>
-                              {room.last_message?.created_at && (
+                            <div
+                              className={cn(
+                                'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono font-bold text-xs',
+                                isActive ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
+                              )}
+                            >
+                              <Hash className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
                                 <span
                                   className={cn(
-                                    'text-[10px] font-mono shrink-0 ml-1',
-                                    isActive ? 'text-blue-100' : 'text-slate-400'
+                                    'text-xs font-semibold truncate',
+                                    isActive ? 'text-white' : 'text-slate-900'
                                   )}
                                 >
-                                  {formatMessageTime(room.last_message.created_at)}
+                                  {room.name || `#${room.job_code}: ${room.job_name}`}
                                 </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <p
-                                className={cn(
-                                  'text-[11px] truncate',
-                                  isActive ? 'text-blue-100' : 'text-slate-500'
+                                {room.last_message?.created_at && (
+                                  <span
+                                    className={cn(
+                                      'text-[10px] font-mono shrink-0 ml-1',
+                                      isActive ? 'text-blue-100' : 'text-slate-400'
+                                    )}
+                                  >
+                                    {formatMessageTime(room.last_message.created_at)}
+                                  </span>
                                 )}
-                              >
-                                {room.last_message?.content || 'No messages yet'}
-                              </p>
-                              {room.unread_count > 0 && (
-                                <span className="ml-1.5 px-1.5 py-0.2 bg-rose-500 text-white text-[10px] font-bold rounded-full shrink-0">
-                                  {room.unread_count}
-                                </span>
-                              )}
+                              </div>
+                              <div className="flex items-center justify-between mt-0.5">
+                                <p
+                                  className={cn(
+                                    'text-[11px] truncate',
+                                    isActive ? 'text-blue-100' : 'text-slate-500'
+                                  )}
+                                >
+                                  {room.last_message?.content || 'No messages yet'}
+                                </p>
+                                {room.unread_count > 0 && (
+                                  <span className="ml-1.5 px-1.5 py-0.2 bg-rose-500 text-white text-[10px] font-bold rounded-full shrink-0">
+                                    {room.unread_count}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
 
               {/* KHỐI 2: TIN NHẮN TRỰC TIẾP (DIRECT MESSAGES 1-1) */}
-              {(activeTab === 'ALL' || activeTab === 'DIRECT') && filteredDMs.length > 0 && (
+              {(activeTab === 'ALL' || activeTab === 'DIRECT') && (
                 <div>
                   <div className="px-2.5 py-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase flex items-center justify-between">
-                    <span>Direct Messages</span>
+                    <span className="flex items-center gap-1">
+                      <User className="w-3 h-3 text-purple-500" />
+                      <span>Direct Messages</span>
+                    </span>
                     <span className="text-[10px] bg-slate-200/70 text-slate-600 px-1.5 py-0.2 rounded-full font-mono">
                       {filteredDMs.length}
                     </span>
                   </div>
                   <div className="space-y-1 mt-1">
-                    {filteredDMs.map((room) => {
-                      const isActive = activeRoom?.id === room.id;
-                      const otherUser = room.other_participant || {};
-                      const displayName = otherUser.full_name || otherUser.email || 'Colleague';
-
-                      return (
+                    {filteredDMs.length === 0 ? (
+                      <div className="p-3 text-center bg-white rounded-xl border border-slate-200/70 space-y-1">
+                        <p className="text-[11px] text-slate-500">No active 1-on-1 chats</p>
                         <button
-                          key={`dm-${room.id}`}
-                          onClick={() => setActiveRoom(room)}
-                          className={cn(
-                            'w-full text-left p-2.5 rounded-xl flex items-start gap-2.5 transition-all relative',
-                            isActive
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'hover:bg-slate-200/60 text-slate-700 bg-transparent'
-                          )}
+                          onClick={handleOpenDirectory}
+                          className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
                         >
-                          <UserAvatar
-                            user={otherUser}
-                            name={displayName}
-                            size="sm"
-                            showStatus={true}
-                            isOnline={true}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <span
-                                className={cn(
-                                  'text-xs font-semibold truncate',
-                                  isActive ? 'text-white' : 'text-slate-900'
-                                )}
-                              >
-                                {displayName}
-                              </span>
-                              {room.last_message?.created_at && (
+                          Start a Direct Chat
+                        </button>
+                      </div>
+                    ) : (
+                      filteredDMs.map((room) => {
+                        const isActive = activeRoom?.id === room.id;
+                        const otherUser = room.other_participant || {};
+                        const displayName = otherUser.full_name || otherUser.email || 'Colleague';
+
+                        return (
+                          <button
+                            key={`dm-${room.id}`}
+                            onClick={() => setActiveRoom(room)}
+                            className={cn(
+                              'w-full text-left p-2.5 rounded-xl flex items-start gap-2.5 transition-all relative cursor-pointer',
+                              isActive
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'hover:bg-slate-200/60 text-slate-700 bg-transparent'
+                            )}
+                          >
+                            <UserAvatar
+                              user={otherUser}
+                              name={displayName}
+                              size="sm"
+                              showStatus={true}
+                              isOnline={true}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
                                 <span
                                   className={cn(
-                                    'text-[10px] font-mono shrink-0 ml-1',
-                                    isActive ? 'text-blue-100' : 'text-slate-400'
+                                    'text-xs font-semibold truncate',
+                                    isActive ? 'text-white' : 'text-slate-900'
                                   )}
                                 >
-                                  {formatMessageTime(room.last_message.created_at)}
+                                  {displayName}
                                 </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <p
-                                className={cn(
-                                  'text-[11px] truncate',
-                                  isActive ? 'text-blue-100' : 'text-slate-500'
+                                {room.last_message?.created_at && (
+                                  <span
+                                    className={cn(
+                                      'text-[10px] font-mono shrink-0 ml-1',
+                                      isActive ? 'text-blue-100' : 'text-slate-400'
+                                    )}
+                                  >
+                                    {formatMessageTime(room.last_message.created_at)}
+                                  </span>
                                 )}
-                              >
-                                {room.last_message?.content || 'Started a conversation'}
-                              </p>
-                              {room.unread_count > 0 && (
-                                <span className="ml-1.5 px-1.5 py-0.2 bg-rose-500 text-white text-[10px] font-bold rounded-full shrink-0">
-                                  {room.unread_count}
-                                </span>
-                              )}
+                              </div>
+                              <div className="flex items-center justify-between mt-0.5">
+                                <p
+                                  className={cn(
+                                    'text-[11px] truncate',
+                                    isActive ? 'text-blue-100' : 'text-slate-500'
+                                  )}
+                                >
+                                  {room.last_message?.content || 'Started a conversation'}
+                                </p>
+                                {room.unread_count > 0 && (
+                                  <span className="ml-1.5 px-1.5 py-0.2 bg-rose-500 text-white text-[10px] font-bold rounded-full shrink-0">
+                                    {room.unread_count}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
-                </div>
-              )}
-
-              {/* Trạng thái trống */}
-              {filteredChannels.length === 0 && filteredDMs.length === 0 && (
-                <div className="text-center py-12 px-4 text-slate-400 text-xs">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300 stroke-1" />
-                  <p>No conversations found</p>
-                  <button
-                    onClick={handleOpenDirectory}
-                    className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100"
-                  >
-                    Start a Direct Chat
-                  </button>
                 </div>
               )}
             </>
@@ -644,9 +760,9 @@ export default function ChatContainer({ initialJobId, customTitle }) {
       </div>
 
       {/* ============================================================
-          CỘT PHẢI: KHUNG CHAT REALTIME TẬP TRUNG
+          CỘT GIỮA: KHUNG CHAT REALTIME TẬP TRUNG
          ============================================================ */}
-      <div className="flex-1 flex flex-col bg-slate-50/30 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-slate-50/30 overflow-hidden min-w-0">
         {activeRoom ? (
           <>
             {/* Header phòng chat đang chọn */}
@@ -679,18 +795,34 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                   </div>
                   <p className="text-xs text-slate-500 truncate">
                     {activeRoom.room_type === 'JOB'
-                      ? `Project Channel • ${activeRoom.participants_count || 1} team members`
+                      ? `Project Channel • ${activeRoom.participants?.length || activeRoom.participants_count || 1} team members`
                       : `${activeRoom.other_participant?.role || 'Team Member'} • ${activeRoom.other_participant?.department_name || 'WorkTracker'}`}
                   </p>
                 </div>
               </div>
 
-              {/* Nút hành động bổ trợ */}
+              {/* Nút hành động bổ trợ (Toggle Members & Refresh) */}
               <div className="flex items-center space-x-2">
+                {activeRoom.room_type === 'JOB' && (
+                  <button
+                    onClick={() => setShowMembersPanel((prev) => !prev)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer',
+                      showMembersPanel
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    )}
+                    title="Toggle channel members panel"
+                  >
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <span>Members ({activeRoom.participants?.length || activeRoom.participants_count || 1})</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => fetchRooms(activeRoom.job)}
                   title="Refresh chat room"
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -705,12 +837,12 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                   <span>Loading messages...</span>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 mb-2">
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 mb-1">
                     <MessageSquare className="w-6 h-6" />
                   </div>
-                  <p className="font-semibold text-slate-700">No messages in this conversation yet</p>
-                  <p className="text-slate-400 mt-1">Send the first message to start the discussion!</p>
+                  <p className="font-bold text-slate-800 text-sm">No messages in this conversation yet</p>
+                  <p className="text-slate-400">Send the first message to start the discussion!</p>
                 </div>
               ) : (
                 messages.map((msg, index) => {
@@ -725,22 +857,36 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                       key={`msg-${msg.id || index}`}
                       className={cn('flex flex-col', isMine ? 'items-end' : 'items-start')}
                     >
-                      {/* Tên người gửi trong Kênh nhóm */}
+                      {/* Tên người gửi trong Kênh nhóm - Cho phép click Chat 1-1 */}
                       {!isMine && activeRoom.room_type === 'JOB' && showAvatar && (
-                        <span className="text-[11px] font-semibold text-slate-500 mb-1 ml-9">
-                          {senderName}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleStartDirectChat(msg.sender)}
+                          title={`Click to send direct message to ${senderName}`}
+                          className="text-[11px] font-bold text-slate-700 hover:text-blue-600 mb-1 ml-9 flex items-center gap-1.5 group cursor-pointer"
+                        >
+                          <span>{senderName}</span>
+                          <span className="text-[10px] font-normal text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                            (Direct Chat)
+                          </span>
+                        </button>
                       )}
 
                       <div className={cn('flex items-end gap-2 max-w-[75%]', isMine && 'flex-row-reverse')}>
                         {/* Avatar người gửi */}
                         {!isMine && (
-                          <UserAvatar
-                            user={msg.sender}
-                            name={senderName}
-                            size="xs"
-                            className="w-7 h-7 shrink-0"
-                          />
+                          <div
+                            onClick={() => handleStartDirectChat(msg.sender)}
+                            className="cursor-pointer"
+                            title={`Chat with ${senderName}`}
+                          >
+                            <UserAvatar
+                              user={msg.sender}
+                              name={senderName}
+                              size="xs"
+                              className="w-7 h-7 shrink-0 hover:ring-2 hover:ring-blue-400 transition"
+                            />
+                          </div>
                         )}
 
                         {/* Bong bóng tin nhắn */}
@@ -833,7 +979,6 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                 </div>
               ) : (
                 <form onSubmit={handleSendMessage} className="space-y-2">
-                  {/* File đang được đính kèm chờ gửi */}
                   {stagedFile && (
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-xs">
                       <FileText className="w-4 h-4" />
@@ -842,7 +987,7 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                       <button
                         type="button"
                         onClick={() => setStagedFile(null)}
-                        className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600"
+                        className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -850,7 +995,6 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                   )}
 
                   <div className="flex items-center gap-2">
-                    {/* Nút đính kèm file */}
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -862,12 +1006,11 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingFile}
                       title="Attach file (Max 20MB)"
-                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors shrink-0"
+                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors shrink-0 cursor-pointer"
                     >
                       <Paperclip className="w-5 h-5" />
                     </button>
 
-                    {/* Ô nhập nội dung tin nhắn */}
                     <input
                       type="text"
                       value={inputText}
@@ -880,11 +1023,10 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                       className="flex-1 px-4 py-2.5 bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-xs text-slate-900 rounded-xl border border-transparent focus:border-blue-400 focus:outline-none transition-all"
                     />
 
-                    {/* Nút gửi tin nhắn */}
                     <button
                       type="submit"
                       disabled={(!inputText.trim() && !stagedFile) || sending || uploadingFile}
-                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 shadow-xs shrink-0"
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
                     >
                       {sending || uploadingFile ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
@@ -910,6 +1052,131 @@ export default function ChatContainer({ initialJobId, customTitle }) {
       </div>
 
       {/* ============================================================
+          CỘT PHẢI (280px): DANH SÁCH THÀNH VIÊN KÊNH (CHANNEL MEMBERS PANEL)
+         ============================================================ */}
+      {activeRoom?.room_type === 'JOB' && showMembersPanel && (
+        <div className="w-72 border-l border-slate-200 bg-white flex flex-col shrink-0 animate-fade-in">
+          {/* Header Panel */}
+          <div className="p-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center space-x-2 min-w-0">
+              <Users className="w-4 h-4 text-blue-600 shrink-0" />
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider truncate">
+                Channel Members ({channelParticipants.total})
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowMembersPanel(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 cursor-pointer"
+              title="Close members panel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Ô lọc thành viên trong kênh */}
+          <div className="p-3 border-b border-slate-100">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={memberSearchQuery}
+                onChange={(e) => setMemberSearchQuery(e.target.value)}
+                placeholder="Filter members..."
+                className="w-full pl-8 pr-2.5 py-1 bg-slate-100 text-[11px] rounded-lg border border-transparent focus:border-blue-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Danh sách thành viên */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar">
+            {/* Nhóm 1: QUẢN LÝ / LEADS */}
+            {channelParticipants.leads.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider px-1 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Project Lead / Manager ({channelParticipants.leads.length})</span>
+                </p>
+                <div className="space-y-1">
+                  {channelParticipants.leads.map((m) => {
+                    const isSelf = m.id === user?.id;
+                    return (
+                      <div
+                        key={`lead-${m.id}`}
+                        className="p-2 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 flex items-center justify-between transition group"
+                      >
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <UserAvatar user={m} size="xs" showStatus={true} isOnline={m.is_active} />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {m.full_name} {isSelf && <span className="text-[10px] text-slate-400 font-normal">(You)</span>}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate">{m.department_name}</p>
+                          </div>
+                        </div>
+
+                        {!isSelf && (
+                          <button
+                            onClick={() => handleStartDirectChat(m)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer opacity-0 group-hover:opacity-100"
+                            title={`Send direct message to ${m.full_name}`}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Nhóm 2: THÀNH VIÊN / ASSIGNEES */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider px-1 flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                <span>Assigned Staff ({channelParticipants.members.length})</span>
+              </p>
+              <div className="space-y-1">
+                {channelParticipants.members.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 px-1 italic">No staff members found</p>
+                ) : (
+                  channelParticipants.members.map((m) => {
+                    const isSelf = m.id === user?.id;
+                    return (
+                      <div
+                        key={`member-${m.id}`}
+                        className="p-2 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 flex items-center justify-between transition group"
+                      >
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <UserAvatar user={m} size="xs" showStatus={true} isOnline={m.is_active} />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-700 truncate">
+                              {m.full_name} {isSelf && <span className="text-[10px] text-slate-400 font-normal">(You)</span>}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate">{m.department_name}</p>
+                          </div>
+                        </div>
+
+                        {!isSelf && (
+                          <button
+                            onClick={() => handleStartDirectChat(m)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer opacity-80 group-hover:opacity-100"
+                            title={`Send direct message to ${m.full_name}`}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
           MODAL DANH BẠ NHÂN SỰ ĐỂ BẮT ĐẦU CHAT 1-1
          ============================================================ */}
       {showDirectoryModal && (
@@ -927,7 +1194,7 @@ export default function ChatContainer({ initialJobId, customTitle }) {
               </div>
               <button
                 onClick={() => setShowDirectoryModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -967,7 +1234,7 @@ export default function ChatContainer({ initialJobId, customTitle }) {
                     <button
                       key={`user-${u.id}`}
                       onClick={() => handleStartDirectChat(u)}
-                      className="w-full p-2.5 hover:bg-blue-50 rounded-xl flex items-center justify-between transition-colors text-left group"
+                      className="w-full p-2.5 hover:bg-blue-50 rounded-xl flex items-center justify-between transition-colors text-left group cursor-pointer"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <UserAvatar user={u} size="sm" />

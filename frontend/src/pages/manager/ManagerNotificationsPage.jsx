@@ -24,6 +24,7 @@ export default function ManagerNotificationsPage() {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     connectWebSocket,
   } = useNotificationStore();
 
@@ -54,7 +55,7 @@ export default function ManagerNotificationsPage() {
         for (const id of idOrIds) {
           await markAsRead(id);
         }
-        toast.success(`Marked ${idOrIds.length} notifications as read.`);
+        toast.success(`Marked ${idOrIds.length} notification${idOrIds.length > 1 ? 's' : ''} as read.`);
       } else {
         await markAsRead(idOrIds);
         toast.success('Notification marked as read.');
@@ -73,10 +74,30 @@ export default function ManagerNotificationsPage() {
     }
   };
 
+  const handleDelete = async (idOrIds) => {
+    try {
+      await deleteNotification(idOrIds);
+      const count = Array.isArray(idOrIds) ? idOrIds.length : 1;
+      toast.success(`Deleted ${count} notification${count > 1 ? 's' : ''}.`);
+    } catch (err) {
+      console.error('Delete notification failed:', err);
+      toast.error('Failed to delete notification.');
+    }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+    if (notification.related_url) {
+      navigate(notification.related_url);
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-6xl mx-auto text-slate-800 pb-12">
+    <div className="space-y-6 max-w-6xl mx-auto text-slate-800 pb-12 antialiased">
       {/* 🌟 HERO HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
             <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20">
@@ -131,10 +152,10 @@ export default function ManagerNotificationsPage() {
 
       {/* 🔍 FILTER TABS */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
           <button
             onClick={() => setActiveFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeFilter === 'ALL'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-50'
@@ -144,7 +165,7 @@ export default function ManagerNotificationsPage() {
           </button>
           <button
             onClick={() => setActiveFilter('UNREAD')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeFilter === 'UNREAD'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-50'
@@ -154,7 +175,7 @@ export default function ManagerNotificationsPage() {
           </button>
           <button
             onClick={() => setActiveFilter('READ')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeFilter === 'READ'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-50'
@@ -166,15 +187,18 @@ export default function ManagerNotificationsPage() {
       </div>
 
       {/* 📋 NOTIFICATIONS TABLE OR EMPTY STATE */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div>
         {filteredNotifications.length > 0 ? (
           <NotificationListTable
             notifications={filteredNotifications}
-            onMarkRead={handleMarkAsRead}
-            onNavigate={(url) => url && navigate(url)}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAllRead={handleMarkAllRead}
+            onDelete={handleDelete}
+            onNotificationClick={handleNotificationClick}
+            isLoading={loading}
           />
         ) : (
-          <div className="py-16 px-4 text-center space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs py-16 px-4 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
               <Inbox className="w-6 h-6 stroke-1" />
             </div>

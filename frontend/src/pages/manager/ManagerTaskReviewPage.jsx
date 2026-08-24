@@ -39,6 +39,7 @@ import {
   useRejectTask,
   useTaskAttachments,
   useUploadTaskAttachment,
+  useTaskComments,
 } from "../../hooks/queries/manager/useManagerTasks";
 import { useManagerJobs } from "../../hooks/queries/manager/useManagerJobs";
 import { chatService } from "../../services/common/chatService";
@@ -79,7 +80,7 @@ export default function ManagerTaskReviewPage() {
 
   // 🚀 QUERY HOOKS
   const queryParams = useMemo(() => {
-    const params = { status: "REVIEWING", page_size: 50 };
+    const params = { status: "REVIEWING", page_size: 50, ordering: "-updated_at" };
     if (selectedJobId) params.job_id = selectedJobId;
     if (searchQuery.trim()) params.search = searchQuery.trim();
     return params;
@@ -147,6 +148,36 @@ export default function ManagerTaskReviewPage() {
     if (Array.isArray(attachmentsResponse.results)) return attachmentsResponse.results;
     return [];
   }, [attachmentsResponse]);
+
+  // Comments for the active task (Handover note)
+  const { data: commentsResponse } = useTaskComments(selectedTaskId);
+  const comments = useMemo(() => {
+    if (!commentsResponse) return [];
+    if (Array.isArray(commentsResponse)) return commentsResponse;
+    if (Array.isArray(commentsResponse.results)) return commentsResponse.results;
+    return [];
+  }, [commentsResponse]);
+
+  const latestHandoverNote = useMemo(() => {
+    if (!comments || comments.length === 0) return null;
+    // 1. Highest priority: The explicit QA Submission Note
+    const qaComment = [...comments].reverse().find(
+      (c) => c.content?.includes("[QA Deliverable Submission]")
+    );
+    if (qaComment) {
+      return qaComment.content.replace("[QA Deliverable Submission]:", "").trim();
+    }
+    // 2. Fallback: Latest comment from assignee
+    const assigneeComment = [...comments].reverse().find(
+      (c) => c.user?.id === selectedTask?.assignee?.id
+    );
+    if (assigneeComment) {
+      return assigneeComment.content.trim();
+    }
+    // 3. Fallback: Latest comment overall
+    const latest = comments[comments.length - 1];
+    return latest?.content?.trim() || null;
+  }, [comments, selectedTask]);
 
   // ⚡ AUTO-ADVANCE HELPER
   const autoAdvanceToNext = (processedId) => {
@@ -325,68 +356,94 @@ export default function ManagerTaskReviewPage() {
       {/* =========================================================================
            MAIN 2-COLUMN SPLIT-PANE WORKSPACE
            ========================================================================= */}
-      {tasks.length === 0 && !isLoading ? (
-        /* 🌟 ALL CAUGHT UP EMPTY STATE VIEW */
-        <div className="flex-1 p-6 bg-slate-100 flex items-center justify-center">
-          <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center space-y-3.5 shadow-2xs max-w-md mx-auto">
-            <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto border-2 border-purple-100 shadow-sm">
-              <Award className="w-7 h-7" />
-            </div>
+      <main className="flex-1 flex overflow-hidden p-3 gap-3 bg-slate-100 min-h-0">
+        
+        {/* =========================================================================
+             LEFT COLUMN (MASTER TASK QUEUE): 56% WIDTH
+             ========================================================================= */}
+        <section className="w-[56%] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden min-h-0">
+          
+          {/* Filter Toolbar - ALWAYS VISIBLE */}
+          <div className="p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
+            <div className="flex items-center gap-2 text-xs">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by task title, code, assignee, or job..."
+                  className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                    title="Clear search text"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-            <div className="space-y-1">
-              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-mono text-[10px] font-bold">
-                ALL DELIVERABLES ACCEPTED
-              </span>
-              <h2 className="text-lg font-extrabold text-slate-900">Task QA Queue is Clear!</h2>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                All submitted task deliverables across all your managed projects have been inspected and accepted.
-              </p>
+              <select
+                value={selectedJobId}
+                onChange={(e) => setSelectedJobId(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 max-w-[170px] truncate focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              >
+                {jobOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+
+              {(searchQuery.trim() || selectedJobId) && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(""); setSelectedJobId(""); }}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs shrink-0 cursor-pointer transition"
+                  title="Clear All Filters"
+                >
+                  Reset
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      ) : (
-        <main className="flex-1 flex overflow-hidden p-3 gap-3 bg-slate-100 min-h-0">
-          
-          {/* =========================================================================
-               LEFT COLUMN (MASTER TASK QUEUE): 56% WIDTH
-               ========================================================================= */}
-          <section className="w-[56%] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden min-h-0">
-            
-            {/* Filter Toolbar */}
-            <div className="p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
-              <div className="flex items-center gap-2 text-xs">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by task title, code, or assignee..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
 
-                <select
-                  value={selectedJobId}
-                  onChange={(e) => setSelectedJobId(e.target.value)}
-                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 max-w-[160px] truncate"
-                >
-                  {jobOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+          {/* MASTER TABLE / EMPTY STATES */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 flex flex-col">
+            {isLoading ? (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="w-7 h-7 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
               </div>
-            </div>
-
-            {/* MASTER TABLE */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-              {isLoading ? (
-                <div className="flex h-full items-center justify-center p-8">
-                  <div className="w-7 h-7 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+            ) : tasks.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3">
+                <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center border border-purple-100 shadow-2xs">
+                  {searchQuery || selectedJobId ? <Search className="w-6 h-6" /> : <Award className="w-6 h-6" />}
                 </div>
-              ) : (
+                <div className="space-y-1">
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    {searchQuery || selectedJobId ? "No Matching Tasks Found" : "Task QA Queue is Clear!"}
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                    {searchQuery || selectedJobId
+                      ? `No tasks awaiting QA review matched your filter criteria.`
+                      : "All submitted task deliverables across all your managed projects have been inspected and accepted."}
+                  </p>
+                </div>
+                {(searchQuery || selectedJobId) && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchQuery(""); setSelectedJobId(""); }}
+                    className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
+                  >
+                    Clear Search Filters
+                  </button>
+                )}
+              </div>
+            ) : (
                 <table className="w-full text-left text-sm table-fixed">
                   <thead className="bg-slate-50/90 text-slate-600 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xs">
                     <tr>
@@ -613,18 +670,24 @@ export default function ManagerTaskReviewPage() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
                       <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Assignee's Handover Summary Note (Lời nhắn khi nộp bài):</span>
+                      <span>Assignee's Handover Summary Note:</span>
                     </label>
 
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 leading-relaxed text-xs font-normal">
-                      {`"Completed and submitted deliverables for task '${selectedTask.title}'. Ready for manager QA signoff."`}
+                    <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-200/80 text-slate-800 leading-relaxed text-xs font-medium">
+                      {latestHandoverNote ? (
+                        <p className="text-slate-800 whitespace-pre-wrap">{latestHandoverNote}</p>
+                      ) : (
+                        <p className="italic text-slate-400">
+                          {`"Completed and submitted deliverables for task '${selectedTask.title}'. Ready for manager QA signoff."`}
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   {/* 📋 ORIGINAL TASK ACCEPTANCE CRITERIA */}
                   <div className="space-y-1.5">
                     <h3 className="text-xs font-extrabold text-slate-900">
-                      Original Scope & Acceptance Criteria (Yêu cầu lúc giao việc):
+                      Original Scope & Acceptance Criteria:
                     </h3>
                     <p className="p-3 rounded-xl bg-slate-50/80 border border-slate-200 text-slate-600 leading-relaxed text-xs">
                       {selectedTask.description || (
@@ -668,7 +731,6 @@ export default function ManagerTaskReviewPage() {
           </section>
 
         </main>
-      )}
 
       {/* =========================================================================
            MODAL: REJECT WITH FIX NOTES & ATTACH REFERENCE DOCUMENTS

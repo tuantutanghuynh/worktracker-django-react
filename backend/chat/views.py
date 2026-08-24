@@ -55,6 +55,17 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         sync_user_job_channels(user)
+        if self.action == "list":
+            return (
+                ChatRoom.objects.filter(
+                    Q(room_type=ChatRoom.RoomType.JOB, participants__user=user)
+                    | Q(room_type=ChatRoom.RoomType.DIRECT, participants__user=user, messages__isnull=False)
+                )
+                .select_related("job")
+                .prefetch_related("participants__user", "messages")
+                .distinct()
+                .order_by("-updated_at")
+            )
         return (
             ChatRoom.objects.filter(participants__user=user)
             .select_related("job")

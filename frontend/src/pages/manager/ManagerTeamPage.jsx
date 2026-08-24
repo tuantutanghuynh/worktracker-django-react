@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   AlertTriangle,
@@ -9,6 +10,8 @@ import {
   RotateCcw,
   Building2,
   Mail,
+  Phone,
+  Calendar,
   UserCheck,
   TrendingUp,
   LayoutGrid,
@@ -17,13 +20,17 @@ import {
   ShieldCheck,
   Zap,
   ChevronRight,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import DataTable from '../../components/common/table/DataTable';
 import PaginationBar from '../../components/common/table/PaginationBar';
 import BaseModal from '../../components/common/modal/BaseModal';
-import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import SideDrawer from '../../components/common/drawer/SideDrawer';
+import StatusBadge from '../../components/common/badges/StatusBadge';
+import PriorityBadge from '../../components/common/badges/PriorityBadge';
 import UserAvatar from '../../components/common/avatar/UserAvatar';
 import { cn } from '../../utils/cn';
 
@@ -32,6 +39,7 @@ import {
   useManagerDepartments,
   useAssignDepartment,
 } from '../../hooks/queries/manager/useManagerTeam';
+import { useManagerTasks } from '../../hooks/queries/manager/useManagerTasks';
 
 export default function ManagerTeamPage() {
   // View mode & filters
@@ -43,14 +51,15 @@ export default function ManagerTeamPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Detail Drawer & Modal States
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [assignModalTarget, setAssignModalTarget] = useState(null);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedStatusFilter]);
-
-  // Modal State
-  const [assignModalTarget, setAssignModalTarget] = useState(null);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
 
   // 🚀 TANSTACK REACT QUERY HOOKS
   const { data: employeesResponse, isLoading, isFetching, refetch } = useManagerEmployees();
@@ -249,14 +258,10 @@ export default function ManagerTeamPage() {
           OVERLOADED: 'bg-rose-50 text-rose-700 border-rose-200',
           BALANCED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
           AVAILABLE: 'bg-blue-50 text-blue-700 border-blue-200',
-        };
+        }[row.workloadStatus] || 'bg-slate-100 text-slate-700 border-slate-200';
+
         return (
-          <span
-            className={cn(
-              'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
-              config[row.workloadStatus]
-            )}
-          >
+          <span className={cn('px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wider', config)}>
             {row.workloadStatus}
           </span>
         );
@@ -266,86 +271,88 @@ export default function ManagerTeamPage() {
       header: 'Actions',
       accessorKey: 'actions',
       cell: (row) => (
-        <button
-          onClick={() => {
-            setAssignModalTarget(row);
-            setSelectedDepartmentId(row.departmentId || '');
-          }}
-          className="p-1.5 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-lg transition cursor-pointer"
-          title="Assign Department"
-        >
-          <Edit className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => {
+              setAssignModalTarget(row);
+              setSelectedDepartmentId(row.departmentId || '');
+            }}
+            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+            title="Assign Department"
+          >
+            <Edit className="w-3.5 h-3.5" />
+          </button>
+        </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6 text-slate-800 pb-12">
-      {/* 🌟 HERO HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20 shrink-0">
-            <Users className="w-6 h-6" />
+    <div className="space-y-6 antialiased">
+      {/* 🌟 HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-mono text-[10px] font-bold">
+              RESOURCE ALLOCATION
+            </span>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Team Members & Workload Capacity</h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Monitor real-time team workload and capacity to balance task distribution and prevent burnout.
-            </p>
-          </div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
+            Team Members & Workload Capacity
+          </h1>
+          <p className="text-slate-500 text-xs mt-0.5">
+            Monitor real-time employee workload utilization, assigned active tasks, and department assignments.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              refetch();
-              toast.success('Team members refreshed!');
-            }}
-            disabled={isFetching}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs transition cursor-pointer"
-          >
-            <RotateCcw className={cn('w-3.5 h-3.5 text-slate-500', isFetching && 'animate-spin')} />
-            <span>Refresh</span>
-          </button>
-        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-2 transition cursor-pointer self-start md:self-auto disabled:opacity-50"
+        >
+          <RotateCcw className={cn('w-3.5 h-3.5', isFetching && 'animate-spin')} />
+          <span>Refresh Data</span>
+        </button>
       </div>
 
-      {/* 📊 4 KPI STATCARDS */}
+      {/* 📊 KPI SUMMARY CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-2xs">
-          <span className="text-xs font-bold text-slate-500">Total Supervised Members</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Members</span>
+            <Users className="w-4 h-4 text-blue-600" />
+          </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-slate-900">{kpis.total}</span>
-            <span className="text-xs font-semibold text-slate-400">members</span>
+            <span className="text-xs font-semibold text-slate-400">staff members</span>
           </div>
         </div>
 
-        <div className="p-4 bg-rose-50/50 border border-rose-200/80 rounded-2xl space-y-1 shadow-2xs">
+        <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-800">Overloaded (&gt;100%)</span>
+            <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">Overloaded</span>
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-rose-900">{kpis.overloaded}</span>
-            <span className="text-xs font-semibold text-rose-700">rebalancing needed</span>
+            <span className="text-xs font-semibold text-rose-700">&gt;100% capacity</span>
           </div>
         </div>
 
-        <div className="p-4 bg-emerald-50/50 border border-emerald-200/80 rounded-2xl space-y-1 shadow-2xs">
+        <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800">Balanced (70-100%)</span>
+            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Balanced</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-emerald-900">{kpis.balanced}</span>
-            <span className="text-xs font-semibold text-emerald-700">optimal cadence</span>
+            <span className="text-xs font-semibold text-emerald-700">70% - 100%</span>
           </div>
         </div>
 
-        <div className="p-4 bg-blue-50/50 border border-blue-200/80 rounded-2xl space-y-1 shadow-2xs">
+        <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-800">Available (&lt;70%)</span>
+            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Available</span>
             <Zap className="w-4 h-4 text-blue-600" />
           </div>
           <div className="flex items-baseline gap-2">
@@ -362,25 +369,25 @@ export default function ManagerTeamPage() {
           <div className="flex items-center p-0.5 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 flex-wrap">
             <button
               onClick={() => setSelectedStatusFilter('ALL')}
-              className={cn('px-3 py-1.5 rounded-lg transition', selectedStatusFilter === 'ALL' && 'bg-white text-blue-700 shadow-xs')}
+              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'ALL' && 'bg-white text-blue-700 shadow-xs')}
             >
               All ({kpis.total})
             </button>
             <button
               onClick={() => setSelectedStatusFilter('OVERLOADED')}
-              className={cn('px-3 py-1.5 rounded-lg transition', selectedStatusFilter === 'OVERLOADED' && 'bg-white text-rose-700 shadow-xs')}
+              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'OVERLOADED' && 'bg-white text-rose-700 shadow-xs')}
             >
               Overloaded ({kpis.overloaded})
             </button>
             <button
               onClick={() => setSelectedStatusFilter('BALANCED')}
-              className={cn('px-3 py-1.5 rounded-lg transition', selectedStatusFilter === 'BALANCED' && 'bg-white text-emerald-700 shadow-xs')}
+              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'BALANCED' && 'bg-white text-emerald-700 shadow-xs')}
             >
               Balanced ({kpis.balanced})
             </button>
             <button
               onClick={() => setSelectedStatusFilter('AVAILABLE')}
-              className={cn('px-3 py-1.5 rounded-lg transition', selectedStatusFilter === 'AVAILABLE' && 'bg-white text-blue-700 shadow-xs')}
+              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'AVAILABLE' && 'bg-white text-blue-700 shadow-xs')}
             >
               Available ({kpis.available})
             </button>
@@ -396,7 +403,7 @@ export default function ManagerTeamPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, email, department..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs rounded-xl border border-transparent focus:border-blue-400 focus:outline-none"
+              className="w-full pl-9 pr-3 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs rounded-xl border border-transparent focus:border-blue-400 focus:outline-none transition"
             />
           </div>
 
@@ -404,14 +411,14 @@ export default function ManagerTeamPage() {
           <div className="flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200 shrink-0">
             <button
               onClick={() => setViewMode('grid')}
-              className={cn('p-1.5 rounded-lg transition', viewMode === 'grid' && 'bg-white text-blue-600 shadow-xs')}
+              className={cn('p-1.5 rounded-lg transition cursor-pointer', viewMode === 'grid' && 'bg-white text-blue-600 shadow-xs')}
               title="Grid View"
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('table')}
-              className={cn('p-1.5 rounded-lg transition', viewMode === 'table' && 'bg-white text-blue-600 shadow-xs')}
+              className={cn('p-1.5 rounded-lg transition cursor-pointer', viewMode === 'table' && 'bg-white text-blue-600 shadow-xs')}
               title="Table View"
             >
               <List className="w-4 h-4" />
@@ -427,14 +434,17 @@ export default function ManagerTeamPage() {
             {paginatedEmployees.map((emp) => (
               <div
                 key={`emp-card-${emp.id || emp.user_id}`}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all space-y-4 relative group"
+                onClick={() => setSelectedMember(emp)}
+                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all space-y-4 relative group cursor-pointer"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3 min-w-0">
                     <UserAvatar user={emp} size="md" showStatus={true} isOnline={true} />
                     <div className="min-w-0">
-                      <h3 className="font-bold text-sm text-slate-900 truncate">{emp.full_name || emp.email}</h3>
+                      <h3 className="font-bold text-sm text-slate-900 group-hover:text-purple-700 transition truncate">
+                        {emp.full_name || emp.email}
+                      </h3>
                       <p className="text-xs text-slate-400 truncate">{emp.email}</p>
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold mt-0.5">
                         <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -444,7 +454,8 @@ export default function ManagerTeamPage() {
                   </div>
 
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setAssignModalTarget(emp);
                       setSelectedDepartmentId(emp.departmentId || '');
                     }}
@@ -527,6 +538,7 @@ export default function ManagerTeamPage() {
           data={paginatedEmployees}
           isLoading={isLoading}
           emptyMessage="No team members matching the selected filters."
+          onRowClick={(row) => setSelectedMember(row)}
           pagination={{
             currentPage,
             totalPages,
@@ -540,6 +552,20 @@ export default function ManagerTeamPage() {
           }}
         />
       )}
+
+      {/* ============================================================
+          SIDE DRAWER: THÔNG TIN CHI TIẾT NHÂN VIÊN & TASK ĐANG PHỤ TRÁCH
+         ============================================================ */}
+      <MemberDetailDrawer
+        key={selectedMember?.id ?? selectedMember?.user_id ?? 'none-member'}
+        member={selectedMember}
+        onClose={() => setSelectedMember(null)}
+        onOpenAssignDept={(m) => {
+          setSelectedMember(null);
+          setAssignModalTarget(m);
+          setSelectedDepartmentId(m.departmentId || '');
+        }}
+      />
 
       {/* ============================================================
           MODAL: PHÂN BỔ / GÁN PHÒNG BAN CHO NHÂN SỰ
@@ -597,5 +623,227 @@ export default function ManagerTeamPage() {
         </form>
       </BaseModal>
     </div>
+  );
+}
+
+/**
+ * Ngăn kéo xem Hồ sơ Chi tiết & Danh sách Task đang làm của Member
+ */
+function MemberDetailDrawer({ member, onClose, onOpenAssignDept }) {
+  const navigate = useNavigate();
+  const targetUserId = member?.id || member?.user_id;
+
+  const { data: tasksData, isLoading: tasksLoading } = useManagerTasks(
+    targetUserId ? { assignee_id: targetUserId, page_size: 30 } : null
+  );
+
+  const memberTasks = useMemo(() => {
+    if (!tasksData) return [];
+    if (Array.isArray(tasksData)) return tasksData;
+    if (Array.isArray(tasksData.results)) return tasksData.results;
+    return [];
+  }, [tasksData]);
+
+  if (!member) return null;
+
+  return (
+    <SideDrawer
+      isOpen={Boolean(member)}
+      onClose={onClose}
+      title={member.full_name || member.email}
+      subtitle={member.departmentName || 'General Staff'}
+      size="lg"
+    >
+      <div className="space-y-6 pb-6">
+        {/* 👤 Profile Card Header */}
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4.5 flex items-start gap-4 shadow-2xs">
+          <UserAvatar user={member} size="xl" showStatus={true} isOnline={member.is_active} />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-extrabold text-slate-900 truncate">
+                {member.full_name || member.email}
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                Staff
+              </span>
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                  member.is_active
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                )}
+              >
+                {member.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs text-slate-600">
+              <div className="flex items-center gap-1.5 truncate">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">{member.email}</span>
+              </div>
+              <div className="flex items-center gap-1.5 truncate">
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{member.phone_number || 'No phone number'}</span>
+              </div>
+              <div className="flex items-center gap-1.5 truncate">
+                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="font-semibold text-slate-700">{member.departmentName}</span>
+              </div>
+              <div className="flex items-center gap-1.5 truncate">
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Joined: {member.joined_date || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ⚡ Quick Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (targetUserId) {
+                navigate(`/manager/chat?userId=${targetUserId}`);
+              } else {
+                navigate('/manager/chat');
+              }
+            }}
+            className="flex-1 py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Message Employee</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenAssignDept(member)}
+            className="flex-1 py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+          >
+            <Edit className="w-3.5 h-3.5 text-slate-500" />
+            <span>Assign Department</span>
+          </button>
+        </div>
+
+        {/* 📊 Workload Capacity & Utilization Metrics */}
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Workload & Capacity Status
+            </h3>
+            <span
+              className={cn(
+                'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
+                member.workloadStatus === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200',
+                member.workloadStatus === 'BALANCED' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                member.workloadStatus === 'AVAILABLE' && 'bg-blue-50 text-blue-700 border-blue-200'
+              )}
+            >
+              {member.workloadStatus}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-600">Monthly Capacity Utilization:</span>
+              <span
+                className={cn(
+                  member.workloadStatus === 'OVERLOADED' && 'text-rose-600',
+                  member.workloadStatus === 'BALANCED' && 'text-emerald-600',
+                  member.workloadStatus === 'AVAILABLE' && 'text-blue-600'
+                )}
+              >
+                {member.capacityRate}% ({member.loggedHours.toFixed(1)}h / {member.capacityHours.toFixed(0)}h)
+              </span>
+            </div>
+            <div className="w-full h-3 bg-slate-200/70 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all',
+                  member.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
+                  member.workloadStatus === 'BALANCED' && 'bg-emerald-500',
+                  member.workloadStatus === 'AVAILABLE' && 'bg-blue-500'
+                )}
+                style={{ width: `${Math.min(member.capacityRate, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-2 text-xs border-t border-slate-200">
+            <div className="p-3 rounded-xl bg-white border border-slate-200/80">
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Total Hours Logged</p>
+              <p className="text-base font-extrabold text-slate-900 mt-0.5">{member.loggedHours.toFixed(1)}h</p>
+            </div>
+            <div className="p-3 rounded-xl bg-white border border-slate-200/80">
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Active Assigned Tasks</p>
+              <p className="text-base font-extrabold text-purple-700 mt-0.5">{member.activeTasks} Tasks</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 📋 Assigned Tasks Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+              <span>Assigned Tasks Under Your Management</span>
+            </h3>
+            <span className="text-[11px] font-bold text-slate-400">
+              {memberTasks.length} task{memberTasks.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {tasksLoading ? (
+            <div className="py-8 flex justify-center">
+              <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : memberTasks.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-1">
+              <p className="text-xs font-bold text-slate-700">No active tasks in your projects</p>
+              <p className="text-[11px] text-slate-400">
+                This member is currently not assigned to any tasks under your managed projects.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+              {memberTasks.map((task) => {
+                const taskCode = task.code || `TSK-${task.id}`;
+                const jobName = task.job?.job_name || task.job_title || 'Project';
+                return (
+                  <div
+                    key={task.id}
+                    className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-purple-300 transition-all space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-mono text-xs font-bold text-purple-700 shrink-0">
+                          {taskCode}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                          {task.title}
+                        </h4>
+                      </div>
+                      <StatusBadge status={task.status} />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                      <span className="truncate max-w-[200px]">{jobName}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <PriorityBadge priority={task.priority} />
+                        {task.deadline && (
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {task.deadline}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </SideDrawer>
   );
 }

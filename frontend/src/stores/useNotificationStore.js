@@ -112,6 +112,29 @@ export const useNotificationStore = create((set, get) => ({
   },
 
   /**
+   * Delete single or multiple notifications (Optimistic Update)
+   */
+  deleteNotification: async (idOrIds) => {
+    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+    if (ids.length === 0) return;
+
+    // Cập nhật State tức thì (Optimistic UI)
+    set((state) => {
+      const updated = state.notifications.filter((n) => !ids.includes(n.id));
+      const unread = updated.filter((n) => !n.is_read).length;
+      return { notifications: updated, unreadCount: unread };
+    });
+
+    try {
+      if (isManager()) {
+        await managerReportService.deleteNotificationsBatch(ids);
+      }
+    } catch (err) {
+      console.error('Failed to delete notifications on server', err);
+    }
+  },
+
+  /**
    * Handle incoming real-time WS notification object
    */
   addRealtimeNotification: (notification) => {
