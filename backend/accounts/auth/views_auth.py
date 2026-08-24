@@ -2,12 +2,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 import time
 import redis
 from django.core.cache import caches
 from django.core.mail import send_mail
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from system.utils import log_audit_event
+from ..authentication import is_reauth_required
 from .serializers_auth import LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer, ChangePasswordSerializer
+from django.conf import settings
 
 blacklist_cache = caches["blacklist"]
 
@@ -20,6 +26,32 @@ blacklist_cache = caches["blacklist"]
 # satisfy must_change_password on CustomUser). Deliberately uses plain
 # IsAuthenticated, not HasPermission, so it is never blocked by the
 # must_change_password gate in permissions.py — see that file for why.
+
+
+# Wraps the default refresh endpoint with the same reauth check used for
+# access tokens (WorkTrackerJWTAuthentication). Without this, a refresh
+# token issued before a role change would just keep minting fresh access
+# tokens forever, since TokenRefreshView never goes through our custom
+# authentication class — require_reauth() alone would do nothing.
+class ReauthAwareTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        raw_refresh = request.data.get("refresh")
+        if raw_refresh:
+            try:
+                token = RefreshToken(raw_refresh)
+            except TokenError:
+                token = None  # invalid/expired — let the parent view produce the normal error response
+
+            if token is not None:
+                user_id = token.get("user_id")
+                issued_at = token.get("iat", 0)
+                if user_id and is_reauth_required(user_id, issued_at):
+                    return Response(
+                        {"detail": "Your permissions have changed. Please log in again.", "code": "reauth_required"},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+
+        return super().post(request, *args, **kwargs)
 
 
 # Public endpoint: verifies email/password and issues an access + refresh token pair.
@@ -64,12 +96,13 @@ class ForgotPasswordView(APIView):
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        reset = serializer.creat_reset_token()
+        reset = serializer.create_reset_token()
 
         if reset is not None:
+            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset.token}"
             send_mail(
                 subject="Reset Password WorkTracker",
-                message=f"Use this token to reset password: {reset.token}",
+                message=f"Click the link below to reset your password:\n{reset_link}",
                 from_email=None,
                 recipient_list=[reset.email],
             )
@@ -108,6 +141,22 @@ class ChangePasswordView(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.apply_new_password()
+
+        # Thu hồi mọi session: blacklist toàn bộ refresh token của user này
+        # (cùng model OutstandingToken/BlacklistedToken của simplejwt, dùng
+        # cho "logout everywhere"), cộng thêm access token hiện tại — access
+        # token không tự mất hiệu lực chỉ vì refresh token bị blacklist.
+        for outstanding in OutstandingToken.objects.filter(user=request.user):
+            BlacklistedToken.objects.get_or_create(token=outstanding)
+
+        token = request.auth
+        jti = token["jti"]
+        ttl = token["exp"] - int(time.time())
+        if ttl > 0:
+            try:
+                blacklist_cache.set(f"blacklist:{jti}", "1", timeout=ttl)
+            except redis.exceptions.RedisError:
+                pass  # best-effort — đổi mật khẩu vẫn đã thành công, không rollback vì lỗi Redis
 
         log_audit_event(
             actor=request.user,

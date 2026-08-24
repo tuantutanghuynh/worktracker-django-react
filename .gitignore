@@ -1,5 +1,6 @@
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -27,11 +28,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Personal docs
+TuDocs/
+
 # IDE
 .DS_Store
 .vscode/*
+.claude/*
 !.vscode/extensions.json
 .idea/
+
+# Spec Kit (local-only, not shared with team)
+.specify/
 *.suo
 *.ntvs*
 *.njsproj

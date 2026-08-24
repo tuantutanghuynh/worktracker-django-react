@@ -132,7 +132,7 @@ class LogWork(models.Model):
         related_name="work_logs",
     )
 
-    work_date = models.DateField()
+    work_date = models.DateField(db_index=True)
     # DECIMAL(4,2) để tránh sai số float khi cộng dồn giờ.
     hours_spent = models.DecimalField(max_digits=4, decimal_places=2)
     description = models.TextField(blank=True, null=True)

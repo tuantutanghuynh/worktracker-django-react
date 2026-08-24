@@ -27,7 +27,20 @@ export function ProfileFormCard({ profile, onSave, saving, error, className = ''
   return (
     <div className={cn('bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs space-y-4', className)}>
       <h3 className="text-sm font-bold text-slate-900">Personal Information</h3>
-      
+
+      {(profile?.department || profile?.manager_name) && (
+        <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase">Department</p>
+            <p className="text-xs font-medium text-slate-800 mt-0.5">{profile?.department || '—'}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase">Manager</p>
+            <p className="text-xs font-medium text-slate-800 mt-0.5">{profile?.manager_name || '—'}</p>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSave)} className="space-y-3">
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">

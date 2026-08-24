@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/admin/", include("projects.urls")),
     path("api/admin/", include("system.urls")),
+    path("api/admin/timesheets/", include("timesheets.admin.urls")),
 
     # ── MANAGER SCOPE (LongNguyen) ──────────────────────────────────────────────
     path("api/manager/", include("projects.manager.urls_manager")),
@@ -26,6 +27,7 @@ urlpatterns = [
 
     # ── EMPLOYEE SCOPE (TuanTu) ────────────────────────────────────────────────
     path("api/employee/", include("accounts.employee.urls_employee")),
+    path("api/employee/", include("tasks.employee.urls_employee")),
     path("api/timesheets/", include("timesheets.employee.urls_employee")),
     path("api/notifications/", include("system.employee.urls_employee")),
 

@@ -6,7 +6,6 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0003_client_address_client_created_at_client_industry_and_more'),
         ('projects', '0006_alter_client_id_alter_job_id'),
     ]
 

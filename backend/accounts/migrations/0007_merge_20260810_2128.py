@@ -6,7 +6,6 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0003_employeeprofile_joined_date_role_is_active'),
         ('accounts', '0006_alter_customuser_id_alter_department_id_and_more'),
     ]
 

@@ -137,6 +137,7 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS':  True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'CHECK_REVOKE_TOKEN': True,
 }
 
 SPECTACULAR_SETTINGS = {
@@ -157,7 +158,6 @@ SPECTACULAR_SETTINGS = {
 }
 
 
-# ── EMAIL ─────────────────────────────────────────────────────────────────────
 # Dev: in email ra console thay vì gửi thật. Đổi sang SMTP khi deploy production.
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 
@@ -178,6 +178,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',   # Vite dev server
 ]
 
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 # Redis & Cache Configuration
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")

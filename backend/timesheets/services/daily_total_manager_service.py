@@ -25,11 +25,11 @@ def normalize_hours(value):
 def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     """
     Tính tổng giờ làm của 1 user trong 1 ngày.
-
     Quy ước:
     - VOIDED và REJECTED không tính vào tổng giờ (giải phóng quota để nhân viên log lại task khác).
     - PENDING / APPROVED được tính vào tổng giờ.
     """
+
     queryset = LogWork.objects.filter(
         user_id=user_id,
         work_date=work_date,
@@ -48,6 +48,7 @@ def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     )["total_hours"]
 
     return normalize_hours(total)
+
 
 
 def assert_daily_total_not_exceed_8(
@@ -71,10 +72,13 @@ def assert_daily_total_not_exceed_8(
 
     if final_total > MAX_DAILY_HOURS:
         raise DailyTotalError(
-            f"Daily total hours cannot exceed standard 8.0 hours limit. Current total: {current_total}h, new hours: {new_hours}h, final total: {final_total}h."
+            f"Daily total hours cannot exceed standard {MAX_DAILY_HOURS} hours limit. "
+            f"Current total: {current_total}h, new hours: {new_hours}h, final total: {final_total}h."
         )
 
     return final_total
+
+assert_daily_total_not_exceed_24 = assert_daily_total_not_exceed_8
 
 
 def rebuild_daily_user_timesheet(user_id, work_date):

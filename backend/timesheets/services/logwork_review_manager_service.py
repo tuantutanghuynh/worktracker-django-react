@@ -3,8 +3,10 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
 from timesheets.models import LogWork
+from system.models import Notification
 from system.security.scoping_manager import scoped_logworks
 from system.services.audit_manager_service import snapshot, log_action
+from system.services.notification_manager_service import notify
 
 from timesheets.services.daily_total_manager_service import (
     assert_daily_total_not_exceed_8,
@@ -122,6 +124,18 @@ def approve_logwork(
             request=request,
         )
 
+        notify(
+            recipients=[locked_logwork.user],
+            event_type=Notification.EventType.LOG_WORK_APPROVED,
+            title="Log work approved",
+            content=(
+                f"Your log work on {locked_logwork.work_date} "
+                f"({locked_logwork.hours_spent}h) has been approved."
+            ),
+            related_url=f"/employee/log-works/{locked_logwork.id}",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
+        )
+
     return locked_logwork
 
 
@@ -210,6 +224,18 @@ def reject_logwork(
                 ],
             ),
             request=request,
+        )
+
+        notify(
+            recipients=[locked_logwork.user],
+            event_type=Notification.EventType.LOG_WORK_REJECTED,
+            title="Log work rejected",
+            content=(
+                f"Your log work on {locked_logwork.work_date} "
+                f"({locked_logwork.hours_spent}h) has been rejected: {clean_reason}"
+            ),
+            related_url=f"/employee/log-works/{locked_logwork.id}",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 
     return locked_logwork
@@ -417,6 +443,18 @@ def void_logwork(
                 ],
             ),
             request=request,
+        )
+
+        notify(
+            recipients=[locked_logwork.user],
+            event_type=Notification.EventType.LOG_WORK_VOIDED,
+            title="Log work voided",
+            content=(
+                f"Your log work on {locked_logwork.work_date} "
+                f"({locked_logwork.hours_spent}h) has been voided: {clean_reason}"
+            ),
+            related_url=f"/employee/log-works/{locked_logwork.id}",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 
     return locked_logwork

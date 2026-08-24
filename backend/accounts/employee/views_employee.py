@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.core.files.storage import default_storage
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.views import APIView
@@ -24,17 +24,30 @@ from accounts.employee.serializers_employee import (
 
 
 
+# EmployeeProfile is only auto-created for accounts made through
+# /api/auth/users/ — Admin/Manager accounts provisioned by createsuperuser
+# or seed scripts have no profile row, and this endpoint is open to every
+# authenticated role, so create it on first access instead of 404ing them
+# out of their own profile page. full_name is NOT NULL, hence the default
+# (same fallback used by UserViewSet.assign_department).
+def get_or_create_own_profile(user):
+    profile, _ = EmployeeProfile.objects.get_or_create(
+        user=user, defaults={"full_name": user.email}
+    )
+    return profile
+
+
 # Lets any logged-in user view and edit their own profile (full_name, phone_number only).
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        profile = get_object_or_404(EmployeeProfile, user=request.user)
+        profile = get_or_create_own_profile(request.user)
         serializer = EmployeeProfileSerializer(profile)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request):
-        profile = get_object_or_404(EmployeeProfile, user=request.user)
+        profile = get_or_create_own_profile(request.user)
         serializer = EmployeeProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -47,7 +60,7 @@ class AvatarUploadView(APIView):
     parser_classes = [MultiPartParser]
 
     def patch(self, request):
-        profile = get_object_or_404(EmployeeProfile, user=request.user)
+        profile = get_or_create_own_profile(request.user)
 
         serializer = AvatarUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -90,7 +103,7 @@ class PersonalKPIView(APIView):
             user=user,
             work_date__range=(week_start, week_end),
         ).exclude(
-            review_status=LogWork.ReviewStatus.VOIDED,
+            review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED],
         ).aggregate(total=Sum("hours_spent"))["total"] or Decimal("0.00")
 
         completion_tasks = Task.objects.filter(assignee=user).exclude(
@@ -105,6 +118,50 @@ class PersonalKPIView(APIView):
         completed_count = completion_tasks.filter(status=Task.Status.COMPLETED).count()
         completion_rate = (completed_count / total_count) if total_count else None
 
+                # Task status breakdown — how many of the user's own tasks sit in
+        # each status. Excludes CANCELLED, same as completion_rate above,
+        # so a cancelled task doesn't skew either metric.
+        status_counts = (
+            Task.objects.filter(assignee=user)
+            .exclude(status=Task.Status.CANCELLED)
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+        task_status_breakdown = {row["status"]: row["count"] for row in status_counts}
+
+        # Hours by project — top 5 projects by hours logged, all-time.
+        # LogWork -> task -> job is a read-only cross-app join (job/task
+        # belong to Minh Anh/Long's apps); never writes to those tables.
+        hours_by_project = list(
+            LogWork.objects.filter(user=user)
+            .exclude(review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED])
+            .values("task__job__job_name")
+            .annotate(total_hours=Sum("hours_spent"))
+            .order_by("-total_hours")[:5]
+        )
+
+        # Daily hours trend — last 14 days, including days with 0 hours
+        # (the frontend line chart needs a continuous x-axis, not gaps).
+        trend_start = today - timedelta(days=13)
+        logged_by_day = {
+            row["work_date"]: row["total"]
+            for row in LogWork.objects.filter(
+                user=user, work_date__range=(trend_start, today)
+            )
+            .exclude(review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED])
+            .values("work_date")
+            .annotate(total=Sum("hours_spent"))
+        }
+        daily_hours_trend = [
+            {
+                "date": trend_start + timedelta(days=i),
+                "hours": logged_by_day.get(trend_start + timedelta(days=i), Decimal("0.00")),
+            }
+            for i in range(14)
+        ]
+
+
+
         return Response({
             "overdue_tasks_count": overdue_tasks_count,
             "hours_logged_this_week": hours_this_week,
@@ -117,4 +174,8 @@ class PersonalKPIView(APIView):
                 "total": total_count,
                 "rate": completion_rate,
             },
+            "task_status_breakdown": task_status_breakdown,
+            "hours_by_project": hours_by_project,
+            "daily_hours_trend": daily_hours_trend,
+
         }, status=status.HTTP_200_OK)

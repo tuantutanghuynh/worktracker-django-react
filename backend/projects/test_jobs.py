@@ -107,6 +107,7 @@ class TestJobAPI:
         user_b = CustomUser.objects.create_user(
             email='b@test.com', password='Test@1234',
             role=admin_role, is_active=True,
+            must_change_password=False,
         )
         api_client.force_authenticate(user=user_b)
         response = api_client.post(f'/api/admin/jobs/{job.id}/acquire-lock/')

@@ -69,6 +69,7 @@ class Command(BaseCommand):
                 # Notification
                 {'code': 'notification:view', 'name': 'View manager notifications'},
                 # System Settings
+                {'code': 'department:view',     'name': 'View department list and details'},
                 {'code': 'department:create',   'name': 'Create a new department in the system'},
                 {'code': 'department:update',   'name': 'Edit department information'},
                 {'code': 'role:manage',         'name': 'Add or edit roles and assign permissions to them'},

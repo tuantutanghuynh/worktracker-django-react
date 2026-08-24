@@ -48,6 +48,11 @@ const processQueue = (error, token = null) => {
 
 // On 401, refreshes the token once and retries the original request;
 // logs the user out if there's no refresh token or the refresh fails.
+// Concurrent 401s while a refresh is already in flight queue up instead
+// of each firing their own refresh call — with ROTATE_REFRESH_TOKENS +
+// BLACKLIST_AFTER_ROTATION on the backend, 2 parallel refresh calls would
+// have the second one use an already-blacklisted refresh token and fail,
+// logging the user out unnecessarily.
 axiosClient.interceptors.response.use(
     (response) => response,
     async (error) => {

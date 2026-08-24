@@ -3,9 +3,12 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
 import secrets
+import re
 from datetime import timedelta
 from django.utils import timezone
 from accounts.models import PasswordReset, RolePermission
+from django.db import transaction
+
 
 User = get_user_model()
 
@@ -16,6 +19,23 @@ User = get_user_model()
 # password, not a token). Each serializer here does double duty: validating
 # the incoming data AND running the business logic needed to turn valid
 # input into a result (tokens, a reset token, or a changed password).
+
+def validate_password_strength(value):
+    """Mirrors the 5 rules in ChangePasswordPage.jsx's Zod schema.
+    Returns every rule the password fails (not just the first), so the
+    client can show all problems at once instead of one at a time."""
+    errors = []
+    if len(value) < 8:
+        errors.append("At least 8 characters")
+    if not re.search(r"[a-z]", value):
+        errors.append("Must contain a lowercase letter")
+    if not re.search(r"[A-Z]", value):
+        errors.append("Must contain an uppercase letter")
+    if not re.search(r"[0-9]", value):
+        errors.append("Must contain a number")
+    if not re.search(r"[^A-Za-z0-9]", value):
+        errors.append("Must contain a special symbol")
+    return errors
 
 
 # Validates email/password and issues JWT access/refresh tokens on success.
@@ -107,7 +127,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     # Generates a secure token, persists a PasswordReset record, and returns it (or None if email unknown).
-    def creat_reset_token(self):
+    def create_reset_token(self):
         email = self.validated_data["email"]
         user = User.objects.filter(email=email).first()
 
@@ -131,6 +151,13 @@ class ResetPasswordSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
         self.reset_record = None
 
+    def validate_new_password(self, value):
+        errors = validate_password_strength(value)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
+
+
     # Verifies the token exists, hasn't been used, and hasn't expired; stores the record for apply_new_password.
     def validate(self, attrs):
         reset = PasswordReset.objects.filter(token=attrs["token"]).first()
@@ -147,7 +174,9 @@ class ResetPasswordSerializer(serializers.Serializer):
         self.reset_record = reset
         return attrs
 
-    # Applies the new password and marks the reset token as used to prevent reuse.
+    # Đọc lại record CÓ khoá (select_for_update) ngay trong transaction —
+    # validate() ở trên chỉ kiểm tra sơ bộ cho UX, không đủ để chặn race
+    # condition giữa 2 request cùng dùng 1 token gần như đồng thời.
     def apply_new_password(self):
         if self.reset_record is None:
             raise RuntimeError(
@@ -155,15 +184,23 @@ class ResetPasswordSerializer(serializers.Serializer):
                 "Ensure that validate() is called and passed before calling this method."
             )
 
-        user = User.objects.filter(email=self.reset_record.email).first()
-        user.set_password(self.validated_data["new_password"])
-        user.save()
+        with transaction.atomic():
+            reset = PasswordReset.objects.select_for_update().get(pk=self.reset_record.pk)
 
-        self.reset_record.is_used = True
-        self.reset_record.save()
+            if reset.is_used:
+                raise serializers.ValidationError("This reset link has already been used.")
+            if reset.expires_at < timezone.now():
+                raise serializers.ValidationError("This reset link has expired.")
+
+            user = User.objects.filter(email=reset.email).first()
+            user.set_password(self.validated_data["new_password"])
+            user.save()
+
+            reset.is_used = True
+            reset.save()
 
         return user
-    
+
 # Used by an already-authenticated user to set a new password (e.g. to
 # satisfy must_change_password). Unlike ResetPasswordSerializer, there is
 # no token here — request.user is already known, so this instead requires
@@ -171,6 +208,12 @@ class ResetPasswordSerializer(serializers.Serializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)
+
+    def validate_new_password(self, value):
+        errors = validate_password_strength(value)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
 
     # Confirms the current password is correct before allowing the change.
     def validate(self, attrs):

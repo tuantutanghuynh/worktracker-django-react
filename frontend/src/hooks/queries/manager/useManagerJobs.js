@@ -23,14 +23,18 @@ export const managerClientKeys = {
 };
 
 /**
- * Fetch paginated list of jobs with caching and automatic background refetching
+ * Fetch paginated list of jobs with caching and automatic background refetching.
+ * `enabled` (default true) lets callers outside the Manager portal — e.g. the
+ * shared Sidebar rendering for Employee/Admin — opt out of firing this request
+ * at all, instead of fetching and discarding a guaranteed 403.
  */
-export function useManagerJobs(params = {}) {
+export function useManagerJobs(params = {}, { enabled = true } = {}) {
   return useQuery({
     queryKey: managerJobKeys.list(params),
     queryFn: () => managerJobService.getJobs(params),
     placeholderData: keepPreviousData,
     staleTime: 3 * 60 * 1000, // 3 minutes cache
+    enabled,
   });
 }
 

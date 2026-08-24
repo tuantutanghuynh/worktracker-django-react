@@ -7,6 +7,8 @@ from rest_framework.exceptions import PermissionDenied
 from system.services.audit_manager_service import log_action, snapshot
 
 from timesheets.models import LogWork, DailyUserTimesheet, TimeLock
+from tasks.models import Task
+from timesheets.services.daily_total_manager_service import MAX_DAILY_HOURS
 
 # This file holds the EMPLOYEE-only serializers for the timesheets app:
 # EmployeeLogWorkSerializer validates and creates a log_work entry, applying
@@ -74,24 +76,25 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                     "Contact your manager to unlock it."
                 )
 
-            # Defensive layer 2 — 8.0h Daily Cap + Race Condition
-            DailyUserTimesheet.objects.get_or_create(
+            # Defensive layer 2 — 24h Cap + Race Condition
+            # select_for_update() trước get_or_create() để: nếu row đã tồn tại, get() nội bộ
+            # khóa nó luôn trong cùng 1 query; nếu chưa tồn tại, get_or_create() tự lo
+            # savepoint + retry khi 2 request cùng tạo mới (xem Django query.py get_or_create()).
+            timesheet, _ = DailyUserTimesheet.objects.select_for_update().get_or_create(
                 user=user, work_date=work_date, defaults={"total_hours": Decimal("0")}
-            )
-            timesheet = DailyUserTimesheet.objects.select_for_update().get(
-                user=user, work_date=work_date
             )
 
             new_total = timesheet.total_hours + hours_spent
-            if new_total > Decimal("8.00"):
+            if new_total > MAX_DAILY_HOURS:
                 raise serializers.ValidationError(
                     {
                         "hours_spent": (
-                            f"Daily limit exceeded: Total hours for {work_date} cannot exceed standard 8.0h limit "
+                            f"Total hours for {work_date} would exceed {MAX_DAILY_HOURS}h "
                             f"(currently {timesheet.total_hours}h, tried to add {hours_spent}h)."
                         )
                     }
                 )
+
 
             timesheet.total_hours = new_total
             timesheet.save()
@@ -113,3 +116,26 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             )
 
             return log_work
+
+# Task rút gọn — chỉ đủ thông tin để hiển thị 1 dòng trong bảng Timesheet
+# (không cần full EmployeeTaskListSerializer, tránh over-fetch).
+class EmployeeLogWorkTaskMiniSerializer(serializers.ModelSerializer):
+    job_name = serializers.CharField(source="job.job_name", read_only=True)
+
+    class Meta:
+        model = Task
+        fields = ["id", "title", "job_name"]
+
+
+# Liệt kê log work của chính user — dùng cho trang Timesheet (bảng chính),
+# khác EmployeeLogWorkSerializer (dùng để TẠO, không có nested task).
+class EmployeeLogWorkListSerializer(serializers.ModelSerializer):
+    task = EmployeeLogWorkTaskMiniSerializer(read_only=True)
+
+    class Meta:
+        model = LogWork
+        fields = [
+            "id", "task", "work_date", "hours_spent", "description",
+            "review_status", "review_note", "reviewed_at",
+            "adjustment_reason", "created_at",
+        ]

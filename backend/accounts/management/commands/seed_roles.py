@@ -71,12 +71,14 @@ class Command(BaseCommand):
                 {'code': 'timesheet:correct',   'name': 'Correct hours spent on employee work log'},
                 {'code': 'timesheet:create', 'name': 'Log new work hours onto a task'},
                 {'code': 'timesheet:void',      'name': 'Void an erroneous work log entry'},
+                {'code': 'timesheet:edit',      'name': "Edit hours/description on your own pending work log"},
                 {'code': 'timesheet:manage',    'name': 'Handle work hour violations such as over-limit or missing'},
 
-                # TimeLock Management 
+                # TimeLock Management
                 {'code': 'timelock:view',       'name': 'View locked timesheet periods'},
                 {'code': 'timelock:lock',       'name': 'Lock timesheet period for a specific job'},
                 {'code': 'timelock:unlock',     'name': 'Unlock timesheet period for a specific job'},
+                {'code': 'timelock:global_manage', 'name': 'Lock or unlock the timesheet period company-wide (Admin only, TimeLock.LockScope.GLOBAL)'},
 
                 # Audit Logs & Notifications
                 {'code': 'audit:view',          'name': 'View system audit trail and action history'},
@@ -88,8 +90,10 @@ class Command(BaseCommand):
                 {'code': 'report:export',       'name': 'Export reports to PDF, Excel, or CSV'},
 
                 # System Settings
+                {'code': 'department:view',   'name': 'View the department in the system'},
                 {'code': 'department:create',   'name': 'Create a new department in the system'},
                 {'code': 'department:update',   'name': 'Edit department information'},
+                {'code': 'department:delete',   'name': 'Delete a department from the system'},
                 {'code': 'role:manage',         'name': 'Add or edit roles and assign permissions to them'},
             ]
 
@@ -127,7 +131,7 @@ class Command(BaseCommand):
                 'client:view',
                 'job:view',
                 'task:view', 'task:update', 'task:change_status', 'task:comment', 'task:attachment', 'task:follow',
-                'timesheet:view','timesheet:create', 'timesheet:void', 'timesheet:export',
+                'timesheet:view','timesheet:create', 'timesheet:void', 'timesheet:edit', 'timesheet:export',
                 'report:view', 'notification:view',
             ]
             employee_role = Role.objects.get(code='EMPLOYEE')

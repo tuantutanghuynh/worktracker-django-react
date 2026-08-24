@@ -1,3 +1,4 @@
+import { ROLE_DASHBOARD } from "../constants/routes"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { login as loginApi } from "../api/authApi"
@@ -23,7 +24,7 @@ export function useLogin() {
     try {
         const data = await loginApi({ email, password })
         login(data, data.user, rememberMe)
-        navigate("/")
+        navigate(ROLE_DASHBOARD[data.user.role]||"/")
     } catch (err) {
         setError(err.response?.data?.detail || "Login failed")
     } finally {

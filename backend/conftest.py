@@ -10,6 +10,8 @@ from accounts.models import CustomUser, Role, Permission, RolePermission
 def use_dummy_cache(settings):
     settings.CACHES = {
         'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'},
+        # 'blacklist' alias cần có vì accounts/authentication.py đọc caches["blacklist"]
+        # khi xác thực JWT thật (mọi request không dùng force_authenticate).
         'blacklist': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'},
     }
     settings.CHANNEL_LAYERS = {
@@ -29,10 +31,12 @@ def admin_role(db):
     with transaction.atomic():
         role = Role.objects.create(code='ADMIN', name='Admin')
         permission_codes = [
-            'client:create', 'client:update', 'client:delete', 'client:view',
-            'job:create', 'job:update', 'job:delete', 'job:view',
-            'user:create', 'user:update', 'user:view',
-            'role:manage', 'audit:view', 'report:export',
+            'client:create', 'client:update', 'client:delete', 'client:view', 'client:export',
+            'job:create', 'job:update', 'job:delete', 'job:view', 'job:export',
+            'user:create', 'user:update', 'user:view', 'user:lock',
+            'department:view', 'department:create', 'department:update', 'department:delete',
+            'timesheet:view', 'timesheet:export',
+            'role:manage', 'audit:view', 'audit:export', 'report:export',
         ]
         for code in permission_codes:
             perm, _ = Permission.objects.get_or_create(code=code, defaults={'name': code})
@@ -47,6 +51,7 @@ def admin_user(db, admin_role):
         password='Test@1234',
         role=admin_role,
         is_active=True,
+        must_change_password=False,
     )
 
 #Tạo client đã đăng nhập- force_authenticate bỏ qua JWT hoàn toàn — gắn user trực tiếp vào request. Dùng để test logic API, không phải test quy trình đăng nhập.

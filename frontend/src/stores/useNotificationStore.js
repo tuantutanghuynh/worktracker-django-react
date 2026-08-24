@@ -1,5 +1,32 @@
 import { create } from 'zustand';
 import managerReportService from '../services/manager/managerReportService';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notificationApi';
+import { useAuthStore } from './authStore';
+
+// Picks the right backend depending on role — Manager's notification
+// routes live under /manager/system/notifications/ and are role-gated;
+// calling them as an Employee/Admin would 403.
+function isManager() {
+  const role = (useAuthStore.getState().user?.role || '').toUpperCase();
+  return role === 'MANAGER';
+}
+
+const SEEN_ALERTS_KEY = 'dq_alerts_seen';
+
+// Data-quality alerts (Admin's "Department without manager" etc.) are
+// computed live from DB state, not persisted rows — no is_read column to
+// flip. "Seen" just means "the viewer opened the bell/notifications page
+// while this exact alert id was showing", tracked per-browser via
+// localStorage. Ported from Minh Anh's useNotificationStore.js (her
+// version got dropped when this file's merge conflict was resolved) —
+// AdminNotificationsPage needs it, none of Employee/Manager's flow uses it.
+function loadSeenAlertIds() {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_ALERTS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
@@ -8,8 +35,23 @@ export const useNotificationStore = create((set, get) => ({
   loading: false,
   socket: null,
   error: null,
+  seenAlertIds: loadSeenAlertIds(),
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  markAlertsSeen: (ids) => {
+    if (!ids || ids.length === 0) return;
+    set((state) => {
+      const merged = Array.from(new Set([...state.seenAlertIds, ...ids]));
+      try {
+        localStorage.setItem(SEEN_ALERTS_KEY, JSON.stringify(merged));
+      } catch {
+        // localStorage unavailable (private window, blocked site data) —
+        // badge just won't persist across reloads, not worth surfacing.
+      }
+      return { seenAlertIds: merged };
+    });
+  },
 
   /**
    * Fetch initial notifications from API
@@ -17,7 +59,9 @@ export const useNotificationStore = create((set, get) => ({
   fetchNotifications: async (params = {}) => {
     set({ loading: true, error: null });
     try {
-      const data = await managerReportService.getNotifications(params);
+      const data = isManager()
+        ? await managerReportService.getNotifications(params)
+        : await getNotifications();
       const list = Array.isArray(data) ? data : data.results || [];
       const unread = list.filter((n) => !n.is_read).length;
       set({ notifications: list, unreadCount: unread, loading: false });
@@ -31,7 +75,11 @@ export const useNotificationStore = create((set, get) => ({
    */
   markAsRead: async (id) => {
     try {
-      await managerReportService.markNotificationRead(id);
+      if (isManager()) {
+        await managerReportService.markNotificationRead(id);
+      } else {
+        await markNotificationRead(id);
+      }
       set((state) => {
         const updated = state.notifications.map((n) =>
           n.id === id ? { ...n, is_read: true } : n
@@ -49,7 +97,11 @@ export const useNotificationStore = create((set, get) => ({
    */
   markAllAsRead: async () => {
     try {
-      await managerReportService.markAllNotificationsRead();
+      if (isManager()) {
+        await managerReportService.markAllNotificationsRead();
+      } else {
+        await markAllNotificationsRead();
+      }
       set((state) => ({
         notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
         unreadCount: 0,
@@ -83,7 +135,7 @@ export const useNotificationStore = create((set, get) => ({
       return;
     }
 
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    const token = useAuthStore.getState().accessToken;
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const wsUrl = wsUrlOverride || `${wsProtocol}//${host}/ws/notifications/?token=${token || ''}`;

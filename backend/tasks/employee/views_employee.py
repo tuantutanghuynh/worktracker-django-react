@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 
 from tasks.models import Task, TaskAttachment, TaskComment
 from tasks.services.file_upload_service import save_task_attachment
+from tasks.services.task_transition_manager_service import apply_transition
 from .serializers_employee import (
     EmployeeTaskListSerializer,
     EmployeeTaskDetailSerializer,
@@ -36,8 +37,9 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='status')
     def change_status(self, request, pk=None):
         """
-        API Kéo thả Kanban: Cập nhật status (TODO -> IN_PROGRESS -> REVIEWING)
-        và cập nhật vị trí thẻ (order_index / LexoRank).
+        API Kéo thả Kanban: Cập nhật status qua apply_transition() dùng chung —
+        tự validate transition + đúng actor (FR-39), tự notify Manager, tự
+        ghi audit log. Không tự set task.status trực tiếp.
         """
         task = self.get_object()
         serializer = EmployeeTaskStatusUpdateSerializer(data=request.data)
@@ -46,19 +48,22 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
         new_status = serializer.validated_data['status']
         order_index = serializer.validated_data.get('order_index')
 
-        update_fields = ['status', 'updated_at']
-        task.status = new_status
-        if order_index:
-            task.order_index = order_index
-            update_fields.append('order_index')
+        updated_task = apply_transition(
+            user=request.user,
+            task=task,
+            to_status=new_status,
+            request=request,
+        )
 
-        task.save(update_fields=update_fields)
+        if order_index:
+            updated_task.order_index = order_index
+            updated_task.save(update_fields=['order_index'])
 
         return Response({
-            "id": task.id,
-            "status": task.status,
-            "order_index": task.order_index,
-            "message": f"Task status successfully updated to {new_status}."
+            "id": updated_task.id,
+            "status": updated_task.status,
+            "order_index": updated_task.order_index,
+            "message": f"Task status successfully updated to {updated_task.status}."
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='attachments')

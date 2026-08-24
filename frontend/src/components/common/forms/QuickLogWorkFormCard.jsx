@@ -1,13 +1,10 @@
-import React, { useState } from 'react';
-import { 
-  Clock, 
-  Plus, 
-  Send, 
-  AlertTriangle, 
-  Calendar as CalendarIcon, 
-  FileText, 
-  CheckCircle2, 
-  Briefcase 
+import { useState } from 'react';
+import {
+  Clock,
+  Send,
+  AlertTriangle,
+  Calendar as CalendarIcon,
+  Briefcase
 } from 'lucide-react';
 import InputField from './InputField';
 import SelectDropdown from './SelectDropdown';
@@ -151,7 +148,7 @@ export default function QuickLogWorkFormCard({
               type="number"
               step="0.25"
               min="0.25"
-              max="24"
+              max="8"
               value={hoursSpent}
               onChange={(e) => {
                 setHoursSpent(e.target.value);
@@ -198,7 +195,7 @@ export default function QuickLogWorkFormCard({
           <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
-              Warning: Total daily hours will exceed 24 hours ({currentTotal.toFixed(2)}h)!
+              Warning: Total daily hours will exceed 8 hours ({currentTotal.toFixed(2)}h)!
             </span>
           </div>
         )}

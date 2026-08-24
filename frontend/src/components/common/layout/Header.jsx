@@ -18,11 +18,12 @@ import UserAvatar from '../avatar/UserAvatar';
 // Bản ánh xạ Nhãn đường dẫn Breadcrumbs sang Tiếng Anh
 const ROUTE_LABELS = {
   manager: 'Manager',
+  employee: 'Employee',
   dashboard: 'Dashboard',
   jobs: 'Projects & Jobs',
   kanban: 'Kanban Board',
   team: 'Team Members',
-  timesheet: 'Timesheet Review',
+  timesheet: 'Timesheet',
   timesheets: 'Timesheets',
   review: 'Review',
   timelock: 'Period Lock',
@@ -31,6 +32,17 @@ const ROUTE_LABELS = {
   notifications: 'Notification Center',
   profile: 'My Profile',
   settings: 'System Settings',
+  'my-tasks': 'My Tasks',
+  'my-performance': 'My Performance',
+};
+
+// Mỗi role có Home/Notifications/Profile/Settings khác nhau — Header dùng
+// chung cho cả 3 role nên không được hardcode 1 path cố định, phải tra
+// theo role hiện tại.
+const ROLE_LINKS = {
+  ADMIN: { home: '/admin', notifications: '/admin/notifications', profile: '/admin/profile', settings: '/admin/profile' },
+  MANAGER: { home: '/manager/dashboard', notifications: '/manager/notifications', profile: '/manager/profile', settings: '/manager/settings' },
+  EMPLOYEE: { home: '/', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
 };
 
 export default function Header({ onOpenSearchModal }) {
@@ -45,6 +57,13 @@ export default function Header({ onOpenSearchModal }) {
   // Lấy thông tin user đăng nhập từ useAuth (Zustand Store)
   const { user, logout } = useAuth();
   const displayUser = user || { email: 'manager@worktracker.vn', role: 'MANAGER' };
+
+  // Header dùng chung Manager + Employee + Admin — 3 role có route gốc
+  // khác nhau, không được hardcode theo 1 role cho tất cả.
+  const userRole = (displayUser.role || '').toUpperCase();
+  const roleLinks = ROLE_LINKS[userRole] || ROLE_LINKS.EMPLOYEE;
+  const homePath = roleLinks.home;
+  const notificationsPath = roleLinks.notifications;
 
   // Đóng Dropdown khi click ra ngoài vùng menu
   useEffect(() => {
@@ -99,7 +118,7 @@ export default function Header({ onOpenSearchModal }) {
 
         {/* Thanh Breadcrumb Động */}
         <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 overflow-hidden">
-          <Link to="/manager/dashboard" className="hover:text-blue-600 transition-colors shrink-0">
+          <Link to={homePath} className="hover:text-blue-600 transition-colors shrink-0">
             Home
           </Link>
           {breadcrumbs.map((crumb) => (
@@ -136,7 +155,7 @@ export default function Header({ onOpenSearchModal }) {
 
         {/* Biểu tượng Chuông Thông báo */}
         <Link
-          to="/manager/notifications"
+          to={notificationsPath}
           className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           title="Notifications Center"
         >
@@ -174,7 +193,7 @@ export default function Header({ onOpenSearchModal }) {
 
               <div className="py-1">
                 <Link
-                  to="/manager/profile"
+                  to={roleLinks.profile}
                   onClick={() => setUserDropdownOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                 >
@@ -183,7 +202,7 @@ export default function Header({ onOpenSearchModal }) {
                 </Link>
 
                 <Link
-                  to="/manager/settings"
+                  to={roleLinks.settings}
                   onClick={() => setUserDropdownOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                 >
