@@ -1,7 +1,7 @@
 import { useMyPerformance } from "../../hooks/queries/employee/useMyPerformance"
 import StatCard from "../../components/common/cards/StatCard"
 import LineChartCard from "../../components/common/charts/LineChartCard"
-import HorizontalBarChartCard from "../../components/common/charts/HorizontalBarChartCard"
+import EmployeeHorizontalBarChartCard from "../../components/employee/EmployeeHorizontalBarChartCard"
 import DonutChartCard from "../../components/common/charts/DonutChartCard"
 import { AlertTriangle, ListChecks, TrendingUp, Clock } from "lucide-react"
 import { getErrorMessage } from "../../utils/errorMessages"
@@ -98,7 +98,7 @@ export function MyPerformancePage() {
             <LineChartCard title="Logged Hours Trend (Daily)" data={dailyTrendData} />
 
             <div className="grid grid-cols-2 gap-4">
-                <HorizontalBarChartCard title="Hours by Project" data={hoursByProjectData} />
+                <EmployeeHorizontalBarChartCard title="Hours by Project" data={hoursByProjectData} />
                 <DonutChartCard
                     title="Task Status Breakdown"
                     data={statusBreakdownData}
