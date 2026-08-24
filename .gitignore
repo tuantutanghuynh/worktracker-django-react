@@ -38,3 +38,9 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Test coverage artifacts (binary — gay conflict moi lan merge)
+backend/.coverage
+backend/htmlcov/
+.coverage
+htmlcov/
