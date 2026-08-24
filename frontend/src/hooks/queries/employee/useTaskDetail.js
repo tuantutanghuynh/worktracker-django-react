@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getMyTaskDetail, addTaskComment, uploadTaskAttachment } from "../../../api/myTasksApi"
-import { createLogWork, voidLogWork } from "../../../api/logWorkApi"
+import { createLogWork, voidLogWork, editLogWork } from "../../../api/logWorkApi"
 import { getErrorMessage } from "../../../utils/errorMessages"
 import { dashboardKeys } from "./useDashboard"
 
@@ -103,18 +103,37 @@ export function useTaskDetail(taskId) {
         }
     }
 
+    const editMutation = useMutation({
+        mutationFn: ({ logWorkId, hoursSpent, description, reason }) =>
+            editLogWork(logWorkId, { hours_spent: hoursSpent, description, adjustment_reason: reason }),
+        onSuccess: () => {
+            invalidateDetail()
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
+            toast.success('Log work updated.')
+        },
+        onError: (err) => toast.error(getErrorMessage(err, "Failed to edit log work")),
+    })
+
+    async function submitEditLogWork(logWorkId, hoursSpent, description, reason) {
+        try {
+            await editMutation.mutateAsync({ logWorkId, hoursSpent, description, reason })
+            return true
+        } catch {
+            return false
+        }
+    }
+
     const submitting =
         commentMutation.isPending || attachmentMutation.isPending ||
-        logWorkMutation.isPending || voidMutation.isPending
+        logWorkMutation.isPending || voidMutation.isPending || editMutation.isPending
 
-        return {
+    return {
         comments: data?.comments ?? [],
         workLogs: data?.work_logs ?? [],
         attachments: data?.attachments ?? [],
         loadingDetail: isLoading,
         submitting,
         error: queryError ? getErrorMessage(queryError, "Failed to load task detail") : null,
-        submitComment, submitAttachment, submitLogWork, submitVoidLogWork,
+        submitComment, submitAttachment, submitLogWork, submitVoidLogWork, submitEditLogWork,
     }
-
 }

@@ -8,6 +8,7 @@ import SideDrawer from "../../components/common/drawer/SideDrawer"
 import StatusBadge from "../../components/common/badges/StatusBadge"
 import PriorityBadge from "../../components/common/badges/PriorityBadge"
 import PromptReasonModal from "../../components/common/modal/PromptReasonModal"
+import EditLogWorkModal from "../../components/employee/EditLogWorkModal"
 
 
 const STATUS_OPTIONS = [
@@ -151,7 +152,7 @@ export function MyTasksPage() {
 function TaskDrawerContent({ task, onClose }) {
     const {
         comments, workLogs, loadingDetail, submitting, error,
-        submitComment, submitLogWork, submitVoidLogWork,
+        submitComment, submitLogWork, submitVoidLogWork, submitEditLogWork,
     } = useTaskDetail(task?.id)
 
     const [commentText, setCommentText] = useState("")
@@ -159,6 +160,7 @@ function TaskDrawerContent({ task, onClose }) {
     const [hoursSpent, setHoursSpent] = useState("")
     const [logDescription, setLogDescription] = useState("")
     const [voidingLogId, setVoidingLogId] = useState(null)
+    const [editingLog, setEditingLog] = useState(null)
 
     async function handleAddComment() {
         if (!commentText.trim()) return
@@ -181,6 +183,12 @@ function TaskDrawerContent({ task, onClose }) {
         if (!voidingLogId) return
         const ok = await submitVoidLogWork(voidingLogId, reason)
         if (ok) setVoidingLogId(null)
+    }
+
+    async function handleConfirmEdit(hoursSpent, description, reason) {
+        if (!editingLog) return
+        const ok = await submitEditLogWork(editingLog.id, hoursSpent, description, reason)
+        if (ok) setEditingLog(null)
     }
 
     return (
@@ -259,13 +267,22 @@ function TaskDrawerContent({ task, onClose }) {
                                                 )}
                                             </div>
                                             {log.review_status === "PENDING" ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setVoidingLogId(log.id)}
-                                                    className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 shrink-0"
-                                                >
-                                                    Void
-                                                </button>
+                                                <div className="flex items-center gap-2.5 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingLog(log)}
+                                                        className="text-[11px] font-semibold text-blue-400 hover:text-blue-300"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setVoidingLogId(log.id)}
+                                                        className="text-[11px] font-semibold text-rose-400 hover:text-rose-300"
+                                                    >
+                                                        Void
+                                                    </button>
+                                                </div>
                                             ) : (
                                                 <span className="text-[11px] font-semibold text-slate-400 shrink-0">{log.review_status}</span>
                                             )}
@@ -321,6 +338,15 @@ function TaskDrawerContent({ task, onClose }) {
                 title="Void Log Work"
                 description="This entry will be excluded from your daily total. This cannot be undone."
                 confirmText="Void Entry"
+                isLoading={submitting}
+            />
+
+            <EditLogWorkModal
+                key={editingLog?.id ?? "none-edit"}
+                isOpen={Boolean(editingLog)}
+                logWork={editingLog}
+                onClose={() => setEditingLog(null)}
+                onConfirm={handleConfirmEdit}
                 isLoading={submitting}
             />
         </>

@@ -8,6 +8,7 @@ import { DataTable } from "../../components/common/table/DataTable"
 import { ViewToggle } from "../../components/common/table/ViewToggle"
 import QuickLogWorkFormCard from "../../components/common/forms/QuickLogWorkFormCard"
 import PromptReasonModal from "../../components/common/modal/PromptReasonModal"
+import EditLogWorkModal from "../../components/employee/EditLogWorkModal"
 
 
 const REVIEW_STATUS_STYLES = {
@@ -40,13 +41,14 @@ const today = new Date().toISOString().split("T")[0]
 // endpoint doesn't take query params, dataset per user is small — same
 // choice already made for My Tasks).
 export function TimesheetPage() {
-    const { entries, loading, error, submitting, submitLogWork, submitVoidLogWork } = useTimesheet()
+    const { entries, loading, error, submitting, submitLogWork, submitVoidLogWork, submitEditLogWork } = useTimesheet()
     const { tasks } = useMyTasks()
 
     const [searchQuery, setSearchQuery] = useState("")
     const [statusValue, setStatusValue] = useState("")
     const [monthValue, setMonthValue] = useState("")
     const [voidingId, setVoidingId] = useState(null)
+    const [editingEntry, setEditingEntry] = useState(null)
 
     const monthOptions = useMemo(() => {
         const months = new Set(entries.map((e) => e.work_date.slice(0, 7)))
@@ -93,6 +95,12 @@ export function TimesheetPage() {
         if (ok) setVoidingId(null)
     }
 
+    async function handleConfirmEdit(hoursSpent, description, reason) {
+        if (!editingEntry) return
+        const ok = await submitEditLogWork(editingEntry.id, hoursSpent, description, reason)
+        if (ok) setEditingEntry(null)
+    }
+
     const columns = [
         { accessorKey: "work_date", header: "Work Date" },
         { accessorKey: "task_title", header: "Task", cell: (info) => info.row.original.task?.title },
@@ -111,13 +119,22 @@ export function TimesheetPage() {
                 const entry = info.row.original
                 if (entry.review_status !== "PENDING") return <span className="text-xs text-slate-400">—</span>
                 return (
-                    <button
-                        type="button"
-                        onClick={() => setVoidingId(entry.id)}
-                        className="px-3 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"
-                    >
-                        Void
-                    </button>
+                    <div className="flex gap-1.5">
+                        <button
+                            type="button"
+                            onClick={() => setEditingEntry(entry)}
+                            className="px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setVoidingId(entry.id)}
+                            className="px-3 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"
+                        >
+                            Void
+                        </button>
+                    </div>
                 )
             },
         },
@@ -191,6 +208,7 @@ export function TimesheetPage() {
                     onNextWeek={() => setWeekOffset((w) => w + 1)}
                     onThisWeek={() => setWeekOffset(0)}
                     onVoid={setVoidingId}
+                    onEdit={setEditingEntry}
                 />
             )}
 
@@ -203,6 +221,15 @@ export function TimesheetPage() {
                 confirmText="Void Entry"
                 isLoading={submitting}
             />
+
+            <EditLogWorkModal
+                key={editingEntry?.id ?? "none-edit"}
+                isOpen={Boolean(editingEntry)}
+                logWork={editingEntry}
+                onClose={() => setEditingEntry(null)}
+                onConfirm={handleConfirmEdit}
+                isLoading={submitting}
+            />
         </div>
     )
 }
@@ -210,7 +237,7 @@ export function TimesheetPage() {
 // Week View — nhóm entries đã tải sẵn theo ngày (không gọi API mới).
 // Tuần bắt đầu Thứ 2, khớp cách backend định nghĩa "tuần" ở
 // PersonalKPIView (hours_logged_this_week).
-function WeekView({ entries, weekOffset, onPrevWeek, onNextWeek, onThisWeek, onVoid }) {
+function WeekView({ entries, weekOffset, onPrevWeek, onNextWeek, onThisWeek, onVoid, onEdit }) {
     const { days, entriesByDay } = useMemo(() => {
         const start = addWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), weekOffset)
         const daysList = eachDayOfInterval({ start, end: addDays(start, 6) })
@@ -270,13 +297,22 @@ function WeekView({ entries, weekOffset, onPrevWeek, onNextWeek, onThisWeek, onV
                                         <ReviewStatusBadge status={e.review_status} />
                                     </div>
                                     {e.review_status === "PENDING" && (
-                                        <button
-                                            type="button"
-                                            onClick={() => onVoid(e.id)}
-                                            className="text-[10px] font-semibold text-rose-500 hover:text-rose-600"
-                                        >
-                                            Void
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => onEdit(e)}
+                                                className="text-[10px] font-semibold text-blue-500 hover:text-blue-600"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => onVoid(e.id)}
+                                                className="text-[10px] font-semibold text-rose-500 hover:text-rose-600"
+                                            >
+                                                Void
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             ))}

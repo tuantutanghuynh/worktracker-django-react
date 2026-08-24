@@ -15,3 +15,10 @@ export async function voidLogWork(id, reason) {
     const { data } = await axiosClient.patch(`/timesheets/log-works/${id}/void/`, { reason })
     return data
 }
+
+export async function editLogWork(id, { hours_spent, description, adjustment_reason }) {
+    const { data } = await axiosClient.patch(`/timesheets/log-works/${id}/edit/`, {
+        hours_spent, description, adjustment_reason,
+    })
+    return data
+}

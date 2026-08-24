@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getMyTimesheet } from "../../../api/timesheetApi"
-import { createLogWork, voidLogWork } from "../../../api/logWorkApi"
+import { createLogWork, voidLogWork, editLogWork } from "../../../api/logWorkApi"
 import { getErrorMessage } from "../../../utils/errorMessages"
 import { dashboardKeys } from "./useDashboard"
 
@@ -62,12 +62,32 @@ export function useTimesheet() {
         }
     }
 
+    const editMutation = useMutation({
+        mutationFn: ({ logWorkId, hoursSpent, description, reason }) =>
+            editLogWork(logWorkId, { hours_spent: hoursSpent, description, adjustment_reason: reason }),
+        onSuccess: () => {
+            invalidateAfterChange()
+            toast.success('Log work updated.')
+        },
+        onError: (err) => toast.error(getErrorMessage(err, "Failed to edit log work")),
+    })
+
+    async function submitEditLogWork(logWorkId, hoursSpent, description, reason) {
+        try {
+            await editMutation.mutateAsync({ logWorkId, hoursSpent, description, reason })
+            return true
+        } catch {
+            return false
+        }
+    }
+
     return {
         entries: data ?? [],
         loading: isLoading,
         error: queryError ? getErrorMessage(queryError, "Failed to load timesheet") : null,
-        submitting: logWorkMutation.isPending || voidMutation.isPending,
+        submitting: logWorkMutation.isPending || voidMutation.isPending || editMutation.isPending,
         submitLogWork,
         submitVoidLogWork,
+        submitEditLogWork,
     }
 }

@@ -71,6 +71,7 @@ class Command(BaseCommand):
                 {'code': 'timesheet:correct',   'name': 'Correct hours spent on employee work log'},
                 {'code': 'timesheet:create', 'name': 'Log new work hours onto a task'},
                 {'code': 'timesheet:void',      'name': 'Void an erroneous work log entry'},
+                {'code': 'timesheet:edit',      'name': "Edit hours/description on your own pending work log"},
                 {'code': 'timesheet:manage',    'name': 'Handle work hour violations such as over-limit or missing'},
 
                 # TimeLock Management 
@@ -127,7 +128,7 @@ class Command(BaseCommand):
                 'client:view',
                 'job:view',
                 'task:view', 'task:update', 'task:change_status', 'task:comment', 'task:attachment', 'task:follow',
-                'timesheet:view','timesheet:create', 'timesheet:void', 'timesheet:export',
+                'timesheet:view','timesheet:create', 'timesheet:void', 'timesheet:edit', 'timesheet:export',
                 'report:view', 'notification:view',
             ]
             employee_role = Role.objects.get(code='EMPLOYEE')
