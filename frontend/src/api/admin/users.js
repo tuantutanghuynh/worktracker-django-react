@@ -1,7 +1,10 @@
-import axiosClient from './axiosClient';
+import axiosClient from '../axiosClient';
 
 export const listUsers = (params) =>
   axiosClient.get('/auth/users/', { params }).then((r) => r.data);
+
+export const getUser = (id) =>
+  axiosClient.get(`/auth/users/${id}/`).then((r) => r.data);
 
 export const createUser = (data) =>
   axiosClient.post('/auth/users/', data).then((r) => r.data);

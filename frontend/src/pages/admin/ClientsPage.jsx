@@ -1,17 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, RotateCcw, Search } from 'lucide-react';
+import { format } from 'date-fns';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
 import SortableHeader from '../../components/common/table/SortableHeader';
+import PaginationBar from '../../components/common/table/PaginationBar';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
-import { listClients, createClient, updateClient, deleteClient, restoreClient } from '../../api/clients';
+import {
+  useAdminClients,
+  useAdminClientDeepLink,
+  useCreateClient,
+  useUpdateClient,
+  useDeactivateClient,
+  useRestoreClient,
+} from '../../hooks/queries/admin/useAdminClients';
+
+const PAGE_SIZE = 15;
 
 const clientSchema = z.object({
   client_name: z.string().min(1, 'Client name is required'),
@@ -37,22 +47,37 @@ const EMPTY_FORM = {
 
 // Admin page for CRUD on clients — mirrors DepartmentsPage's structure, plus
 // soft-delete/restore (Client uses is_active, never a hard delete — matches
-// ClientViewSet.perform_destroy on the backend).
+// ClientViewSet.perform_destroy on the backend). Data logic lives in
+// hooks/queries/admin/useAdminClients.js — this file is JSX only.
 export function ClientsPage() {
-  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [modalState, setModalState] = useState(null); // null | { mode: 'create' } | { mode: 'edit', client }
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const [ordering, toggleSort] = useOrdering();
+  const [page, setPage] = useState(1);
 
-  // Server-side search + sort — ClientViewSet.get_queryset() handles
-  // ?search= (OR across name/tax_code/email) and OrderingFilter handles
-  // ?ordering=. queryKey includes both so a new combination refetches.
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['clients', { search: debouncedSearch, ordering }],
-    queryFn: () => listClients({ search: debouncedSearch || undefined, ordering: ordering || undefined }),
+  // Reset to page 1 whenever the result set changes shape — otherwise a
+  // narrower search/filter could leave the user stranded on a page number
+  // that no longer exists. Adjusting state during render (React's own
+  // pattern for this — see "Adjusting state based on a prop change") instead
+  // of a useEffect, which would cause an extra render pass for no benefit.
+  const filterKey = `${debouncedSearch}|${ordering}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const { data, isLoading } = useAdminClients({
+    search: debouncedSearch || undefined,
+    ordering: ordering || undefined,
+    page,
   });
+  const clients = data?.results || [];
+  const totalCount = data?.count || 0;
 
   const {
     register,
@@ -65,6 +90,24 @@ export function ClientsPage() {
     reset(EMPTY_FORM);
     setModalState({ mode: 'create' });
   }
+
+  // Deep-link support for notifications (bell dropdown / data-quality
+  // alerts) that point at ?edit=<id> — fetches that one client directly
+  // instead of relying on it being present on whatever page/filter is
+  // currently loaded, then opens the edit modal and clears the param so
+  // navigating away and back doesn't reopen it.
+  const editId = searchParams.get('edit');
+  const { data: deepLinkedClient } = useAdminClientDeepLink(editId);
+  useEffect(() => {
+    if (deepLinkedClient) {
+      openEdit(deepLinkedClient);
+      setSearchParams((prev) => {
+        prev.delete('edit');
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkedClient]);
 
   function openEdit(client) {
     reset({
@@ -80,48 +123,14 @@ export function ClientsPage() {
     setModalState({ mode: 'edit', client });
   }
 
-  const saveMutation = useMutation({
-    mutationFn: (payload) =>
-      modalState.mode === 'edit'
-        ? updateClient(modalState.client.id, payload)
-        : createClient(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success(modalState.mode === 'edit' ? 'Client updated.' : 'Client created.');
-      setModalState(null);
-    },
-    onError: (err) => {
-      const data = err.response?.data;
-      const firstMessage = (value) => (Array.isArray(value) ? value[0] : value);
-      toast.error(
-        firstMessage(data?.tax_code) || firstMessage(data?.client_name) || data?.detail || 'Save failed.'
-      );
-    },
-  });
-
-  // Client never gets hard-deleted — this calls DELETE, but the backend
-  // only flips is_active to False (ClientViewSet.perform_destroy).
-  const deleteMutation = useMutation({
-    mutationFn: (id) => deleteClient(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success('Client deactivated.');
-      setDeleteTarget(null);
-    },
-    onError: () => toast.error('Delete failed.'),
-  });
-
-  const restoreMutation = useMutation({
-    mutationFn: (id) => restoreClient(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success('Client restored.');
-    },
-    onError: () => toast.error('Restore failed.'),
-  });
+  const createMutation = useCreateClient();
+  const updateMutation = useUpdateClient();
+  const deleteMutation = useDeactivateClient();
+  const restoreMutation = useRestoreClient();
+  const saveMutation = modalState?.mode === 'edit' ? updateMutation : createMutation;
 
   function onSubmit(data) {
-    saveMutation.mutate({
+    const payload = {
       client_name: data.client_name,
       tax_code: data.tax_code,
       contact_person: data.contact_person || null,
@@ -130,6 +139,10 @@ export function ClientsPage() {
       address: data.address || null,
       industry: data.industry || null,
       notes: data.notes || null,
+    };
+    const mutation = modalState.mode === 'edit' ? updateMutation : createMutation;
+    mutation.mutate(modalState.mode === 'edit' ? { id: modalState.client.id, payload } : payload, {
+      onSuccess: () => setModalState(null),
     });
   }
 
@@ -185,7 +198,15 @@ export function ClientsPage() {
             )}
             {clients.map((client) => (
               <tr key={client.id}>
-                <td className="px-4 py-3 font-medium text-slate-900">{client.client_name}</td>
+                <td className="px-4 py-3 font-medium text-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setDetailTarget(client)}
+                    className="hover:text-blue-600 hover:underline cursor-pointer text-left"
+                  >
+                    {client.client_name}
+                  </button>
+                </td>
                 <td className="px-4 py-3 text-slate-500">{client.tax_code}</td>
                 <td className="px-4 py-3 text-slate-500">{client.contact_email || '—'}</td>
                 <td className="px-4 py-3">
@@ -231,6 +252,14 @@ export function ClientsPage() {
             ))}
           </tbody>
         </table>
+
+        <PaginationBar
+          page={page}
+          totalPages={Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+          onPageChange={setPage}
+          totalItems={totalCount}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       <BaseModal
@@ -274,10 +303,91 @@ export function ClientsPage() {
         </form>
       </BaseModal>
 
+      <BaseModal
+        isOpen={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Client Details"
+        description={detailTarget?.client_name}
+        maxWidth="max-w-lg"
+      >
+        {detailTarget && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span
+                className={
+                  detailTarget.is_active
+                    ? 'inline-flex text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full'
+                    : 'inline-flex text-xs font-semibold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full'
+                }
+              >
+                {detailTarget.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailTarget(null);
+                  openEdit(detailTarget);
+                }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:underline"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </button>
+            </div>
+
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              <div className="col-span-2">
+                <dt className="text-xs font-medium text-slate-500">Client Name</dt>
+                <dd className="text-slate-900 font-medium">{detailTarget.client_name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Tax Code</dt>
+                <dd className="text-slate-800">{detailTarget.tax_code}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Industry</dt>
+                <dd className="text-slate-800">{detailTarget.industry || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Contact Person</dt>
+                <dd className="text-slate-800">{detailTarget.contact_person || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Contact Email</dt>
+                <dd className="text-slate-800">{detailTarget.contact_email || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Contact Phone</dt>
+                <dd className="text-slate-800">{detailTarget.contact_phone || '—'}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-xs font-medium text-slate-500">Address</dt>
+                <dd className="text-slate-800">{detailTarget.address || '—'}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-xs font-medium text-slate-500">Notes</dt>
+                <dd className="text-slate-800 whitespace-pre-wrap">{detailTarget.notes || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Created</dt>
+                <dd className="text-slate-500 text-xs">
+                  {format(new Date(detailTarget.created_at), 'HH:mm - yyyy-MM-dd')}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Last Updated</dt>
+                <dd className="text-slate-500 text-xs">
+                  {format(new Date(detailTarget.updated_at), 'HH:mm - yyyy-MM-dd')}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </BaseModal>
+
       <ConfirmModal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+        onConfirm={() => deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}
         title="Deactivate Client"
         description={`"${deleteTarget?.client_name}" will be marked inactive (not deleted) — existing jobs are kept for history. Continue?`}
         confirmText="Deactivate"

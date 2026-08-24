@@ -1,12 +1,10 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
-import { createUser, listRoles } from '../../api/users';
-import { listDepartments } from '../../api/departments';
+import { useAdminRoles, useCreateUser } from '../../hooks/queries/admin/useAdminUsers';
+import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
 
 // Same password-strength rules as ChangePasswordPage/ResetPasswordPage —
 // the backend's UserCreateSerializer.password has no strength validation
@@ -27,10 +25,13 @@ const createUserSchema = z.object({
 // forces must_change_password=True on every new CustomUser, so the account
 // will be required to set its own password on first login.
 export function CreateUserPage() {
-  const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: listRoles });
+  const { data: roles = [] } = useAdminRoles();
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
 
-  const { data: departments = [] } = useQuery({ queryKey: ['departments', {}], queryFn: () => listDepartments() });
+  // page_size=500 opts this dropdown out of the default 15/page pagination —
+  // it needs every department, not just the first page of them.
+  const { data: departmentsPage } = useAdminDepartments({ page_size: 500 });
+  const departments = departmentsPage?.results || [];
   const departmentOptions = [
     { value: '', label: 'No Department' },
     ...departments.map((d) => ({ value: String(d.id), label: d.name })),
@@ -44,28 +45,18 @@ export function CreateUserPage() {
     formState: { errors },
   } = useForm({ resolver: zodResolver(createUserSchema) });
 
-  const createMutation = useMutation({
-    mutationFn: (payload) => createUser(payload),
-    onSuccess: () => {
-      toast.success('User created. They must change this password on first login.');
-      reset({ email: '', password: '', role: '', department: '' });
-    },
-    onError: (err) => {
-      const data = err.response?.data;
-      const msg =
-        data?.email?.[0] || data?.password?.[0] || data?.role?.[0] || data?.department?.[0] ||
-        data?.detail || 'Failed to create user.';
-      toast.error(msg);
-    },
-  });
+  const createMutation = useCreateUser();
 
   function onSubmit(data) {
-    createMutation.mutate({
-      email: data.email,
-      password: data.password,
-      role: Number(data.role),
-      department: data.department ? Number(data.department) : null,
-    });
+    createMutation.mutate(
+      {
+        email: data.email,
+        password: data.password,
+        role: Number(data.role),
+        department: data.department ? Number(data.department) : null,
+      },
+      { onSuccess: () => reset({ email: '', password: '', role: '', department: '' }) }
+    );
   }
 
   return (

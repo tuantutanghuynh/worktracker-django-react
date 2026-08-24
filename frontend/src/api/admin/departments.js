@@ -1,7 +1,10 @@
-import axiosClient from './axiosClient';
+import axiosClient from '../axiosClient';
 
 export const listDepartments = (params) =>
   axiosClient.get('/auth/departments/', { params }).then((r) => r.data);
+
+export const getDepartment = (id) =>
+  axiosClient.get(`/auth/departments/${id}/`).then((r) => r.data);
 
 export const createDepartment = (data) =>
   axiosClient.post('/auth/departments/', data).then((r) => r.data);

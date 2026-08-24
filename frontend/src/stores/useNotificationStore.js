@@ -1,6 +1,23 @@
 import { create } from 'zustand';
 import { listNotifications, markNotificationRead } from '../api/notifications';
 
+const SEEN_ALERTS_KEY = 'dq_alerts_seen';
+
+// Data-quality alerts (Department without manager, etc.) are computed live
+// from DB state, not persisted rows — they have no is_read column to flip.
+// "Seen" here just means "the viewer opened the bell/notifications page
+// while this exact alert id was showing", tracked per-browser via
+// localStorage so the badge count actually clears like a real notification
+// would, without needing a backend table for it. A brand new alert id
+// (issue reappears, or a different record) is unseen again automatically.
+function loadSeenAlertIds() {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_ALERTS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
 // fetch/markAsRead go through /api/notifications/ (system.employee.urls_employee)
 // — that route is shared by every authenticated role, not Manager-only, so it's
 // safe to use here. There is no bulk "mark all read" endpoint on that shared
@@ -13,8 +30,28 @@ export const useNotificationStore = create((set, get) => ({
   loading: false,
   socket: null,
   error: null,
+  seenAlertIds: loadSeenAlertIds(),
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  /**
+   * Marks the given data-quality alert ids as seen (badge no longer counts
+   * them) — called when the bell dropdown opens or the Notifications page
+   * loads, for whichever alerts are currently visible.
+   */
+  markAlertsSeen: (ids) => {
+    if (!ids || ids.length === 0) return;
+    set((state) => {
+      const merged = Array.from(new Set([...state.seenAlertIds, ...ids]));
+      try {
+        localStorage.setItem(SEEN_ALERTS_KEY, JSON.stringify(merged));
+      } catch {
+        // localStorage unavailable (private window, blocked site data) —
+        // badge just won't persist across reloads, not worth surfacing.
+      }
+      return { seenAlertIds: merged };
+    });
+  },
 
   /**
    * Fetch the caller's own notifications from the API.

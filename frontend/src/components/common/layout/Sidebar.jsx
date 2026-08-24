@@ -18,6 +18,7 @@ import {
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
+import { useAdminDataQualityAlerts } from '../../../hooks/queries/admin/useAdminNotifications';
 import { cn } from '../../../utils/cn';
 
 // BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
@@ -47,7 +48,9 @@ const MENU_CONFIG = {
       { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
       { path: '/admin/users/search', label: 'Search Users', icon: Search },
       { path: '/admin/departments', label: 'Departments', icon: Users },
+      { path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock },
       { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
+      { path: '/admin/notifications', label: 'Notification Center', icon: Bell, hasBadge: true },
     ],
   },
 };
@@ -55,13 +58,19 @@ const MENU_CONFIG = {
 export default function Sidebar() {
   const location = useLocation();
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
-  const { unreadCount } = useNotificationStore();
+  const { unreadCount, seenAlertIds } = useNotificationStore();
 
   const { user } = useAuth();
   const displayUser = user || { full_name: 'User', role: 'EMPLOYEE' };
 
   const userRole = (displayUser.role || 'EMPLOYEE').toUpperCase();
   const currentConfig = MENU_CONFIG[userRole] || MENU_CONFIG.EMPLOYEE;
+
+  // Same badge total as the Header bell — real unread notifications plus
+  // not-yet-seen data-quality alerts (Department without manager, etc.).
+  const { data: dataQualityAlerts = [] } = useAdminDataQualityAlerts({ enabled: userRole === 'ADMIN' });
+  const unseenDataQualityCount = dataQualityAlerts.filter((a) => !seenAlertIds.includes(a.id)).length;
+  const notificationBadgeCount = unreadCount + unseenDataQualityCount;
 
   return (
     <aside
@@ -129,9 +138,9 @@ export default function Sidebar() {
                 <Icon className="w-5 h-5 text-center shrink-0" />
                 {!isSidebarCollapsed && <span className="flex-1">{item.label}</span>}
 
-                {item.hasBadge && unreadCount > 0 && (
+                {item.hasBadge && notificationBadgeCount > 0 && (
                   <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                    {unreadCount > 99 ? '99+' : unreadCount}
+                    {notificationBadgeCount > 99 ? '99+' : notificationBadgeCount}
                   </span>
                 )}
               </NavLink>

@@ -8,16 +8,22 @@ from rest_framework.response import Response
 from ..models import Client, Job
 from .serializers import ClientSerializer, JobSerializer
 from accounts.permissions import HasPermission
+from system.security.permissions_manager import IsAdminRole
+from system.pagination import AdminPageNumberPagination
 from system.utils import log_audit_event
 
 
 class ClientViewSet(viewsets.ModelViewSet):
     serializer_class = ClientSerializer
+    pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['client_name', 'tax_code', 'contact_email', 'is_active', 'created_at']
 
     def get_queryset(self):
-        qs = Client.objects.all()
+        # Explicit default order — required for pagination to be stable
+        # across pages (Postgres doesn't guarantee row order without one),
+        # overridden by OrderingFilter whenever ?ordering= is passed.
+        qs = Client.objects.order_by('-created_at')
         params=self.request.query_params
         if name := params.get('name'):
             qs = qs.filter(client_name__icontains=name)
@@ -35,12 +41,12 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == 'create':
-            return [HasPermission('client:create')]
+            return [IsAdminRole(), HasPermission('client:create')]
         if self.action == 'destroy':
-            return [HasPermission('client:delete')]
+            return [IsAdminRole(), HasPermission('client:delete')]
         if self.action in ('list', 'retrieve'):
-            return [HasPermission('client:view')]
-        return [HasPermission('client:update')]
+            return [IsAdminRole(), HasPermission('client:view')]
+        return [IsAdminRole(), HasPermission('client:update')]
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -107,6 +113,7 @@ class ClientViewSet(viewsets.ModelViewSet):
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
+    pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     # __ lookups let OrderingFilter sort by a related row's field (e.g. the
     # client's name) even though Job only stores client_id/manager_id.
@@ -116,7 +123,8 @@ class JobViewSet(viewsets.ModelViewSet):
     ]
 
     def get_queryset(self):
-        qs = Job.objects.select_related('client', 'manager').all()
+        # See ClientViewSet.get_queryset() — same reason for an explicit default order.
+        qs = Job.objects.select_related('client', 'manager').order_by('-created_at')
         if search := self.request.query_params.get('search'):
             qs = qs.filter(
                 Q(job_name__icontains=search) |
@@ -127,12 +135,12 @@ class JobViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == 'create':
-            return [HasPermission('job:create')]
+            return [IsAdminRole(), HasPermission('job:create')]
         if self.action == 'destroy':
-            return [HasPermission('job:delete')]
+            return [IsAdminRole(), HasPermission('job:delete')]
         if self.action in ('list', 'retrieve'):
-            return [HasPermission('job:view')]
-        return [HasPermission('job:update')]
+            return [IsAdminRole(), HasPermission('job:view')]
+        return [IsAdminRole(), HasPermission('job:update')]
 
     @transaction.atomic
     def perform_create(self, serializer):

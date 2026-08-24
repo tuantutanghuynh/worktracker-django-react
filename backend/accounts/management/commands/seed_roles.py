@@ -73,10 +73,11 @@ class Command(BaseCommand):
                 {'code': 'timesheet:void',      'name': 'Void an erroneous work log entry'},
                 {'code': 'timesheet:manage',    'name': 'Handle work hour violations such as over-limit or missing'},
 
-                # TimeLock Management 
+                # TimeLock Management
                 {'code': 'timelock:view',       'name': 'View locked timesheet periods'},
                 {'code': 'timelock:lock',       'name': 'Lock timesheet period for a specific job'},
                 {'code': 'timelock:unlock',     'name': 'Unlock timesheet period for a specific job'},
+                {'code': 'timelock:global_manage', 'name': 'Lock or unlock the timesheet period company-wide (Admin only, TimeLock.LockScope.GLOBAL)'},
 
                 # Audit Logs & Notifications
                 {'code': 'audit:view',          'name': 'View system audit trail and action history'},
@@ -91,6 +92,7 @@ class Command(BaseCommand):
                 {'code': 'department:view',   'name': 'View the department in the system'},
                 {'code': 'department:create',   'name': 'Create a new department in the system'},
                 {'code': 'department:update',   'name': 'Edit department information'},
+                {'code': 'department:delete',   'name': 'Delete a department from the system'},
                 {'code': 'role:manage',         'name': 'Add or edit roles and assign permissions to them'},
             ]
 

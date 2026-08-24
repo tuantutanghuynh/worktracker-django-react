@@ -1,10 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Building2, Users, UserCheck, Lock, UserX, ShieldAlert } from 'lucide-react';
 import StatCard from '../../components/common/cards/StatCard';
 import DonutChartCard from '../../components/common/charts/DonutChartCard';
 import SeverityBadge from '../../components/common/badges/SeverityBadge';
-import { getDashboard } from '../../api/dashboard';
+import { useAdminDashboard } from '../../hooks/queries/admin/useAdminDashboard';
 
 const JOB_STATUS_COLORS = ['#94a3b8', '#2563eb', '#f59e0b', '#f97316', '#ef4444'];
 const CLIENTS_OVERVIEW_COLORS = ['#2563eb', '#94a3b8'];
@@ -20,10 +19,7 @@ const AUDIT_LABELS = {
 // for 30s (DashboardView), so this page doesn't need its own aggressive
 // polling on top of that.
 export function DashboardPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin-dashboard'],
-    queryFn: getDashboard,
-  });
+  const { data, isLoading } = useAdminDashboard();
 
   if (isLoading || !data) {
     return <p className="text-sm text-slate-400">Loading dashboard...</p>;

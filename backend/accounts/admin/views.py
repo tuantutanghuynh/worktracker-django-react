@@ -8,7 +8,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from system.security.permissions_manager import ROLE_PERMISSION_CACHE_KEY
+from system.security.permissions_manager import ROLE_PERMISSION_CACHE_KEY, IsAdminRole
+from system.pagination import AdminPageNumberPagination
 
 from ..models import (
     CustomUser,
@@ -27,17 +28,38 @@ from .serializers import (
 )
 from ..permissions import HasPermission
 from ..authentication import set_user_active_status, require_reauth
-from system.models import AuditLog
+from system.models import AuditLog, Notification
 from system.utils import log_audit_event
+from system.services.notification_manager_service import notify
+
+
+# Sends an in-app notification to every OTHER admin when one admin performs
+# a sensitive IAM action (role change, lock/unlock, reset password) — so
+# admins stay aware of each other's changes without having to poll the
+# Audit Logs page. Deliberately scoped to the same actions already flagged
+# severity=WARNING/CRITICAL (see the log_audit_event calls below), not every
+# CRUD write, to avoid flooding the bell with routine edits.
+def notify_other_admins(actor, title, content=None, related_url=None):
+    other_admins = CustomUser.objects.filter(role__code="ADMIN").exclude(id=actor.id)
+    notify(
+        recipients=other_admins,
+        event_type=Notification.EventType.ACCOUNT_OR_PERMISSION_CHANGED,
+        title=title,
+        content=content,
+        related_url=related_url,
+    )
 
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
+    pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['email', 'role__code', 'is_active', 'profile__department__name']
 
     def get_queryset(self):
-        qs = CustomUser.objects.select_related("role", "profile", "profile__department").all()
+        # Explicit default order for stable pagination — CustomUser has no
+        # created_at field, so id is the simplest always-present tiebreaker.
+        qs = CustomUser.objects.select_related("role", "profile", "profile__department").order_by("id")
         params = self.request.query_params
         if email := params.get("email"):
             qs = qs.filter(email__icontains=email)
@@ -51,12 +73,17 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == "create":
-            return [HasPermission("user:create")]
+            return [IsAdminRole(), HasPermission("user:create")]
         if self.action in ("list", "retrieve"):
-            return [HasPermission("user:view")]
+            return [IsAdminRole(), HasPermission("user:view")]
         if self.action == "reset_password":
-            return [HasPermission("user:reset_password")]
-        return [HasPermission("user:update")]
+            return [IsAdminRole(), HasPermission("user:reset_password")]
+        # destroy is grouped with lock/unlock, not update: perform_destroy
+        # below doesn't actually delete the row, it deactivates the account
+        # exactly like lock() does (see its docstring comment).
+        if self.action in ("lock", "unlock", "destroy"):
+            return [IsAdminRole(), HasPermission("user:lock")]
+        return [IsAdminRole(), HasPermission("user:update")]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -86,7 +113,17 @@ class UserViewSet(viewsets.ModelViewSet):
                 request=self.request,
                 severity=AuditLog.Severity.WARNING,
             )
+            notify_other_admins(
+                self.request.user,
+                title="Role changed",
+                content=f"{self.request.user.email} changed the role of {instance.email}.",
+                related_url=f"/admin/users/search?edit={instance.id}",
+            )
 
+    # DRF's standard DELETE verb — deliberately doesn't remove the row (same
+    # effect as lock(), just reachable through the generic REST endpoint
+    # instead of the dedicated /lock/ action). Logged as LOCK_ACCOUNT, not
+    # DELETE, so Audit Logs reflects what actually happened to the record.
     @transaction.atomic
     def perform_destroy(self, instance):
         old_values = UserSerializer(instance).data
@@ -95,11 +132,18 @@ class UserViewSet(viewsets.ModelViewSet):
         set_user_active_status(instance.id, False)
         log_audit_event(
             actor=self.request.user,
-            action="DELETE",
+            action="LOCK_ACCOUNT",
             table_name="users",
             record_id=instance.id,
             old_values=old_values,
+            severity=AuditLog.Severity.WARNING,
             request=self.request,
+        )
+        notify_other_admins(
+            self.request.user,
+            title="Account locked",
+            content=f"{self.request.user.email} locked the account {instance.email}.",
+            related_url=f"/admin/users/search?edit={instance.id}",
         )
 
     @transaction.atomic
@@ -120,6 +164,12 @@ class UserViewSet(viewsets.ModelViewSet):
             request=request,
             severity=AuditLog.Severity.WARNING,
         )
+        notify_other_admins(
+            request.user,
+            title="Account locked",
+            content=f"{request.user.email} locked the account {user.email}.",
+            related_url=f"/admin/users/search?edit={user.id}",
+        )
         return Response({"detail": "User locked."}, status=status.HTTP_200_OK)
 
     @transaction.atomic
@@ -137,6 +187,12 @@ class UserViewSet(viewsets.ModelViewSet):
             new_values={"is_active": True},
             request=request,
             severity=AuditLog.Severity.WARNING,
+        )
+        notify_other_admins(
+            request.user,
+            title="Account unlocked",
+            content=f"{request.user.email} unlocked the account {user.email}.",
+            related_url=f"/admin/users/search?edit={user.id}",
         )
         return Response({"detail": "User unlocked."}, status=status.HTTP_200_OK)
 
@@ -167,6 +223,12 @@ class UserViewSet(viewsets.ModelViewSet):
             new_values={"must_change_password": True},
             request=request,
             severity=AuditLog.Severity.WARNING,
+        )
+        notify_other_admins(
+            request.user,
+            title="Password reset",
+            content=f"{request.user.email} reset the password for {user.email}.",
+            related_url=f"/admin/users/search?edit={user.id}",
         )
         return Response({"detail": "Password reset."}, status=status.HTTP_200_OK)
 
@@ -214,7 +276,7 @@ class RoleViewSet(viewsets.ModelViewSet):
     serializer_class = RoleSerializer
 
     def get_permissions(self):
-        return [HasPermission("role:manage")]
+        return [IsAdminRole(), HasPermission("role:manage")]
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -270,16 +332,18 @@ class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PermissionSerializer
 
     def get_permissions(self):
-        return [HasPermission("role:manage")]
+        return [IsAdminRole(), HasPermission("role:manage")]
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
+    pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['name', 'description', 'manager__email']
 
     def get_queryset(self):
-        qs = Department.objects.select_related("manager").all()
+        # See UserViewSet.get_queryset() — explicit order needed for stable pagination.
+        qs = Department.objects.select_related("manager").order_by("-created_at")
         if search := self.request.query_params.get("search"):
             qs = qs.filter(
                 Q(name__icontains=search) | Q(manager__email__icontains=search)
@@ -288,10 +352,12 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == "create":
-            return [HasPermission("department:create")]
+            return [IsAdminRole(), HasPermission("department:create")]
         if self.action in ("list", "retrieve"):
-            return [HasPermission("department:view")]
-        return [HasPermission("department:update")]
+            return [IsAdminRole(), HasPermission("department:view")]
+        if self.action == "destroy":
+            return [IsAdminRole(), HasPermission("department:delete")]
+        return [IsAdminRole(), HasPermission("department:update")]
 
     @transaction.atomic
     def perform_create(self, serializer):

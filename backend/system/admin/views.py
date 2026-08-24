@@ -13,6 +13,8 @@ from rest_framework.response import Response
 
 from accounts.models import CustomUser, Department
 from accounts.permissions import HasPermission
+from system.security.permissions_manager import IsAdminRole
+from system.pagination import AdminPageNumberPagination
 from projects.models import Client, Job
 from ..models import AuditLog
 from .serializers import AuditLogSerializer
@@ -22,11 +24,12 @@ import openpyxl
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
+    pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'user__email', 'action', 'table_name', 'record_id', 'severity']
 
     def get_permissions(self):
-        return [HasPermission('audit:view')]
+        return [IsAdminRole(), HasPermission('audit:view')]
 
     def get_queryset(self):
         queryset = AuditLog.objects.all().order_by('-created_at')
@@ -57,6 +60,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         if record_id := self.request.query_params.get('record_id'):
             queryset = queryset.filter(record_id=record_id)
 
+        if severity := self.request.query_params.get('severity'):
+            queryset = queryset.filter(severity=severity)
+
         if keyword := self.request.query_params.get('keyword'):
             # 'create' phải khớp cả dòng action=CREATE, không chỉ tìm chữ
             # "create" nằm lẫn đâu đó trong nội dung old/new_values.
@@ -83,11 +89,34 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             ),
         })
 
+    # Powers the 5 KPI cards at the top of the Audit Logs page. Scoped to
+    # today + whichever role tab is active (?actor_role=), same scoping as
+    # the table itself, so the cards always describe what's on screen.
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary_stats(self, request):
+        today = timezone.now().date()
+        qs = AuditLog.objects.filter(created_at__date=today)
+
+        if actor_role := request.query_params.get('actor_role'):
+            qs = qs.filter(user__role__code=actor_role)
+
+        return Response({
+            'total_logs_today': qs.count(),
+            'sensitive_actions': qs.filter(
+                severity__in=[AuditLog.Severity.CRITICAL, AuditLog.Severity.WARNING]
+            ).count(),
+            'account_changes': qs.filter(table_name='users').count(),
+            'timesheet_locks': qs.filter(action__in=['LOCK_TIMESHEET', 'UNLOCK_TIMESHEET']).count(),
+            'data_changes': qs.filter(
+                table_name__in=['jobs', 'clients', 'tasks'], action__in=['CREATE', 'UPDATE']
+            ).count(),
+        })
+
 
 class DashboardView(APIView):
 
     def get_permissions(self):
-        return [HasPermission('audit:view')]
+        return [IsAdminRole(), HasPermission('audit:view')]
 
     def get(self, request):
         cached = cache.get(DASHBOARD_CACHE_KEY)
@@ -97,7 +126,6 @@ class DashboardView(APIView):
         today = timezone.now().date()
 
         active_clients = Client.objects.filter(is_active=True).count()
-        running_jobs   = Job.objects.filter(status='ACTIVE').count()
         total_users    = CustomUser.objects.count()
         active_accounts = CustomUser.objects.filter(is_active=True).count()
         locked_accounts = CustomUser.objects.filter(is_active=False).count()
@@ -139,12 +167,10 @@ class DashboardView(APIView):
 
         data = {
             'active_clients':               active_clients,
-            'running_jobs':                 running_jobs,
             'total_users':                  total_users,
             'active_accounts':              active_accounts,
             'locked_accounts':              locked_accounts,
             'departments_without_manager':  departments_without_manager,
-            'overdue_jobs':                 overdue_jobs,
             'jobs_by_status':               jobs_by_status,
             'clients_overview':             clients_overview,
             'audit_summary_today':          audit_summary_today,
@@ -153,9 +179,57 @@ class DashboardView(APIView):
         cache.set(DASHBOARD_CACHE_KEY, data, timeout=DASHBOARD_CACHE_TTL)
         return Response(data)
 
+class DataQualityAlertsView(APIView):
+    """
+    Synthetic, not-persisted alerts computed live from current DB state —
+    unlike AuditLog-triggered notifications, these have no "read/unread"
+    concept: they simply stop appearing once the underlying field is fixed,
+    with no stale row to clean up afterwards.
+    """
+
+    def get_permissions(self):
+        return [IsAdminRole(), HasPermission('audit:view')]
+
+    def get(self, request):
+        alerts = []
+
+        for dept in Department.objects.filter(manager__isnull=True):
+            alerts.append({
+                'id': f'dept-no-manager-{dept.id}',
+                'title': 'Department has no manager',
+                'content': f'"{dept.name}" has no manager assigned.',
+                'related_url': f'/admin/departments?edit={dept.id}',
+            })
+
+        employees_without_department = CustomUser.objects.filter(
+            role__code='EMPLOYEE', is_active=True
+        ).filter(Q(profile__isnull=True) | Q(profile__department__isnull=True))
+        for user in employees_without_department:
+            alerts.append({
+                'id': f'user-no-department-{user.id}',
+                'title': 'Employee not assigned to a department',
+                'content': f'{user.email} has no department.',
+                'related_url': f'/admin/users/search?edit={user.id}',
+            })
+
+        clients_missing_contact = Client.objects.filter(is_active=True).filter(
+            Q(contact_email__isnull=True) | Q(contact_email='')
+            | Q(contact_phone__isnull=True) | Q(contact_phone='')
+        )
+        for c in clients_missing_contact:
+            alerts.append({
+                'id': f'client-missing-contact-{c.id}',
+                'title': 'Client missing contact info',
+                'content': f'"{c.client_name}" has no contact email or phone.',
+                'related_url': f'/admin/clients?edit={c.id}',
+            })
+
+        return Response(alerts)
+
+
 class AdminReportView(APIView):
     def get_permissions(self):
-        return [HasPermission('report:export')]
+        return [IsAdminRole(), HasPermission('report:export')]
 
     @transaction.atomic
     def get(self, request):

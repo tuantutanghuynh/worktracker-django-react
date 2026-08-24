@@ -1,7 +1,10 @@
-import axiosClient from './axiosClient';
+import axiosClient from '../axiosClient';
 
 export const listClients = (params) =>
   axiosClient.get('/admin/clients/', { params }).then((r) => r.data);
+
+export const getClient = (id) =>
+  axiosClient.get(`/admin/clients/${id}/`).then((r) => r.data);
 
 export const createClient = (data) =>
   axiosClient.post('/admin/clients/', data).then((r) => r.data);

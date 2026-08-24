@@ -1,24 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import SortableHeader from '../../components/common/table/SortableHeader';
+import PaginationBar from '../../components/common/table/PaginationBar';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
 import {
-  listDepartments,
-  createDepartment,
-  updateDepartment,
-  deleteDepartment,
-} from '../../api/departments';
-import { listUsers } from '../../api/users';
+  useAdminDepartments,
+  useAdminDepartmentDeepLink,
+  useCreateDepartment,
+  useUpdateDepartment,
+  useDeleteDepartment,
+} from '../../hooks/queries/admin/useAdminDepartments';
+import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
+
+const PAGE_SIZE = 15;
 
 const departmentSchema = z.object({
   name: z.string().min(1, 'Department name is required'),
@@ -26,29 +29,41 @@ const departmentSchema = z.object({
   manager: z.string().optional(),
 });
 
-// Admin page for CRUD on departments — list table + create/edit modal + delete confirm.
+// Admin page for CRUD on departments — list table + create/edit modal +
+// delete confirm. Data logic lives in
+// hooks/queries/admin/useAdminDepartments.js — this file is JSX only.
 export function DepartmentsPage() {
-  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [modalState, setModalState] = useState(null); // null | { mode: 'create' } | { mode: 'edit', department }
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const [ordering, toggleSort] = useOrdering();
+  const [page, setPage] = useState(1);
 
-  // Server-side search + sort — DepartmentViewSet.get_queryset() handles
-  // ?search= (name or manager email) and OrderingFilter handles ?ordering=.
-  const { data: departments = [], isLoading } = useQuery({
-    queryKey: ['departments', { search: debouncedSearch, ordering }],
-    queryFn: () => listDepartments({ search: debouncedSearch || undefined, ordering: ordering || undefined }),
+  // Adjusting state during render instead of a useEffect — see the same
+  // comment on ClientsPage for why.
+  const filterKey = `${debouncedSearch}|${ordering}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const { data, isLoading } = useAdminDepartments({
+    search: debouncedSearch || undefined,
+    ordering: ordering || undefined,
+    page,
   });
+  const departments = data?.results || [];
+  const totalCount = data?.count || 0;
 
   // Managers double as the dropdown options and the lookup table used to
   // render a department's manager email in the table (the department API
-  // only returns the manager's id, not a nested user object).
-  const { data: managers = [] } = useQuery({
-    queryKey: ['users', { role: 'MANAGER' }],
-    queryFn: () => listUsers({ role: 'MANAGER' }),
-  });
+  // only returns the manager's id, not a nested user object). page_size=500
+  // opts out of the default 15/page — this needs every manager, not a page.
+  const { data: managersPage } = useAdminUsers({ role: 'MANAGER', page_size: 500 });
+  const managers = managersPage?.results || [];
   const managerOptions = managers.map((m) => ({ value: String(m.id), label: m.email }));
   const managerEmailById = Object.fromEntries(managers.map((m) => [m.id, m.email]));
 
@@ -65,6 +80,24 @@ export function DepartmentsPage() {
     setModalState({ mode: 'create' });
   }
 
+  // Deep-link support for notifications (bell dropdown / data-quality
+  // alerts) that point at ?edit=<id> — fetches that one department directly
+  // instead of relying on it being present on whatever page/filter is
+  // currently loaded, then opens the edit modal and clears the param so
+  // navigating away and back doesn't reopen it.
+  const editId = searchParams.get('edit');
+  const { data: deepLinkedDepartment } = useAdminDepartmentDeepLink(editId);
+  useEffect(() => {
+    if (deepLinkedDepartment) {
+      openEdit(deepLinkedDepartment);
+      setSearchParams((prev) => {
+        prev.delete('edit');
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkedDepartment]);
+
   function openEdit(department) {
     reset({
       name: department.name,
@@ -74,36 +107,20 @@ export function DepartmentsPage() {
     setModalState({ mode: 'edit', department });
   }
 
-  const saveMutation = useMutation({
-    mutationFn: (payload) =>
-      modalState.mode === 'edit'
-        ? updateDepartment(modalState.department.id, payload)
-        : createDepartment(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
-      toast.success(modalState.mode === 'edit' ? 'Department updated.' : 'Department created.');
-      setModalState(null);
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.name?.[0] || err.response?.data?.detail || 'Save failed.');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => deleteDepartment(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
-      toast.success('Department deleted.');
-      setDeleteTarget(null);
-    },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Delete failed.'),
-  });
+  const createMutation = useCreateDepartment();
+  const updateMutation = useUpdateDepartment();
+  const deleteMutation = useDeleteDepartment();
+  const saveMutation = modalState?.mode === 'edit' ? updateMutation : createMutation;
 
   function onSubmit(data) {
-    saveMutation.mutate({
+    const payload = {
       name: data.name,
       description: data.description || null,
       manager: data.manager || null,
+    };
+    const mutation = modalState.mode === 'edit' ? updateMutation : createMutation;
+    mutation.mutate(modalState.mode === 'edit' ? { id: modalState.department.id, payload } : payload, {
+      onSuccess: () => setModalState(null),
     });
   }
 
@@ -185,6 +202,14 @@ export function DepartmentsPage() {
             ))}
           </tbody>
         </table>
+
+        <PaginationBar
+          page={page}
+          totalPages={Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+          onPageChange={setPage}
+          totalItems={totalCount}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       <BaseModal
@@ -235,7 +260,7 @@ export function DepartmentsPage() {
       <ConfirmModal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+        onConfirm={() => deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}
         title="Delete Department"
         description={`Are you sure you want to delete "${deleteTarget?.name}"?`}
         confirmText="Delete"

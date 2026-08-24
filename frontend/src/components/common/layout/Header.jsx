@@ -7,11 +7,13 @@ import {
   LogOut,
   ChevronRight,
   Menu,
+  AlertTriangle,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
+import { useAdminDataQualityAlerts } from '../../../hooks/queries/admin/useAdminNotifications';
 
 // Bản ánh xạ Nhãn đường dẫn Breadcrumbs sang Tiếng Anh
 // Manager portal tạm bỏ khỏi file này — sẽ lấy nguyên bản từ nhánh Long
@@ -43,7 +45,7 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toggleSidebar } = useUIStore();
-  const { notifications, unreadCount, markAsRead } = useNotificationStore();
+  const { notifications, unreadCount, markAsRead, seenAlertIds, markAlertsSeen } = useNotificationStore();
 
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -54,6 +56,25 @@ export default function Header() {
   const { user, logout } = useAuth();
   const displayUser = user || { email: 'user@worktracker.vn', role: 'EMPLOYEE' };
   const roleLinks = ROLE_LINKS[displayUser.role] || ROLE_LINKS.EMPLOYEE;
+
+  // Admin-only: synthetic data-quality alerts (Department without manager,
+  // Employee without department, Client missing contact info) — computed
+  // live, not persisted, so no read/unread state to track for these.
+  const { data: dataQualityAlerts = [] } = useAdminDataQualityAlerts({ enabled: displayUser.role === 'ADMIN' });
+  const unseenDataQualityAlerts = dataQualityAlerts.filter((a) => !seenAlertIds.includes(a.id));
+  const totalBadgeCount = unreadCount + unseenDataQualityAlerts.length;
+
+  // Clicking the bell counts as "read" for the data-quality alerts visible
+  // right now — same instant-feedback expectation as the badge for real
+  // notifications, even though these have no backend read state to flip.
+  function toggleNotifDropdown() {
+    setNotifDropdownOpen((prev) => {
+      if (!prev && dataQualityAlerts.length > 0) {
+        markAlertsSeen(dataQualityAlerts.map((a) => a.id));
+      }
+      return !prev;
+    });
+  }
 
   // Đóng Dropdown khi click ra ngoài vùng menu
   useEffect(() => {
@@ -128,14 +149,14 @@ export default function Header() {
         {/* Biểu tượng Chuông Thông báo + Dropdown xem nhanh */}
         <div className="relative" ref={notifDropdownRef}>
           <button
-            onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
+            onClick={toggleNotifDropdown}
             className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Notifications"
           >
             <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
+            {totalBadgeCount > 0 && (
               <span className="absolute top-1 right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs">
-                {unreadCount > 99 ? '99+' : unreadCount}
+                {totalBadgeCount > 99 ? '99+' : totalBadgeCount}
               </span>
             )}
           </button>
@@ -147,7 +168,7 @@ export default function Header() {
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                {notifications.length === 0 && (
+                {notifications.length === 0 && dataQualityAlerts.length === 0 && (
                   <p className="px-3.5 py-6 text-center text-xs text-slate-400">No notifications yet.</p>
                 )}
                 {notifications.slice(0, 8).map((n) => (
@@ -166,6 +187,27 @@ export default function Header() {
                       {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                     </p>
                   </button>
+                ))}
+                {dataQualityAlerts.length > 0 && (
+                  <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    Data Quality
+                  </p>
+                )}
+                {dataQualityAlerts.map((alert) => (
+                  <Link
+                    key={alert.id}
+                    to={alert.related_url}
+                    onClick={() => setNotifDropdownOpen(false)}
+                    className="block px-3.5 py-2.5 hover:bg-amber-50/60 transition-colors"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <span className="text-xs font-semibold text-slate-800 truncate block">{alert.title}</span>
+                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{alert.content}</p>
+                      </div>
+                    </div>
+                  </Link>
                 ))}
               </div>
 

@@ -1,27 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { Search, Lock, Unlock } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import SortableHeader from '../../components/common/table/SortableHeader';
+import PaginationBar from '../../components/common/table/PaginationBar';
 import RoleBadge from '../../components/common/badges/RoleBadge';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
 import {
-  listUsers,
-  updateUser,
-  lockUser,
-  unlockUser,
-  resetUserPassword,
-  assignUserDepartment,
-  listRoles,
-} from '../../api/users';
-import { listDepartments } from '../../api/departments';
+  useAdminUsers,
+  useAdminUserDeepLink,
+  useAdminRoles,
+  useUpdateUser,
+  useLockUser,
+  useUnlockUser,
+  useAssignUserDepartment,
+  useResetUserPassword,
+} from '../../hooks/queries/admin/useAdminUsers';
+import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
+
+const PAGE_SIZE = 15;
 
 const editUserSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -37,39 +40,53 @@ const resetPasswordSchema = z.object({
     .regex(/[^A-Za-z0-9]/, 'Must contain a special symbol'),
 });
 
-// Admin page to find a user by email and modify their email/role/status/password.
+// Admin page to find a user by email and modify their email/role/status/
+// password/department. Data logic lives in
+// hooks/queries/admin/useAdminUsers.js — this file is JSX only.
 export function SearchUserPage() {
-  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState('search'); // 'search' | 'all'
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const [selectedUser, setSelectedUser] = useState(null);
   const [ordering, toggleSort] = useOrdering();
+  const [page, setPage] = useState(1);
 
-  // Server-side search + sort — UserViewSet.get_queryset() handles ?email=
-  // and OrderingFilter handles ?ordering= (role__code, is_active...).
-  const { data: searchResults = [], isLoading: isSearching } = useQuery({
-    queryKey: ['users', { email: debouncedSearch, ordering }],
-    queryFn: () => listUsers({ email: debouncedSearch, ordering: ordering || undefined }),
-    enabled: viewMode === 'search' && debouncedSearch.length > 0,
-  });
+  // Reset to page 1 whenever the active tab, search term, or sort changes —
+  // otherwise switching context could leave the user stranded on a page
+  // number that doesn't exist in the new result set. Adjusting state during
+  // render (React's own pattern for this) instead of a useEffect.
+  const filterKey = `${viewMode}|${debouncedSearch}|${ordering}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
 
-  // "Account List" tab — fetches everyone at once (no backend pagination
-  // yet), only enabled while that tab is active so switching to Search
-  // doesn't trigger a needless full-table fetch.
-  const { data: allUsers = [], isLoading: isLoadingAll } = useQuery({
-    queryKey: ['users', { ordering }],
-    queryFn: () => listUsers({ ordering: ordering || undefined }),
-    enabled: viewMode === 'all',
-  });
+  const { data: searchData, isLoading: isSearching } = useAdminUsers(
+    { email: debouncedSearch, ordering: ordering || undefined, page },
+    { enabled: viewMode === 'search' && debouncedSearch.length > 0 }
+  );
 
-  const rows = viewMode === 'all' ? allUsers : searchResults;
+  // "Account List" tab — only enabled while that tab is active so switching
+  // to Search doesn't trigger a needless fetch.
+  const { data: allData, isLoading: isLoadingAll } = useAdminUsers(
+    { ordering: ordering || undefined, page },
+    { enabled: viewMode === 'all' }
+  );
+
+  const activeData = viewMode === 'all' ? allData : searchData;
+  const rows = activeData?.results || [];
+  const totalCount = activeData?.count || 0;
   const isLoading = viewMode === 'all' ? isLoadingAll : isSearching;
 
-  const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: listRoles });
+  const { data: roles = [] } = useAdminRoles();
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
 
-  const { data: departments = [] } = useQuery({ queryKey: ['departments', {}], queryFn: () => listDepartments() });
+  // page_size=500 opts this dropdown/lookup out of the default 15/page —
+  // needs every department, not just the first page of them.
+  const { data: departmentsPage } = useAdminDepartments({ page_size: 500 });
+  const departments = departmentsPage?.results || [];
   const departmentNameById = Object.fromEntries(departments.map((d) => [d.id, d.name]));
   const departmentOptions = [
     { value: '', label: 'No Department' },
@@ -91,71 +108,69 @@ export function SearchUserPage() {
     formState: { errors: passwordErrors },
   } = useForm({ resolver: zodResolver(resetPasswordSchema) });
 
+  // Deep-link support for notifications (bell dropdown / data-quality
+  // alerts) that point at ?edit=<id> — fetches that one user directly
+  // instead of relying on it being present on whatever search/page is
+  // currently loaded, then opens the modal and clears the param so
+  // navigating away and back doesn't reopen it.
+  const editId = searchParams.get('edit');
+  const { data: deepLinkedUser } = useAdminUserDeepLink(editId);
+  useEffect(() => {
+    if (deepLinkedUser) {
+      openUser(deepLinkedUser);
+      setSearchParams((prev) => {
+        prev.delete('edit');
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkedUser]);
+
   function openUser(user) {
     setSelectedUser(user);
     reset({ email: user.email, role: user.role_detail ? String(user.role_detail.id) : '' });
     resetPasswordForm({ new_password: '' });
   }
 
-  const updateMutation = useMutation({
-    mutationFn: (payload) => updateUser(selectedUser.id, payload),
-    onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setSelectedUser((prev) => ({ ...prev, ...updated }));
-      toast.success('User updated.');
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.email?.[0] || err.response?.data?.detail || 'Update failed.');
-    },
-  });
+  const updateMutation = useUpdateUser();
+  const lockMutation = useLockUser();
+  const unlockMutation = useUnlockUser();
+  const departmentMutation = useAssignUserDepartment();
+  const resetPasswordMutation = useResetUserPassword();
+
+  function onSubmitEdit(data) {
+    updateMutation.mutate(
+      { id: selectedUser.id, payload: { email: data.email, role: Number(data.role) } },
+      { onSuccess: (updated) => setSelectedUser((prev) => ({ ...prev, ...updated })) }
+    );
+  }
 
   // Deliberately calls the dedicated lock/unlock actions instead of a plain
   // PATCH is_active — those also revoke the Redis-cached session, a plain
   // PATCH would leave an already-issued JWT usable until it expires.
-  const lockMutation = useMutation({
-    mutationFn: () =>
-      selectedUser.is_active ? lockUser(selectedUser.id) : unlockUser(selectedUser.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setSelectedUser((prev) => ({ ...prev, is_active: !prev.is_active }));
-      toast.success(selectedUser.is_active ? 'Account locked.' : 'Account unlocked.');
-    },
-    onError: () => toast.error('Failed to change account status.'),
-  });
+  function toggleLock() {
+    const mutation = selectedUser.is_active ? lockMutation : unlockMutation;
+    mutation.mutate(selectedUser.id, {
+      onSuccess: () => setSelectedUser((prev) => ({ ...prev, is_active: !prev.is_active })),
+    });
+  }
 
-  // department=null clears the assignment — same endpoint handles both
-  // "assign to X" and "remove from department" (assign-department action
-  // on UserViewSet just writes whatever it's given to profile.department).
-  const departmentMutation = useMutation({
-    mutationFn: (departmentId) => assignUserDepartment(selectedUser.id, departmentId),
-    onSuccess: (_data, departmentId) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setSelectedUser((prev) => ({
-        ...prev,
-        profile: { ...prev.profile, department: departmentId },
-      }));
-      toast.success(departmentId ? 'Department assigned.' : 'Removed from department.');
-    },
-    onError: () => toast.error('Failed to update department.'),
-  });
-
-  const resetPasswordMutation = useMutation({
-    mutationFn: (payload) => resetUserPassword(selectedUser.id, payload.new_password),
-    onSuccess: () => {
-      toast.success('Password reset. The user must change it on next login.');
-      resetPasswordForm({ new_password: '' });
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.new_password?.[0] || 'Failed to reset password.');
-    },
-  });
-
-  function onSubmitEdit(data) {
-    updateMutation.mutate({ email: data.email, role: Number(data.role) });
+  function onChangeDepartment(val) {
+    const departmentId = val ? Number(val) : null;
+    departmentMutation.mutate(
+      { id: selectedUser.id, departmentId },
+      {
+        onSuccess: () =>
+          setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, department: departmentId } })),
+      }
+    );
   }
 
   function onSubmitPassword(data) {
-    resetPasswordMutation.mutate(data);
+    resetPasswordMutation.mutate(
+      { id: selectedUser.id, newPassword: data.new_password },
+      { onSuccess: () => resetPasswordForm({ new_password: '' }) }
+    );
   }
 
   return (
@@ -256,6 +271,16 @@ export function SearchUserPage() {
             ))}
           </tbody>
         </table>
+
+        {(viewMode === 'all' || debouncedSearch) && (
+          <PaginationBar
+            page={page}
+            totalPages={Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+            onPageChange={setPage}
+            totalItems={totalCount}
+            pageSize={PAGE_SIZE}
+          />
+        )}
       </div>
 
       <BaseModal
@@ -295,7 +320,7 @@ export function SearchUserPage() {
                 label="Department"
                 options={departmentOptions}
                 value={selectedUser.profile?.department ? String(selectedUser.profile.department) : ''}
-                onChange={(val) => departmentMutation.mutate(val ? Number(val) : null)}
+                onChange={onChangeDepartment}
                 disabled={departmentMutation.isPending}
               />
               <p className="text-[11px] text-slate-400">
@@ -318,8 +343,8 @@ export function SearchUserPage() {
               </span>
               <button
                 type="button"
-                onClick={() => lockMutation.mutate()}
-                disabled={lockMutation.isPending}
+                onClick={toggleLock}
+                disabled={lockMutation.isPending || unlockMutation.isPending}
                 className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
               >
                 {selectedUser.is_active ? (

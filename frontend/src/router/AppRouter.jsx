@@ -15,6 +15,7 @@ import { ClientsPage } from "../pages/admin/ClientsPage"
 import { AuditLogsPage } from "../pages/admin/AuditLogsPage"
 import { DashboardPage } from "../pages/admin/DashboardPage"
 import { NotificationsPage } from "../pages/admin/NotificationsPage"
+import { TimesheetControlPage } from "../pages/admin/TimesheetControlPage"
 
 export function AppRouter() {
     return (
@@ -36,6 +37,7 @@ export function AppRouter() {
                             <Route path="users/search" element={<SearchUserPage />} />
                             <Route path="jobs" element={<JobsPage />} />
                             <Route path="audit-logs" element={<AuditLogsPage />} />
+                            <Route path="timesheets" element={<TimesheetControlPage />} />
                             <Route path="notifications" element={<NotificationsPage />} />
                         </Route>
                     </Route>
