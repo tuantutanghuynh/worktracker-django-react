@@ -19,7 +19,6 @@ import {
   Building2,
   UserPlus,
   Search,
-  ShieldCheck,
   FileText,
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';

@@ -42,7 +42,6 @@ import AdminLayout from "../layouts/AdminLayout"
 const AdminDashboardPage = lazy(() => import("../pages/admin/DashboardPage").then((m) => ({ default: m.DashboardPage })))
 const AdminClientsPage = lazy(() => import("../pages/admin/ClientsPage").then((m) => ({ default: m.ClientsPage })))
 const AdminDepartmentsPage = lazy(() => import("../pages/admin/DepartmentsPage").then((m) => ({ default: m.DepartmentsPage })))
-const AdminRolesPermissionsPage = lazy(() => import("../pages/admin/RolesPermissionsPage").then((m) => ({ default: m.RolesPermissionsPage })))
 const AdminCreateUserPage = lazy(() => import("../pages/admin/CreateUserPage").then((m) => ({ default: m.CreateUserPage })))
 const AdminSearchUserPage = lazy(() => import("../pages/admin/SearchUserPage").then((m) => ({ default: m.SearchUserPage })))
 const AdminJobsPage = lazy(() => import("../pages/admin/JobsPage").then((m) => ({ default: m.JobsPage })))
@@ -141,7 +140,6 @@ export function AppRouter() {
                                 <Route index element={<AdminDashboardPage />} />
                                 <Route path="clients" element={<AdminClientsPage />} />
                                 <Route path="departments" element={<AdminDepartmentsPage />} />
-                                <Route path="roles" element={<AdminRolesPermissionsPage />} />
                                 <Route path="users/create" element={<AdminCreateUserPage />} />
                                 <Route path="users/search" element={<AdminSearchUserPage />} />
                                 <Route path="jobs" element={<AdminJobsPage />} />
@@ -154,6 +152,7 @@ export function AppRouter() {
                                 <Route path="profile" element={<ProfilePage />} />
                             </Route>
                         </Route>
+                    </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
