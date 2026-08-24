@@ -37,7 +37,7 @@ const ROUTE_LABELS = {
 // chung cho cả 3 role nên không được hardcode 1 path cố định, phải tra
 // theo role hiện tại.
 const ROLE_LINKS = {
-  ADMIN: { home: '/admin', notifications: '/admin/notifications', profile: '/admin', settings: '/admin' },
+  ADMIN: { home: '/admin', notifications: '/admin/notifications', profile: '/admin/profile', settings: '/admin/profile' },
   EMPLOYEE: { home: '/employee/dashboard', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
 };
 

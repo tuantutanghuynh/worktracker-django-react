@@ -10,6 +10,7 @@ import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
+import ExportButton from '../../components/common/table/ExportButton';
 import StatCard from '../../components/common/cards/StatCard';
 import {
   useAdminTimesheetSummary,
@@ -190,10 +191,24 @@ export function TimesheetControlPage() {
             Monitor, audit, and lock company-wide employee timesheets.
           </p>
         </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <ExportButton
+          url="/admin/timesheets/employees/export/"
+          params={{
+            month,
+            year,
+            department: department || undefined,
+            manager: manager || undefined,
+            status: statusFilter || undefined,
+            search: debouncedSearch || undefined,
+            ordering: ordering || undefined,
+          }}
+          filename="worktracker_timesheets.xlsx"
+        />
         <button
           type="button"
           onClick={isPeriodLocked ? openUnlockModal : openLockModal}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-md transition self-start sm:self-auto ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-md transition ${
             isPeriodLocked
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
               : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
@@ -202,6 +217,7 @@ export function TimesheetControlPage() {
           {isPeriodLocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           {isPeriodLocked ? 'Unlock Period' : 'Lock Period'}
         </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">

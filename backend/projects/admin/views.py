@@ -11,6 +11,13 @@ from accounts.permissions import HasPermission
 from system.security.permissions_manager import IsAdminRole
 from system.pagination import AdminPageNumberPagination
 from system.utils import log_audit_event
+from system.services.admin_report_export_service import (
+    build_xlsx_response,
+    CLIENT_HEADERS,
+    client_rows,
+    JOB_HEADERS,
+    job_rows,
+)
 
 
 class ClientViewSet(viewsets.ModelViewSet):
@@ -44,9 +51,31 @@ class ClientViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission('client:create')]
         if self.action == 'destroy':
             return [IsAdminRole(), HasPermission('client:delete')]
+        if self.action == 'export':
+            return [IsAdminRole(), HasPermission('client:export')]
         if self.action in ('list', 'retrieve'):
             return [IsAdminRole(), HasPermission('client:view')]
         return [IsAdminRole(), HasPermission('client:update')]
+
+    # GET /api/admin/clients/export/ — same ?name=/?is_active=/?search=/?ordering=
+    # params as the list endpoint, so the file matches what's on screen.
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        log_audit_event(
+            actor=request.user,
+            action='EXPORT',
+            table_name='clients',
+            record_id=0,
+            new_values={'filters': dict(request.query_params), 'row_count': queryset.count()},
+            request=request,
+        )
+        return build_xlsx_response(
+            sheet_title='Clients',
+            headers=CLIENT_HEADERS,
+            rows=client_rows(queryset),
+            filename='worktracker_clients.xlsx',
+        )
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -138,9 +167,30 @@ class JobViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission('job:create')]
         if self.action == 'destroy':
             return [IsAdminRole(), HasPermission('job:delete')]
+        if self.action == 'export':
+            return [IsAdminRole(), HasPermission('job:export')]
         if self.action in ('list', 'retrieve'):
             return [IsAdminRole(), HasPermission('job:view')]
         return [IsAdminRole(), HasPermission('job:update')]
+
+    # GET /api/admin/jobs/export/ — same ?search=/?ordering= params as list.
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        log_audit_event(
+            actor=request.user,
+            action='EXPORT',
+            table_name='jobs',
+            record_id=0,
+            new_values={'filters': dict(request.query_params), 'row_count': queryset.count()},
+            request=request,
+        )
+        return build_xlsx_response(
+            sheet_title='Jobs',
+            headers=JOB_HEADERS,
+            rows=job_rows(queryset),
+            filename='worktracker_jobs.xlsx',
+        )
 
     @transaction.atomic
     def perform_create(self, serializer):

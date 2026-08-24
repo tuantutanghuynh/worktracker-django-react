@@ -5,6 +5,7 @@ from .views import (
     AdminTimesheetSummaryView,
     AdminTimesheetEmployeeListView,
     AdminTimesheetEmployeeDetailView,
+    AdminTimesheetExportView,
 )
 
 router = DefaultRouter()
@@ -24,6 +25,10 @@ urlpatterns = router.urls + [
     # GET /api/admin/timesheets/employees/?month=&year=&department=&manager=&search=&status=&page=
     # → Bảng giờ log theo từng nhân viên, company-wide (quyền: timesheet:view)
     path('employees/', AdminTimesheetEmployeeListView.as_view(), name='admin-timesheet-employees'),
+
+    # GET /api/admin/timesheets/employees/export/?month=&year=&department=&manager=&search=&status=&ordering=
+    # → Xuất Excel đúng bộ lọc đang áp dụng trên bảng (quyền: timesheet:export)
+    path('employees/export/', AdminTimesheetExportView.as_view(), name='admin-timesheet-export'),
 
     # GET /api/admin/timesheets/employees/{user_id}/?month=&year=
     # → Compliance drill-down cho 1 nhân viên (quyền: timesheet:view)

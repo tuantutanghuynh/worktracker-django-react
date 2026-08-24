@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from .views import AuditLogViewSet, DashboardView, AdminReportView, DataQualityAlertsView
+from .views import AuditLogViewSet, DashboardView, DataQualityAlertsView
 
 router = DefaultRouter()
 
@@ -11,19 +11,16 @@ router = DefaultRouter()
 # GET /api/admin/audit-logs/filters/ → { actions: [...], tables: [...] } — giá trị action/table_name
 #     thực tế đang có trong bảng, dùng để đổ vào 2 dropdown filter phía frontend
 # GET /api/admin/audit-logs/summary/ → 5 KPI card cho trang Audit Logs, scope theo ?actor_role= + hôm nay
+# GET /api/admin/audit-logs/export/  → Xuất Excel đúng bộ lọc đang áp dụng (quyền: audit:export)
 router.register('audit-logs', AuditLogViewSet, basename='auditlog')
 
 urlpatterns = router.urls + [
     # GET /api/admin/dashboard/
     # → Thống kê tổng quan: active_clients, total_users, active_accounts, locked_accounts,
-    #   departments_without_manager, jobs_by_status, clients_overview, audit_summary_today,
-    #   recent_security_events (quyền: audit:view) — cache server-side 30s
+    #   departments_without_manager, overdue_jobs, total_work_hours, pending_timesheets,
+    #   jobs_by_status, clients_overview, audit_summary_today, recent_security_events
+    #   (quyền: audit:view) — cache server-side 30s
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
-
-    # GET /api/admin/reports/
-    # → Xuất file Excel gồm 3 sheet: Clients / Jobs / Users
-    #   Sau khi export tự ghi audit log action='EXPORT' (quyền: report:export)
-    path('reports/', AdminReportView.as_view(), name='admin-report'),
 
     # GET /api/admin/data-quality-alerts/
     # → Danh sách cảnh báo tổng hợp real-time (không lưu DB): Department chưa có

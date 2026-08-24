@@ -10,6 +10,7 @@ import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
+import ExportButton from '../../components/common/table/ExportButton';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
 import {
@@ -150,13 +151,20 @@ export function ClientsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-slate-900">Clients</h1>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" /> New Client
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportButton
+            url="/admin/clients/export/"
+            params={{ search: debouncedSearch || undefined, ordering: ordering || undefined }}
+            filename="worktracker_clients.xlsx"
+          />
+          <button
+            type="button"
+            onClick={openCreate}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> New Client
+          </button>
+        </div>
       </div>
 
       <div className="relative max-w-md">

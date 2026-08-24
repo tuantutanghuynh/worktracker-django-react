@@ -6,6 +6,7 @@ import SideDrawer from '../../components/common/drawer/SideDrawer';
 import SeverityBadge from '../../components/common/badges/SeverityBadge';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
+import ExportButton from '../../components/common/table/ExportButton';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import InputField from '../../components/common/forms/InputField';
 import StatCard from '../../components/common/cards/StatCard';
@@ -173,19 +174,35 @@ export function AuditLogsPage() {
             Track sensitive system actions and data changes across WorkTracker.
           </p>
         </div>
-        <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
-          {ROLE_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => selectRoleTab(tab.value)}
-              className={`rounded-md px-3 py-1.5 transition-colors ${
-                roleTab === tab.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
+            {ROLE_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => selectRoleTab(tab.value)}
+                className={`rounded-md px-3 py-1.5 transition-colors ${
+                  roleTab === tab.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <ExportButton
+            url="/admin/audit-logs/export/"
+            params={{
+              actor_role: roleTab,
+              actor: filters.actor || undefined,
+              action: filters.action || undefined,
+              table_name: filters.table_name || undefined,
+              severity: filters.severity || undefined,
+              date_from: filters.date_from || undefined,
+              date_to: filters.date_to || undefined,
+              ordering: ordering || undefined,
+            }}
+            filename="worktracker_audit_logs.xlsx"
+          />
         </div>
       </div>
 

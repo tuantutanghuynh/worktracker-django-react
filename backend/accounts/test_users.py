@@ -7,10 +7,12 @@ from accounts.models import CustomUser, Department
 class TestUserAPI:
 
     # GET danh sách → expect 200 và có ít nhất 1 user (admin_user từ fixture)
+    # /api/auth/users/ có pagination (AdminPageNumberPagination) nên response.data
+    # là {count, next, previous, results}, không phải list — phải đọc ['results'].
     def test_list_users(self, auth_client, admin_user):
         response = auth_client.get('/api/auth/users/')
         assert response.status_code == 200
-        assert len(response.data) >= 1
+        assert len(response.data['results']) >= 1
 
     # POST tạo user mới → expect 201 và user xuất hiện trong DB
     def test_create_user(self, auth_client, admin_role):
@@ -27,8 +29,8 @@ class TestUserAPI:
     def test_filter_by_email(self, auth_client, admin_user):
         response = auth_client.get('/api/auth/users/?email=admin@test')
         assert response.status_code == 200
-        assert len(response.data) == 1
-        assert response.data[0]['email'] == 'admin@test.com'
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['email'] == 'admin@test.com'
 
     # PATCH lock → expect 200 và is_active chuyển False
     def test_lock_user(self, auth_client, admin_user, admin_role):

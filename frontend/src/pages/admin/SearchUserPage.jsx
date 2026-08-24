@@ -9,6 +9,7 @@ import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
+import ExportButton from '../../components/common/table/ExportButton';
 import RoleBadge from '../../components/common/badges/RoleBadge';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
@@ -177,6 +178,15 @@ export function SearchUserPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-slate-900">Search Users</h1>
+        <div className="flex items-center gap-2">
+        <ExportButton
+          url="/auth/users/export/"
+          params={{
+            email: viewMode === 'search' ? debouncedSearch || undefined : undefined,
+            ordering: ordering || undefined,
+          }}
+          filename="worktracker_users.xlsx"
+        />
         <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
           <button
             type="button"
@@ -196,6 +206,7 @@ export function SearchUserPage() {
           >
             Account List
           </button>
+        </div>
         </div>
       </div>
 

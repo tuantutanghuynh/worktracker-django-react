@@ -8,6 +8,25 @@ const COLOR_STYLES = {
   rose: 'bg-rose-50 text-rose-600',
 };
 
+// size 'md' là bản gốc dùng chung; 'sm' chỉ dùng cho lưới 4 thẻ hẹp bên
+// Admin Dashboard — thu nhỏ chữ + padding để label dài không bị tràn.
+const SIZE_STYLES = {
+  md: {
+    container: 'space-y-1.5 p-3.5',
+    icon: 'h-7 w-7',
+    iconGlyph: 'h-3.5 w-3.5',
+    label: 'text-xs',
+    value: 'text-xl',
+  },
+  sm: {
+    container: 'space-y-1 p-3',
+    icon: 'h-6 w-6',
+    iconGlyph: 'h-3 w-3',
+    label: 'text-[11px]',
+    value: 'text-lg',
+  },
+};
+
 export default function StatCard({
   icon: Icon,
   color = 'blue',
@@ -17,14 +36,17 @@ export default function StatCard({
   trend,
   trendDirection = 'up',
   tag,
+  size = 'md',
   className,
 }) {
   const colorStyle = COLOR_STYLES[color] ?? COLOR_STYLES.blue;
+  const sizeStyle = SIZE_STYLES[size] ?? SIZE_STYLES.md;
 
   return (
     <div
       className={clsx(
-        'space-y-1.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm',
+        'rounded-xl border border-slate-200/80 bg-white shadow-sm',
+        sizeStyle.container,
         className
       )}
     >
@@ -32,11 +54,12 @@ export default function StatCard({
         {Icon && (
           <div
             className={clsx(
-              'flex h-7 w-7 items-center justify-center rounded-lg text-xs',
+              'flex items-center justify-center rounded-lg text-xs',
+              sizeStyle.icon,
               colorStyle
             )}
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className={sizeStyle.iconGlyph} />
           </div>
         )}
         {tag && (
@@ -51,10 +74,12 @@ export default function StatCard({
         )}
       </div>
 
-      <div>
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <h3 className="text-xl font-bold text-slate-900">{value}</h3>
-        {subtext && <p className="text-[10px] text-slate-400">{subtext}</p>}
+      <div className="min-w-0">
+        <p className={clsx('truncate font-medium text-slate-500', sizeStyle.label)} title={label}>
+          {label}
+        </p>
+        <h3 className={clsx('truncate font-bold text-slate-900', sizeStyle.value)}>{value}</h3>
+        {subtext && <p className="truncate text-[10px] text-slate-400">{subtext}</p>}
       </div>
 
       {trend && (
