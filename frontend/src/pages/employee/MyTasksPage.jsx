@@ -32,6 +32,7 @@ export function MyTasksPage() {
     const [statusValue, setStatusValue] = useState("")
     const [priorityValue, setPriorityValue] = useState("")
     const [selectedTask, setSelectedTask] = useState(null)
+    const [submittingTask, setSubmittingTask] = useState(null)
 
     const filteredTasks = useMemo(() => {
         return tasks.filter((task) => {
@@ -48,15 +49,11 @@ export function MyTasksPage() {
         setPriorityValue("")
     }
 
-    // Only 2 actions are ever valid for an Employee: start a TODO task, or
-    // submit an IN_PROGRESS task for review (FR-39) — apply_transition()
-    // on the backend enforces this regardless, this just picks the target.
-    async function handleAction(task) {
-        if (task.status === "TODO") {
-            await changeStatus(task.id, "IN_PROGRESS")
-        } else if (task.status === "IN_PROGRESS") {
-            await changeStatus(task.id, "REVIEWING")
-        }
+    // Start Task đổi trạng thái ngay (không cần xem lại gì trước).
+    // Submit for Review giờ mở TaskSubmitReviewModal thay vì đổi trạng
+    // thái ngay.
+    async function handleStartTask(task) {
+        await changeStatus(task.id, "IN_PROGRESS")
     }
 
     const columns = [
@@ -82,7 +79,7 @@ export function MyTasksPage() {
                     return (
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); handleAction(task) }}
+                            onClick={(e) => { e.stopPropagation(); handleStartTask(task) }}
                             className="px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"
                         >
                             Start Task
@@ -93,7 +90,7 @@ export function MyTasksPage() {
                     return (
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); handleAction(task) }}
+                            onClick={(e) => { e.stopPropagation(); setSubmittingTask(task) }}
                             className="px-3 py-1 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg"
                         >
                             Submit for Review
@@ -138,6 +135,13 @@ export function MyTasksPage() {
             />
 
               <TaskDrawerContent key={selectedTask?.id ?? "none"} task={selectedTask} onClose={() => setSelectedTask(null)} />
+
+            <TaskSubmitReviewModal
+                key={submittingTask?.id ?? "none-submit"}
+                task={submittingTask}
+                changeStatus={changeStatus}
+                onClose={() => setSubmittingTask(null)}
+            />
         </div>
     )
 }
@@ -147,7 +151,7 @@ export function MyTasksPage() {
 function TaskDrawerContent({ task, onClose }) {
     const {
         comments, workLogs, loadingDetail, submitting, error,
-        submitComment, submitAttachment, submitLogWork, submitVoidLogWork,
+        submitComment, submitLogWork, submitVoidLogWork,
     } = useTaskDetail(task?.id)
 
     const [commentText, setCommentText] = useState("")
@@ -155,19 +159,11 @@ function TaskDrawerContent({ task, onClose }) {
     const [hoursSpent, setHoursSpent] = useState("")
     const [logDescription, setLogDescription] = useState("")
     const [voidingLogId, setVoidingLogId] = useState(null)
-    const fileInputRef = useRef(null)
 
     async function handleAddComment() {
         if (!commentText.trim()) return
         const ok = await submitComment(commentText.trim())
         if (ok) setCommentText("")
-    }
-
-    async function handleUploadFile(e) {
-        const file = e.target.files?.[0]
-        if (!file) return
-        await submitAttachment(file)
-        e.target.value = ""
     }
 
     async function handleLogWork() {
@@ -279,21 +275,6 @@ function TaskDrawerContent({ task, onClose }) {
                             )}
                         </div>
 
-                        {/* Attachment */}
-                        <div className="border-t border-slate-800 pt-4 space-y-2">
-                            <p className="text-xs font-semibold text-slate-400 uppercase">Deliverable</p>
-                            <input ref={fileInputRef} type="file" onChange={handleUploadFile} className="hidden" />
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={submitting}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg disabled:opacity-50"
-                            >
-                                <Paperclip size={14} />
-                                Upload File
-                            </button>
-                        </div>
-
                         {/* Comments */}
                         <div className="border-t border-slate-800 pt-4 space-y-3">
                             <p className="text-xs font-semibold text-slate-400 uppercase">Comments</p>
@@ -343,5 +324,111 @@ function TaskDrawerContent({ task, onClose }) {
                 isLoading={submitting}
             />
         </>
+    )
+}
+
+// Popup xem lại công việc trước khi Submit for Review — tách biệt hoàn
+// toàn với TaskDrawerContent (SideDrawer = xem/quản lý, modal này = xác
+// nhận nộp bài), cùng lý do gọi useTaskDetail() riêng và dùng key prop
+// để reset state khi đổi task, giống TaskDrawerContent.
+function TaskSubmitReviewModal({ task, changeStatus, onClose }) {
+    const { workLogs, attachments, loadingDetail, submitting, submitAttachment } = useTaskDetail(task?.id)
+    const fileInputRef = useRef(null)
+    const [confirming, setConfirming] = useState(false)
+
+    const totalHours = workLogs
+        .filter((log) => log.review_status !== "VOIDED")
+        .reduce((sum, log) => sum + Number(log.hours_spent), 0)
+
+    async function handleUploadFile(e) {
+        const file = e.target.files?.[0]
+        if (!file) return
+        await submitAttachment(file)
+        e.target.value = ""
+    }
+
+    async function handleConfirmSubmit() {
+        if (!task) return
+        setConfirming(true)
+        const ok = await changeStatus(task.id, "REVIEWING")
+        setConfirming(false)
+        if (ok) onClose()
+    }
+
+    if (!task) return null
+
+    return (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
+                <h2 className="text-sm font-bold text-slate-900">Submit "{task.title}" for Review</h2>
+
+                {loadingDetail ? (
+                    <p className="text-xs text-slate-400">Loading...</p>
+                ) : (
+                    <>
+                        {workLogs.length === 0 && (
+                            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                                You haven't logged any hours for this task yet.
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <p className="text-xs font-semibold text-slate-500 uppercase">
+                                Logged Work (Total: {totalHours}h)
+                            </p>
+                            {workLogs.length > 0 && (
+                                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                                    {workLogs.map((log) => (
+                                        <div key={log.id} className="text-xs text-slate-700 flex justify-between border-b border-slate-100 pb-1">
+                                            <span>{log.work_date} — {log.description}</span>
+                                            <span className="font-semibold shrink-0 ml-2">{log.hours_spent}h</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <p className="text-xs font-semibold text-slate-500 uppercase">Deliverable Files</p>
+                            {attachments.length > 0 && (
+                                <div className="space-y-1">
+                                    {attachments.map((file) => (
+                                        <p key={file.id} className="text-xs text-slate-700">{file.file_name}</p>
+                                    ))}
+                                </div>
+                            )}
+                            <input ref={fileInputRef} type="file" onChange={handleUploadFile} className="hidden" />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={submitting || confirming}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg disabled:opacity-50"
+                            >
+                                <Paperclip size={14} />
+                                Upload another file
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirmSubmit}
+                        disabled={submitting || confirming}
+                        className="px-4 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50"
+                    >
+                        {confirming ? "Submitting..." : "Confirm Submit"}
+                    </button>
+                </div>
+            </div>
+        </div>
     )
 }

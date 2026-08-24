@@ -107,12 +107,14 @@ export function useTaskDetail(taskId) {
         commentMutation.isPending || attachmentMutation.isPending ||
         logWorkMutation.isPending || voidMutation.isPending
 
-    return {
+        return {
         comments: data?.comments ?? [],
         workLogs: data?.work_logs ?? [],
+        attachments: data?.attachments ?? [],
         loadingDetail: isLoading,
         submitting,
         error: queryError ? getErrorMessage(queryError, "Failed to load task detail") : null,
         submitComment, submitAttachment, submitLogWork, submitVoidLogWork,
     }
+
 }
