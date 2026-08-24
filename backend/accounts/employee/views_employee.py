@@ -90,7 +90,7 @@ class PersonalKPIView(APIView):
             user=user,
             work_date__range=(week_start, week_end),
         ).exclude(
-            review_status=LogWork.ReviewStatus.VOIDED,
+            review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED],
         ).aggregate(total=Sum("hours_spent"))["total"] or Decimal("0.00")
 
         completion_tasks = Task.objects.filter(assignee=user).exclude(
@@ -121,7 +121,7 @@ class PersonalKPIView(APIView):
         # belong to Minh Anh/Long's apps); never writes to those tables.
         hours_by_project = list(
             LogWork.objects.filter(user=user)
-            .exclude(review_status=LogWork.ReviewStatus.VOIDED)
+            .exclude(review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED])
             .values("task__job__job_name")
             .annotate(total_hours=Sum("hours_spent"))
             .order_by("-total_hours")[:5]
@@ -135,7 +135,7 @@ class PersonalKPIView(APIView):
             for row in LogWork.objects.filter(
                 user=user, work_date__range=(trend_start, today)
             )
-            .exclude(review_status=LogWork.ReviewStatus.VOIDED)
+            .exclude(review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED])
             .values("work_date")
             .annotate(total=Sum("hours_spent"))
         }

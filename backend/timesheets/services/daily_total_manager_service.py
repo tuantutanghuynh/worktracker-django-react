@@ -6,7 +6,7 @@ from rest_framework.exceptions import APIException
 from timesheets.models import DailyUserTimesheet, LogWork
 
 
-MAX_DAILY_HOURS = Decimal("24.00")
+MAX_DAILY_HOURS = Decimal("8.00")
 
 
 class DailyTotalError(APIException):
@@ -27,15 +27,16 @@ def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     Tính tổng giờ làm của 1 user trong 1 ngày.
 
     Quy ước:
-    - VOIDED không tính vào tổng giờ.
-    - PENDING / APPROVED / REJECTED vẫn tính, vì đó vẫn là log đã nhập,
-      trừ khi Manager void log đó.
+    - VOIDED và REJECTED không tính vào tổng giờ — cả 2 đều là "không còn
+      giá trị" (VOIDED do tự huỷ, REJECTED do Manager từ chối) nên giải
+      phóng lại dung lượng ngày đó ngay lập tức để nhân viên log bù việc khác.
+    - Chỉ PENDING / APPROVED mới tính vào tổng.
     """
     queryset = LogWork.objects.filter(
         user_id=user_id,
         work_date=work_date,
     ).exclude(
-        review_status=LogWork.ReviewStatus.VOIDED,
+        review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED],
     )
 
     if exclude_logwork_id:
@@ -46,6 +47,7 @@ def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     )["total_hours"]
 
     return normalize_hours(total)
+
 
 
 def assert_daily_total_not_exceed_24(
@@ -74,7 +76,7 @@ def assert_daily_total_not_exceed_24(
 
     if final_total > MAX_DAILY_HOURS:
         raise DailyTotalError(
-            f"Daily total hours cannot exceed 24 hours. Current total: {current_total}, new hours: {new_hours}, final total: {final_total}."
+            f"Daily total hours cannot exceed {MAX_DAILY_HOURS} hours. Current total: {current_total}, new hours: {new_hours}, final total: {final_total}."
         )
 
     return final_total

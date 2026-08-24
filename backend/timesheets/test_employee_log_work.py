@@ -85,12 +85,12 @@ class TestEmployeeLogWorkDailyTotal:
             user=self.employee, work_date=self.work_date
         ).count() == 1
 
-    # Cap 24h vẫn phải hoạt động đúng sau khi gộp query — hồi quy quan trọng nhất.
-    def test_exceeding_24h_cap_still_rejected(self):
+    # Cap 8h vẫn phải hoạt động đúng sau khi gộp query — hồi quy quan trọng nhất.
+    def test_exceeding_8h_cap_still_rejected(self):
         self.client.post("/api/timesheets/log-works/", {
             "task": self.task.id,
             "work_date": self.work_date,
-            "hours_spent": 20,
+            "hours_spent": 6,
             "description": "Log gần đầy ngày",
         }, format="json")
 
@@ -98,11 +98,11 @@ class TestEmployeeLogWorkDailyTotal:
             "task": self.task.id,
             "work_date": self.work_date,
             "hours_spent": 5,
-            "description": "Log vượt 24h",
+            "description": "Log vượt 8h",
         }, format="json")
 
         assert response.status_code == 400
         timesheet = DailyUserTimesheet.objects.get(
             user=self.employee, work_date=self.work_date
         )
-        assert timesheet.total_hours == Decimal("20")  # không bị cộng thêm 5h vượt cap
+        assert timesheet.total_hours == Decimal("6")  # không bị cộng thêm 5h vượt cap
