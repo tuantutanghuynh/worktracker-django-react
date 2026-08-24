@@ -11,6 +11,23 @@ function isManager() {
   return role === 'MANAGER';
 }
 
+const SEEN_ALERTS_KEY = 'dq_alerts_seen';
+
+// Data-quality alerts (Admin's "Department without manager" etc.) are
+// computed live from DB state, not persisted rows — no is_read column to
+// flip. "Seen" just means "the viewer opened the bell/notifications page
+// while this exact alert id was showing", tracked per-browser via
+// localStorage. Ported from Minh Anh's useNotificationStore.js (her
+// version got dropped when this file's merge conflict was resolved) —
+// AdminNotificationsPage needs it, none of Employee/Manager's flow uses it.
+function loadSeenAlertIds() {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_ALERTS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
   unreadCount: 0,
@@ -18,8 +35,23 @@ export const useNotificationStore = create((set, get) => ({
   loading: false,
   socket: null,
   error: null,
+  seenAlertIds: loadSeenAlertIds(),
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  markAlertsSeen: (ids) => {
+    if (!ids || ids.length === 0) return;
+    set((state) => {
+      const merged = Array.from(new Set([...state.seenAlertIds, ...ids]));
+      try {
+        localStorage.setItem(SEEN_ALERTS_KEY, JSON.stringify(merged));
+      } catch {
+        // localStorage unavailable (private window, blocked site data) —
+        // badge just won't persist across reloads, not worth surfacing.
+      }
+      return { seenAlertIds: merged };
+    });
+  },
 
   /**
    * Fetch initial notifications from API

@@ -35,6 +35,21 @@ const ManagerChatPage = lazy(() => import("../pages/manager/ManagerChatPage"))
 const ManagerProfilePage = lazy(() => import("../pages/manager/ManagerProfilePage"))
 const ManagerSettingsPage = lazy(() => import("../pages/manager/ManagerSettingsPage"))
 
+// Admin (Minh Anh) — lazy load, chỉ tải khi thật sự vào /admin/*.
+// Chỉ nối tạm trên nhánh nháp draft-merge-tuantu-minhanh để thử chạy,
+// không phải quyết định merge chính thức.
+import AdminLayout from "../layouts/AdminLayout"
+const AdminDashboardPage = lazy(() => import("../pages/admin/DashboardPage").then((m) => ({ default: m.DashboardPage })))
+const AdminClientsPage = lazy(() => import("../pages/admin/ClientsPage").then((m) => ({ default: m.ClientsPage })))
+const AdminDepartmentsPage = lazy(() => import("../pages/admin/DepartmentsPage").then((m) => ({ default: m.DepartmentsPage })))
+const AdminRolesPermissionsPage = lazy(() => import("../pages/admin/RolesPermissionsPage").then((m) => ({ default: m.RolesPermissionsPage })))
+const AdminCreateUserPage = lazy(() => import("../pages/admin/CreateUserPage").then((m) => ({ default: m.CreateUserPage })))
+const AdminSearchUserPage = lazy(() => import("../pages/admin/SearchUserPage").then((m) => ({ default: m.SearchUserPage })))
+const AdminJobsPage = lazy(() => import("../pages/admin/JobsPage").then((m) => ({ default: m.JobsPage })))
+const AdminAuditLogsPage = lazy(() => import("../pages/admin/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage })))
+const AdminTimesheetControlPage = lazy(() => import("../pages/admin/TimesheetControlPage").then((m) => ({ default: m.TimesheetControlPage })))
+const AdminNotificationsPage = lazy(() => import("../pages/admin/NotificationsPage").then((m) => ({ default: m.NotificationsPage })))
+
 function PageLoadingSpinner() {
     return (
         <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -53,7 +68,10 @@ function PageLoadingSpinner() {
 function RoleHome() {
     const { user } = useAuth()
     const role = (user?.role || "").toUpperCase()
-    if (role === "MANAGER" || role === "ADMIN") {
+    if (role === "ADMIN") {
+        return <Navigate to="/admin" replace />
+    }
+    if (role === "MANAGER") {
         return <Navigate to="/manager/dashboard" replace />
     }
     return <DashboardPage />
@@ -115,6 +133,21 @@ export function AppRouter() {
                                 <Route path="notifications" element={<ManagerNotificationsPage />} />
                                 <Route path="profile" element={<ManagerProfilePage />} />
                                 <Route path="settings" element={<ManagerSettingsPage />} />
+                            </Route>
+                        </Route>
+
+                        <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+                            <Route path="/admin" element={<AdminLayout />}>
+                                <Route index element={<AdminDashboardPage />} />
+                                <Route path="clients" element={<AdminClientsPage />} />
+                                <Route path="departments" element={<AdminDepartmentsPage />} />
+                                <Route path="roles" element={<AdminRolesPermissionsPage />} />
+                                <Route path="users/create" element={<AdminCreateUserPage />} />
+                                <Route path="users/search" element={<AdminSearchUserPage />} />
+                                <Route path="jobs" element={<AdminJobsPage />} />
+                                <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+                                <Route path="timesheets" element={<AdminTimesheetControlPage />} />
+                                <Route path="notifications" element={<AdminNotificationsPage />} />
                             </Route>
                         </Route>
                     </Route>

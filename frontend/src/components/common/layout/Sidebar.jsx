@@ -15,7 +15,12 @@ import {
   Bell,
   User,
   Kanban,
-  MessageSquare
+  MessageSquare,
+  Building2,
+  UserPlus,
+  Search,
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
@@ -56,13 +61,22 @@ const MENU_CONFIG = {
     showRecentJobs: false,
   },
 
-  // Cấu hình Menu dành cho ADMIN
+  // Cấu hình Menu dành cho ADMIN — khớp đúng 10 trang thật Minh Anh đã
+  // xây (layouts/AdminLayout.jsx + router/AppRouter.jsx), thay bản nháp
+  // 3 mục cũ (path còn sai, không khớp route thật nào).
   ADMIN: {
     portalLabel: 'Admin Portal',
     navItems: [
-      { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/admin/users', label: 'User Management', icon: Users },
-      { path: '/admin/settings', label: 'System Settings', icon: Settings },
+      { path: '/admin', label: 'Dashboard', icon: LayoutGrid },
+      { path: '/admin/clients', label: 'Clients', icon: Building2 },
+      { path: '/admin/jobs', label: 'Jobs', icon: Briefcase },
+      { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
+      { path: '/admin/users/search', label: 'Search Users', icon: Search },
+      { path: '/admin/departments', label: 'Departments', icon: Users },
+      { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
+      { path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock },
+      { path: '/admin/audit-logs', label: 'Audit Logs', icon: FileText },
+      { path: '/admin/notifications', label: 'Notification Center', icon: Bell, hasBadge: true },
     ],
     showRecentJobs: false,
   },
