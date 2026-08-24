@@ -1,9 +1,9 @@
 import { format } from 'date-fns';
-import { Building2, Users, UserCheck, Lock, UserX, ShieldAlert } from 'lucide-react';
+import { Building2, Users, UserCheck, Lock, UserX, ShieldAlert, Download } from 'lucide-react';
 import StatCard from '../../components/common/cards/StatCard';
 import DonutChartCard from '../../components/common/charts/DonutChartCard';
 import SeverityBadge from '../../components/common/badges/SeverityBadge';
-import { useAdminDashboard } from '../../hooks/queries/admin/useAdminDashboard';
+import { useAdminDashboard, useExportAdminReport } from '../../hooks/queries/admin/useAdminDashboard';
 
 const JOB_STATUS_COLORS = ['#94a3b8', '#2563eb', '#f59e0b', '#f97316', '#ef4444'];
 const CLIENTS_OVERVIEW_COLORS = ['#2563eb', '#94a3b8'];
@@ -20,6 +20,7 @@ const AUDIT_LABELS = {
 // polling on top of that.
 export function DashboardPage() {
   const { data, isLoading } = useAdminDashboard();
+  const exportMutation = useExportAdminReport();
 
   if (isLoading || !data) {
     return <p className="text-sm text-slate-400">Loading dashboard...</p>;
@@ -36,7 +37,17 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-bold text-slate-900">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-slate-900">Dashboard</h1>
+        <button
+          type="button"
+          onClick={() => exportMutation.mutate()}
+          disabled={exportMutation.isPending}
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          <Download className="h-4 w-4" /> {exportMutation.isPending ? 'Exporting...' : 'Export Report'}
+        </button>
+      </div>
 
       <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Active Clients" value={data.active_clients} icon={Building2} color="blue" />

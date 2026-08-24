@@ -3,9 +3,16 @@ from ..models import Role, Permission, CustomUser, Department, EmployeeProfile
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    # Currently-assigned permission ids — lets the Roles & Permissions page
+    # pre-check the right boxes on GET without a second request.
+    permission_ids = serializers.SerializerMethodField()
+
     class Meta:
         model = Role
-        fields = ['id', 'code', 'name', 'description', 'is_active']
+        fields = ['id', 'code', 'name', 'description', 'is_active', 'permission_ids']
+
+    def get_permission_ids(self, obj):
+        return list(obj.role_permissions.values_list('permission_id', flat=True))
 
 
 class PermissionSerializer(serializers.ModelSerializer):

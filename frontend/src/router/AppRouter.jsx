@@ -16,6 +16,7 @@ import { AuditLogsPage } from "../pages/admin/AuditLogsPage"
 import { DashboardPage } from "../pages/admin/DashboardPage"
 import { NotificationsPage } from "../pages/admin/NotificationsPage"
 import { TimesheetControlPage } from "../pages/admin/TimesheetControlPage"
+import { RolesPermissionsPage } from "../pages/admin/RolesPermissionsPage"
 
 export function AppRouter() {
     return (
@@ -33,6 +34,7 @@ export function AppRouter() {
                             <Route index element={<DashboardPage />} />
                             <Route path="clients" element={<ClientsPage />} />
                             <Route path="departments" element={<DepartmentsPage />} />
+                            <Route path="roles" element={<RolesPermissionsPage />} />
                             <Route path="users/create" element={<CreateUserPage />} />
                             <Route path="users/search" element={<SearchUserPage />} />
                             <Route path="jobs" element={<JobsPage />} />

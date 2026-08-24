@@ -15,9 +15,9 @@ router.register('audit-logs', AuditLogViewSet, basename='auditlog')
 
 urlpatterns = router.urls + [
     # GET /api/admin/dashboard/
-    # → Thống kê tổng quan: active_clients, running_jobs, total_users, overdue_jobs,
-    #   total_work_hours, jobs_by_status, clients_overview, task_status, audit_summary_today
-    #   (quyền: audit:view)
+    # → Thống kê tổng quan: active_clients, total_users, active_accounts, locked_accounts,
+    #   departments_without_manager, jobs_by_status, clients_overview, audit_summary_today,
+    #   recent_security_events (quyền: audit:view) — cache server-side 30s
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
 
     # GET /api/admin/reports/

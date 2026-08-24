@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { listJobs, createJob, updateJob, cancelJob } from '../../../api/admin/jobs';
+import { listJobs, createJob, updateJob, cancelJob, acquireJobLock, releaseJobLock } from '../../../api/admin/jobs';
 import { getErrorMessage } from '../../../utils/errorMessages';
 
 /**
@@ -57,4 +57,15 @@ export function useCancelJob() {
     },
     onError: () => toast.error('Failed to cancel job.'),
   });
+}
+
+// No onError toast here — JobsPage handles the 423 "someone else is
+// editing this" case itself (keeps the modal closed instead of showing it
+// briefly then erroring out).
+export function useAcquireJobLock() {
+  return useMutation({ mutationFn: (id) => acquireJobLock(id) });
+}
+
+export function useReleaseJobLock() {
+  return useMutation({ mutationFn: (id) => releaseJobLock(id) });
 }

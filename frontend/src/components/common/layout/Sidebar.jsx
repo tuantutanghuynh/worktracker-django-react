@@ -12,6 +12,7 @@ import {
   UserPlus,
   Search,
   ScrollText,
+  ShieldCheck,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -48,6 +49,7 @@ const MENU_CONFIG = {
       { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
       { path: '/admin/users/search', label: 'Search Users', icon: Search },
       { path: '/admin/departments', label: 'Departments', icon: Users },
+      { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
       { path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock },
       { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
       { path: '/admin/notifications', label: 'Notification Center', icon: Bell, hasBadge: true },

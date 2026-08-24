@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { toast } from 'sonner';
 import { Plus, Search, Pencil, Ban } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
@@ -13,9 +14,17 @@ import PriorityBadge from '../../components/common/badges/PriorityBadge';
 import StatusBadge from '../../components/common/badges/StatusBadge';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
-import { useAdminJobs, useCreateJob, useUpdateJob, useCancelJob } from '../../hooks/queries/admin/useAdminJobs';
+import {
+  useAdminJobs,
+  useCreateJob,
+  useUpdateJob,
+  useCancelJob,
+  useAcquireJobLock,
+  useReleaseJobLock,
+} from '../../hooks/queries/admin/useAdminJobs';
 import { useAdminClients } from '../../hooks/queries/admin/useAdminClients';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 15;
 
@@ -157,6 +166,27 @@ export function JobsPage() {
   const createMutation = useCreateJob();
   const updateMutation = useUpdateJob();
   const cancelMutation = useCancelJob();
+  const acquireLockMutation = useAcquireJobLock();
+  const releaseLockMutation = useReleaseJobLock();
+
+  // Mirrors editTarget's id into a ref purely so the unmount-safety effect
+  // below can read the latest value in its cleanup without re-subscribing
+  // on every change (and without reading a ref from render-time code,
+  // which react-hooks/refs flags).
+  const editTargetIdRef = useRef(null);
+  useEffect(() => {
+    editTargetIdRef.current = editTarget?.id ?? null;
+  }, [editTarget]);
+
+  // Safety net — if the admin navigates away without closing the modal
+  // (route change, browser back), still release the lock instead of
+  // leaving it held for the full 5-minute TTL.
+  useEffect(() => {
+    return () => {
+      if (editTargetIdRef.current) releaseLockMutation.mutate(editTargetIdRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function openCreate() {
     reset({
@@ -188,17 +218,30 @@ export function JobsPage() {
     );
   }
 
+  // Acquires the per-job editing lock before opening the modal — if another
+  // admin already holds it, the backend returns 423 and the modal never
+  // opens, avoiding two admins silently overwriting each other's changes.
   function openEditJob(job) {
-    resetEdit({
-      manager: String(job.manager),
-      job_name: job.job_name,
-      priority: job.priority,
-      status: job.status,
-      description: job.description || '',
-      start_date: job.start_date,
-      deadline: job.deadline,
+    acquireLockMutation.mutate(job.id, {
+      onSuccess: () => {
+        resetEdit({
+          manager: String(job.manager),
+          job_name: job.job_name,
+          priority: job.priority,
+          status: job.status,
+          description: job.description || '',
+          start_date: job.start_date,
+          deadline: job.deadline,
+        });
+        setEditTarget(job);
+      },
+      onError: (err) => toast.error(getErrorMessage(err, 'This job is currently being edited by someone else.')),
     });
-    setEditTarget(job);
+  }
+
+  function closeEditModal() {
+    if (editTarget) releaseLockMutation.mutate(editTarget.id);
+    setEditTarget(null);
   }
 
   function onSubmitEdit(data) {
@@ -215,7 +258,7 @@ export function JobsPage() {
           deadline: data.deadline,
         },
       },
-      { onSuccess: () => setEditTarget(null) }
+      { onSuccess: closeEditModal }
     );
   }
 
@@ -421,7 +464,7 @@ export function JobsPage() {
 
       <BaseModal
         isOpen={!!editTarget}
-        onClose={() => setEditTarget(null)}
+        onClose={closeEditModal}
         title="Edit Job"
         description={editTarget?.job_name}
         maxWidth="max-w-lg"
@@ -501,7 +544,7 @@ export function JobsPage() {
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={() => setEditTarget(null)}
+              onClick={closeEditModal}
               className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200"
             >
               Cancel

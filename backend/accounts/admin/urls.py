@@ -12,6 +12,7 @@ router = DefaultRouter()
 # DELETE /api/auth/users/{id}/                    → Xóa mềm: is_active=False + xóa cache Redis
 # PATCH  /api/auth/users/{id}/lock/               → Khóa tài khoản: is_active=False + xóa cache Redis
 # PATCH  /api/auth/users/{id}/unlock/             → Mở khóa: is_active=True + cập nhật cache Redis
+# PATCH  /api/auth/users/{id}/reset-password/     → Đặt lại mật khẩu, ép must_change_password=True (quyền: user:reset_password)
 # PATCH  /api/auth/users/{id}/assign-department/  → Gán user vào phòng ban qua EmployeeProfile
 router.register('users', UserViewSet, basename='user')
 

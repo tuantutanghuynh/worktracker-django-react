@@ -25,6 +25,3 @@ export const resetUserPassword = (id, new_password) =>
 // treats a missing/null "department" key in the body as "unassign").
 export const assignUserDepartment = (id, department) =>
   axiosClient.patch(`/auth/users/${id}/assign-department/`, { department }).then((r) => r.data);
-
-export const listRoles = () =>
-  axiosClient.get('/auth/roles/').then((r) => r.data);
