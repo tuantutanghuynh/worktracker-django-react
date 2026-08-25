@@ -132,7 +132,7 @@ def approve_logwork(
                 f"Your log work on {locked_logwork.work_date} "
                 f"({locked_logwork.hours_spent}h) has been approved."
             ),
-            related_url=f"/employee/log-works/{locked_logwork.id}",
+            related_url="/employee/timesheet",
             channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 
@@ -234,7 +234,7 @@ def reject_logwork(
                 f"Your log work on {locked_logwork.work_date} "
                 f"({locked_logwork.hours_spent}h) has been rejected: {clean_reason}"
             ),
-            related_url=f"/employee/log-works/{locked_logwork.id}",
+            related_url="/employee/timesheet",
             channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 
@@ -453,7 +453,7 @@ def void_logwork(
                 f"Your log work on {locked_logwork.work_date} "
                 f"({locked_logwork.hours_spent}h) has been voided: {clean_reason}"
             ),
-            related_url=f"/employee/log-works/{locked_logwork.id}",
+            related_url="/employee/timesheet",
             channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 

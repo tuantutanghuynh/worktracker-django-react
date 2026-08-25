@@ -251,7 +251,7 @@ def lock_job_period(
             event_type=Notification.EventType.TIMESHEET_LOCK,
             title="Timesheet period locked",
             content=f"Timesheet period {lock_month}/{lock_year} has been locked for job: {job.job_name}",
-            related_url=f"/manager/jobs/{job.id}/timesheets",
+            related_url="/manager/timelock",
             channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 
@@ -511,7 +511,7 @@ def unlock_job_period(
             event_type=Notification.EventType.TIMESHEET_UNLOCK,
             title="Timesheet period unlocked",
             content=f"Timesheet period {locked_time_lock.lock_month}/{locked_time_lock.lock_year} has been unlocked for job: {locked_time_lock.job.job_name}",
-            related_url=f"/manager/jobs/{locked_time_lock.job.id}/timesheets",
+            related_url="/manager/timelock",
             channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 

@@ -19,6 +19,41 @@ import { cn } from '../../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
 
 /**
+ * Hàm phân giải và chuẩn hóa đường dẫn thông báo thông minh
+ * Tránh trường hợp dẫn vào các route ảo/không tồn tại gây redirect về Dashboard
+ */
+export function resolveNotificationUrl(url, eventType) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === '#' || trimmed === '/') return null;
+
+  // Manager task routes: /manager/tasks/123 or /manager/tasks -> /manager/tasks/review
+  if (trimmed.startsWith('/manager/tasks/') && !trimmed.startsWith('/manager/tasks/review')) {
+    return '/manager/tasks/review';
+  }
+  if (trimmed === '/manager/tasks') {
+    return '/manager/tasks/review';
+  }
+
+  // Manager timesheet review subroutes: /manager/jobs/123/timesheets -> /manager/timesheets/review
+  if (trimmed.includes('/timesheets') && trimmed.startsWith('/manager/')) {
+    return '/manager/timesheets/review';
+  }
+
+  // Employee log-work routes: /employee/log-works/123 -> /employee/timesheet
+  if (trimmed.startsWith('/employee/log-works/')) {
+    return '/employee/timesheet';
+  }
+
+  // Employee task routes: /employee/tasks/123 -> /employee/my-tasks
+  if (trimmed.startsWith('/employee/tasks/')) {
+    return '/employee/my-tasks';
+  }
+
+  return trimmed;
+}
+
+/**
  * NotificationListTable - System Notifications Table / List Component
  * Chuẩn giao diện hiện đại, trực quan, hỗ trợ đánh dấu đã đọc 1-click & hàng loạt
  * 
@@ -27,7 +62,8 @@ import { formatDistanceToNow } from 'date-fns';
  * - onMarkAsRead (function): (id | id[]) => void
  * - onMarkAllRead (function): () => void
  * - onDelete (function): (id) => void
- * - onNotificationClick (function): (notification) => void
+ * - onNotificationClick (function): (notification, targetUrl) => void
+ * - onNavigate (function): (targetUrl) => void
  * - isLoading (boolean): loading state
  */
 export default function NotificationListTable({
@@ -48,14 +84,24 @@ export default function NotificationListTable({
   // Chuẩn hóa hàm callbacks
   const handleMarkReadFn = onMarkAsRead || onMarkRead;
   const handleMarkAllReadFn = onMarkAllRead || onMarkAllAsRead;
-  const handleItemClickFn = (item) => {
+
+  // Bấm vào thân dòng thông báo: CHỈ đánh dấu đã đọc, KHÔNG tự động chuyển trang
+  const handleRowClick = (item) => {
     if (handleMarkReadFn && !item.is_read) {
       handleMarkReadFn(item.id);
     }
-    if (onNotificationClick) {
-      onNotificationClick(item);
-    } else if (onNavigate && item.related_url) {
-      onNavigate(item.related_url);
+  };
+
+  // Bấm vào nút "View Details": Đánh dấu đã đọc VÀ chuyển đúng đến trang chi tiết
+  const handleViewDetails = (e, item, targetUrl) => {
+    e.stopPropagation();
+    if (handleMarkReadFn && !item.is_read) {
+      handleMarkReadFn(item.id);
+    }
+    if (onNavigate) {
+      onNavigate(targetUrl);
+    } else if (onNotificationClick) {
+      onNotificationClick(item, targetUrl);
     }
   };
 
@@ -221,11 +267,12 @@ export default function NotificationListTable({
           {filteredNotifications.map((item) => {
             const badge = getEventBadge(item.event_type);
             const isSelected = selectedIds.includes(item.id);
+            const targetUrl = resolveNotificationUrl(item.related_url, item.event_type);
 
             return (
               <div
                 key={item.id}
-                onClick={() => handleItemClickFn(item)}
+                onClick={() => handleRowClick(item)}
                 className={cn(
                   "p-4 transition-all flex items-start gap-3.5 group cursor-pointer",
                   !item.is_read ? "bg-blue-50/30 hover:bg-blue-50/60" : "bg-white hover:bg-slate-50/80",
@@ -277,15 +324,19 @@ export default function NotificationListTable({
                         ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true })
                         : 'Just now'}
                     </span>
-                    {item.related_url && (
-                      <span className="text-blue-600 font-semibold hover:underline flex items-center gap-1 text-[11px]">
+                    {targetUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleViewDetails(e, item, targetUrl)}
+                        className="text-blue-600 hover:text-blue-800 font-bold hover:underline inline-flex items-center gap-1 text-[11px] cursor-pointer"
+                      >
                         <ExternalLink className="w-3 h-3" /> View Details
-                      </span>
+                      </button>
                     )}
                   </div>
                 </div>
 
-                {/* Row Quick Action Menu (1-Click Mark as Read) */}
+                {/* Row Quick Action Menu (1-Click Mark as Read & Delete) */}
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {!item.is_read && handleMarkReadFn && (
                     <button

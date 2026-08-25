@@ -85,12 +85,9 @@ export default function ManagerNotificationsPage() {
     }
   };
 
-  const handleNotificationClick = async (notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
-    if (notification.related_url) {
-      navigate(notification.related_url);
+  const handleNavigate = (url) => {
+    if (url) {
+      navigate(url);
     }
   };
 
@@ -194,7 +191,7 @@ export default function ManagerNotificationsPage() {
             onMarkAsRead={handleMarkAsRead}
             onMarkAllRead={handleMarkAllRead}
             onDelete={handleDelete}
-            onNotificationClick={handleNotificationClick}
+            onNavigate={handleNavigate}
             isLoading={loading}
           />
         ) : (

@@ -220,7 +220,7 @@ def create_task(*, user, data, request=None):
             event_type=Notification.EventType.TASK_ASSIGNED,
             title="New task assigned",
             content=f"You have been assigned to task: {task.title}",
-            related_url=f"/manager/tasks/{task.id}",
+            related_url="/employee/my-tasks",
             channel=Notification.ChannelType.SYSTEM_ONLY,
         )
 
@@ -327,7 +327,7 @@ def update_task(*, user, task, data, request=None):
                 event_type=Notification.EventType.TASK_ASSIGNED,
                 title="Task assigned",
                 content=f"You have been assigned to task: {locked_task.title}",
-                related_url=f"/manager/tasks/{locked_task.id}",
+                related_url="/employee/my-tasks",
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
 

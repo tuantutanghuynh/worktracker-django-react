@@ -319,13 +319,16 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
             exclude_user=user,
         )
 
-        notify(
-            recipients=recipients,
-            event_type=get_event_type(from_status, to_status),
-            title=get_transition_title(from_status, to_status, locked_task),
-            content=f"Task status changed from {from_status} to {to_status}: {locked_task.title}",
-            related_url=f"/manager/tasks/{locked_task.id}",
-            channel=Notification.ChannelType.SYSTEM_ONLY,
-        )
+        for recipient in recipients:
+            is_mgr = getattr(recipient, 'role', None) and getattr(recipient.role, 'name', '').upper() == 'MANAGER'
+            target_url = "/manager/tasks/review" if is_mgr else "/employee/my-tasks"
+            notify(
+                recipients=[recipient],
+                event_type=get_event_type(from_status, to_status),
+                title=get_transition_title(from_status, to_status, locked_task),
+                content=f"Task status changed from {from_status} to {to_status}: {locked_task.title}",
+                related_url=target_url,
+                channel=Notification.ChannelType.SYSTEM_ONLY,
+            )
 
     return locked_task
