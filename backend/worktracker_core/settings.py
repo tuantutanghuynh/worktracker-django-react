@@ -156,7 +156,11 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Redis & Cache Configuration
-REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+# Mac dinh 127.0.0.1 chu KHONG phai "localhost": tren Windows, "localhost"
+# phan giai ra IPv6 (::1) truoc, ma Redis chi lang nghe tren IPv4 -> moi
+# lan ket noi phai cho timeout IPv6 ~2 giay roi moi fallback sang IPv4.
+# Dashboard goi cache 2 lan nen bi cham gan 2s du SQL chi ton 62ms.
+REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 # Dev: in email ra console thay vì gửi thật. Đổi sang SMTP khi deploy production.
