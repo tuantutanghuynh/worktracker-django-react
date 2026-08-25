@@ -20,6 +20,7 @@ const ROUTE_LABELS = {
   manager: 'Manager',
   employee: 'Employee',
   dashboard: 'Dashboard',
+  // --- Manager / Employee (giu nguyen tu main) ---
   jobs: 'Projects & Jobs',
   kanban: 'Kanban Board',
   team: 'Team Members',
@@ -29,6 +30,14 @@ const ROUTE_LABELS = {
   timelock: 'Period Lock',
   timelocks: 'Period Lock',
   reports: 'Reports & Analytics',
+  // --- Admin (bi mat khi merge, khoi phuc lai) ---
+  admin: 'Admin',
+  clients: 'Clients',
+  departments: 'Departments',
+  users: 'Users',
+  create: 'Create',
+  search: 'User List',
+  'audit-logs': 'Audit Logs',
   notifications: 'Notification Center',
   profile: 'My Profile',
   settings: 'System Settings',

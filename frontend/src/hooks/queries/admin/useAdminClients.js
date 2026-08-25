@@ -15,7 +15,7 @@ export const adminClientKeys = {
 /**
  * Fetch paginated/filtered/sorted list of clients — ClientViewSet.get_queryset()
  * handles ?search=, OrderingFilter handles ?ordering=, AdminPageNumberPagination
- * handles ?page= (15/page).
+ * handles ?page= (10/page).
  */
 export function useAdminClients(params = {}) {
   return useQuery({

@@ -10,14 +10,14 @@ export default function SortableHeader({ label, sortKey, ordering, onSort, class
   const Icon = isActive ? (isDesc ? ChevronDown : ChevronUp) : ChevronsUpDown;
 
   return (
-    <th className={`px-4 py-3 ${className}`}>
+    <th className={`px-3 py-2.5 ${className}`}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500 hover:text-slate-700"
+        className="flex w-full items-center gap-1 whitespace-nowrap text-[11px] font-semibold uppercase text-slate-500 hover:text-slate-700"
       >
-        {label}
-        <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-slate-700' : 'text-slate-400'}`} />
+        <span className="truncate">{label}</span>
+        <Icon className={`h-3 w-3 shrink-0 ${isActive ? 'text-slate-700' : 'text-slate-400'}`} />
       </button>
     </th>
   );

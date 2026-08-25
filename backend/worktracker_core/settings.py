@@ -181,7 +181,10 @@ CORS_ALLOWED_ORIGINS = [
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 # Redis & Cache Configuration
-REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+# Mac dinh 127.0.0.1 chu KHONG phai "localhost": tren Windows, "localhost"
+# phan giai ra IPv6 (::1) truoc, ma Redis chi lang nghe tren IPv4 -> moi
+# lan ket noi phai cho timeout IPv6 ~2 giay roi moi fallback sang IPv4.
+REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 
 CACHES = {

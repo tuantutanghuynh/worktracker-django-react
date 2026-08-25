@@ -19,8 +19,9 @@ import {
   ShieldCheck,
   Building2,
   UserPlus,
-  Search,
   FileText,
+  Network,
+  ScrollText,
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
@@ -78,23 +79,56 @@ const MENU_CONFIG = {
   // Cấu hình Menu dành cho ADMIN — khớp đúng 10 trang thật Minh Anh đã
   // xây (layouts/AdminLayout.jsx + router/AppRouter.jsx), thay bản nháp
   // 3 mục cũ (path còn sai, không khớp route thật nào).
+  // Cau hinh Menu ADMIN — gom 10 trang thanh 5 nhom cho de tim.
+  // Dung khoa `sections` thay `navItems`; MANAGER/EMPLOYEE giu nguyen
+  // `navItems` phang nen khong bi anh huong (xem buildSections ben duoi).
   ADMIN: {
     portalLabel: 'Admin Portal',
-    navItems: [
-      { path: '/admin', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/admin/clients', label: 'Clients', icon: Building2 },
-      { path: '/admin/jobs', label: 'Jobs', icon: Briefcase },
-      { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
-      { path: '/admin/users/search', label: 'Search Users', icon: Search },
-      { path: '/admin/departments', label: 'Departments', icon: Users },
-      { path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock },
-      { path: '/admin/audit-logs', label: 'Audit Logs', icon: FileText },
-      { path: '/admin/notifications', label: 'Notification Center', icon: Bell, hasBadge: true },
-      { path: '/admin/profile', label: 'Profile', icon: User },
+    sections: [
+      {
+        label: 'Overview',
+        items: [{ path: '/admin', label: 'Dashboard', icon: LayoutGrid }],
+      },
+      {
+        label: 'Business',
+        items: [
+          { path: '/admin/clients', label: 'Clients', icon: Building2 },
+          { path: '/admin/jobs', label: 'Jobs', icon: Briefcase },
+        ],
+      },
+      {
+        label: 'People',
+        items: [
+          { path: '/admin/users/search', label: 'User List', icon: Users },
+          { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
+          { path: '/admin/departments', label: 'Departments', icon: Network },
+        ],
+      },
+      {
+        label: 'Operations',
+        items: [{ path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock }],
+      },
+      {
+        label: 'System',
+        items: [
+          { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
+          { path: '/admin/notifications', label: 'Notification Center', icon: Bell, hasBadge: true },
+          { path: '/admin/profile', label: 'Profile', icon: User },
+        ],
+      },
     ],
     showRecentJobs: false,
   },
 };
+
+// Chuan hoa cau hinh menu ve chung mot dang de renderer chi phai xu ly
+// mot kieu du lieu. Role nao khai bao `sections` thi dung nguyen; role nao
+// con dung `navItems` phang (MANAGER, EMPLOYEE) duoc boc thanh dung mot
+// nhom khong co tieu de -> giao dien cua ho khong doi mot pixel nao.
+function buildSections(config) {
+  if (Array.isArray(config.sections)) return config.sections;
+  return [{ label: null, items: config.navItems || [] }];
+}
 
 export default function Sidebar() {
   const location = useLocation();
@@ -119,7 +153,10 @@ export default function Sidebar() {
   const { data: jobResponse } = useManagerJobs({ page_size: 5 }, { enabled: currentConfig.showRecentJobs });
 
   // 🚀 REACT QUERY: Lấy số lượng Task đang chờ duyệt QA để hiển thị badge
-  const { data: reviewingTasks } = useManagerTasks(userRole === 'MANAGER' ? { status: 'REVIEWING' } : {});
+  const isManager = userRole === 'MANAGER';
+  // Truyen params khac nhau theo role KHONG ngan duoc query chay — React Query
+  // van goi API voi params rong. Phai dung `enabled` moi that su tat.
+  const { data: reviewingTasks } = useManagerTasks({ status: 'REVIEWING' }, { enabled: isManager });
   const pendingQACount = useMemo(() => {
     if (!reviewingTasks) return 0;
     if (Array.isArray(reviewingTasks)) return reviewingTasks.length;
@@ -129,7 +166,8 @@ export default function Sidebar() {
 
   // 🚀 REACT QUERY: Lấy số lượng Daily Timesheets đang chờ duyệt (PENDING) để hiển thị badge Timesheets
   const { data: pendingLogWorksData } = useLogWorks(
-    userRole === 'MANAGER' ? { review_status: 'PENDING', page_size: 200 } : {}
+    { review_status: 'PENDING', page_size: 200 },
+    { enabled: isManager }
   );
   const pendingTimesheetCount = useMemo(() => {
     if (!pendingLogWorksData) return 0;
@@ -232,7 +270,15 @@ export default function Sidebar() {
             </p>
           )}
 
-          {currentConfig.navItems.map((item) => {
+          {buildSections(currentConfig).map((section, sectionIdx) => (
+            <div key={section.label || `group-${sectionIdx}`} className={section.label ? 'pt-1.5 first:pt-0' : ''}>
+              {/* Tieu de nhom: chi ve khi co label (tuc la role dung `sections`) */}
+              {section.label && !isSidebarCollapsed && (
+                <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-wider px-3 mb-0.5">
+                  {section.label}
+                </p>
+              )}
+              {section.items.map((item) => {
             const Icon = item.icon;
             const isActive =
               location.pathname === item.path ||
@@ -276,8 +322,10 @@ export default function Sidebar() {
                   )}
                 </NavLink>
               </React.Fragment>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
         </div>
 
         {/* RECENTLY VIEWED JOBS (KẾT NỐI ZUSTAND PERSIST + REACT QUERY REAL DATA) */}
