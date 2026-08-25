@@ -41,11 +41,11 @@ const ROUTE_LABELS = {
 // theo role hiện tại.
 const ROLE_LINKS = {
   ADMIN: { home: '/admin', notifications: '/admin/notifications', profile: '/admin/profile', settings: '/admin/profile' },
-  MANAGER: { home: '/manager/dashboard', notifications: '/manager/notifications', profile: '/manager/profile', settings: '/manager/settings' },
+  MANAGER: { home: '/manager/dashboard', notifications: '/manager/notifications', profile: '/manager/profile', settings: '/manager/audit-logs' },
   EMPLOYEE: { home: '/', notifications: '/employee/notifications', profile: '/employee/profile', settings: '/employee/profile' },
 };
 
-export default function Header({ onOpenSearchModal }) {
+export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toggleSidebar } = useUIStore();
@@ -138,21 +138,8 @@ export default function Header({ onOpenSearchModal }) {
         </nav>
       </div>
 
-      {/* Bên Phải: Nút Tìm kiếm, Chuông thông báo & Avatar User */}
+      {/* Bên Phải: Chuông thông báo & Avatar User */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Nút Mở Modal Tìm kiếm Quick Search (Ctrl + K) */}
-        <button
-          onClick={onOpenSearchModal}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 transition-colors"
-          title="Quick Search (Ctrl + K)"
-        >
-          <Search className="w-4 h-4 text-slate-400" />
-          <span className="hidden md:inline font-medium">Search jobs, tasks...</span>
-          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 rounded shadow-2xs">
-            Ctrl K
-          </kbd>
-        </button>
-
         {/* Biểu tượng Chuông Thông báo */}
         <Link
           to={notificationsPath}

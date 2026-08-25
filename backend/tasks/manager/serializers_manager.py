@@ -117,6 +117,14 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
 
         return value
 
+    def validate_deadline(self, value):
+        today = timezone.localdate()
+        if value < today:
+            raise serializers.ValidationError(
+                f"Task deadline cannot be in the past (must be on or after {today})."
+            )
+        return value
+
     def validate_assignee_id(self, value):
         from django.contrib.auth import get_user_model
         User = get_user_model()

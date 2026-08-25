@@ -27,18 +27,13 @@ import { toast } from 'sonner';
 
 import DataTable from '../../components/common/table/DataTable';
 import PaginationBar from '../../components/common/table/PaginationBar';
-import BaseModal from '../../components/common/modal/BaseModal';
 import SideDrawer from '../../components/common/drawer/SideDrawer';
 import StatusBadge from '../../components/common/badges/StatusBadge';
 import PriorityBadge from '../../components/common/badges/PriorityBadge';
 import UserAvatar from '../../components/common/avatar/UserAvatar';
 import { cn } from '../../utils/cn';
 
-import {
-  useManagerEmployees,
-  useManagerDepartments,
-  useAssignDepartment,
-} from '../../hooks/queries/manager/useManagerTeam';
+import { useManagerEmployees } from '../../hooks/queries/manager/useManagerTeam';
 import { useManagerTasks } from '../../hooks/queries/manager/useManagerTasks';
 
 export default function ManagerTeamPage() {
@@ -51,10 +46,8 @@ export default function ManagerTeamPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Detail Drawer & Modal States
+  // Detail Drawer State
   const [selectedMember, setSelectedMember] = useState(null);
-  const [assignModalTarget, setAssignModalTarget] = useState(null);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -63,23 +56,6 @@ export default function ManagerTeamPage() {
 
   // 🚀 TANSTACK REACT QUERY HOOKS
   const { data: employeesResponse, isLoading, isFetching, refetch } = useManagerEmployees();
-  const { data: departmentsData, isLoading: isDeptsLoading } = useManagerDepartments();
-  const assignDepartmentMutation = useAssignDepartment();
-
-  // Danh sách phòng ban cho Dropdown
-  const departmentOptions = useMemo(() => {
-    const rawDepts = Array.isArray(departmentsData)
-      ? departmentsData
-      : departmentsData?.results || [];
-
-    return [
-      { value: '', label: '-- No Department (General Staff) --' },
-      ...rawDepts.map((d) => ({
-        value: String(d.id),
-        label: d.name,
-      })),
-    ];
-  }, [departmentsData]);
 
   // Chuẩn hóa danh sách nhân sự
   const employeesList = useMemo(() => {
@@ -160,25 +136,6 @@ export default function ManagerTeamPage() {
 
     return { total, overloaded, balanced, available };
   }, [employeesList]);
-
-  // Xử lý Phân bổ Phòng Ban
-  const handleAssignSubmit = (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!assignModalTarget) return;
-
-    assignDepartmentMutation.mutate(
-      {
-        userId: assignModalTarget.user_id || assignModalTarget.id,
-        departmentId: selectedDepartmentId ? Number(selectedDepartmentId) : null,
-      },
-      {
-        onSuccess: () => {
-          setAssignModalTarget(null);
-          setSelectedDepartmentId('');
-        },
-      }
-    );
-  };
 
   // Cấu hình Cột DataTable (cho Table View)
   const columns = [
@@ -273,14 +230,11 @@ export default function ManagerTeamPage() {
       cell: (row) => (
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => {
-              setAssignModalTarget(row);
-              setSelectedDepartmentId(row.departmentId || '');
-            }}
+            onClick={() => setSelectedMember(row)}
             className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-            title="Assign Department"
+            title="View Member Details"
           >
-            <Edit className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       ),
@@ -452,18 +406,6 @@ export default function ManagerTeamPage() {
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAssignModalTarget(emp);
-                      setSelectedDepartmentId(emp.departmentId || '');
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer shrink-0"
-                    title="Assign Department"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                  </button>
                 </div>
 
                 {/* Workload Progress Bar */}
@@ -560,68 +502,7 @@ export default function ManagerTeamPage() {
         key={selectedMember?.id ?? selectedMember?.user_id ?? 'none-member'}
         member={selectedMember}
         onClose={() => setSelectedMember(null)}
-        onOpenAssignDept={(m) => {
-          setSelectedMember(null);
-          setAssignModalTarget(m);
-          setSelectedDepartmentId(m.departmentId || '');
-        }}
       />
-
-      {/* ============================================================
-          MODAL: PHÂN BỔ / GÁN PHÒNG BAN CHO NHÂN SỰ
-         ============================================================ */}
-      <BaseModal
-        isOpen={Boolean(assignModalTarget)}
-        onClose={() => setAssignModalTarget(null)}
-        title="Assign Department"
-        description="Update department assignment for employee"
-        maxWidth="max-w-md"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setAssignModalTarget(null)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleAssignSubmit}
-              disabled={assignDepartmentMutation.isPending}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 cursor-pointer disabled:opacity-50"
-            >
-              {assignDepartmentMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={handleAssignSubmit} className="space-y-4">
-          <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1">
-            <p>
-              Employee: <strong>{assignModalTarget?.full_name || assignModalTarget?.email}</strong>
-            </p>
-            <p>
-              Email: <strong>{assignModalTarget?.email}</strong>
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">Assigned Department</label>
-            <select
-              value={selectedDepartmentId}
-              onChange={(e) => setSelectedDepartmentId(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-semibold text-slate-800 rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none transition cursor-pointer"
-            >
-              {departmentOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </form>
-      </BaseModal>
     </div>
   );
 }
@@ -629,7 +510,7 @@ export default function ManagerTeamPage() {
 /**
  * Ngăn kéo xem Hồ sơ Chi tiết & Danh sách Task đang làm của Member
  */
-function MemberDetailDrawer({ member, onClose, onOpenAssignDept }) {
+function MemberDetailDrawer({ member, onClose }) {
   const navigate = useNavigate();
   const targetUserId = member?.id || member?.user_id;
 
@@ -700,7 +581,7 @@ function MemberDetailDrawer({ member, onClose, onOpenAssignDept }) {
         </div>
 
         {/* ⚡ Quick Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center">
           <button
             type="button"
             onClick={() => {
@@ -710,18 +591,10 @@ function MemberDetailDrawer({ member, onClose, onOpenAssignDept }) {
                 navigate('/manager/chat');
               }
             }}
-            className="flex-1 py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+            className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
           >
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Message Employee</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenAssignDept(member)}
-            className="flex-1 py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
-          >
-            <Edit className="w-3.5 h-3.5 text-slate-500" />
-            <span>Assign Department</span>
           </button>
         </div>
 

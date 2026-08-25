@@ -178,6 +178,16 @@ export default function ManagerJobDetailPage() {
       return;
     }
 
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (taskFormData.deadline && taskFormData.deadline < todayStr) {
+      toast.error('Task deadline cannot be in the past.');
+      return;
+    }
+    if (taskFormData.deadline && job?.deadline && taskFormData.deadline > job.deadline) {
+      toast.error(`Task deadline cannot exceed project deadline (${formatDateSafe(job.deadline)}).`);
+      return;
+    }
+
     const payload = {
       title: taskFormData.title.trim(),
       description: taskFormData.description.trim() || undefined,
@@ -933,6 +943,8 @@ const ALLOWED_TRANSITIONS = {
             <InputField
               label="Deadline"
               type="date"
+              min={format(new Date(), 'yyyy-MM-dd')}
+              max={job?.deadline || undefined}
               value={taskFormData.deadline}
               onChange={(e) => setTaskFormData({ ...taskFormData, deadline: e.target.value })}
             />

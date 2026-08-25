@@ -9,10 +9,10 @@ from rest_framework.views import APIView
 
 from accounts.models import CustomUser, Department, EmployeeProfile
 from accounts.manager.serializers_manager import (
-    ManagerDepartmentAssignSerializer,
     ManagerDepartmentMiniSerializer,
     ManagerEmployeeListSerializer,
 )
+from tasks.models import Task
 from system.security.permissions_manager import (
     IsActiveAuthenticated,
     IsManagerRole,
@@ -73,7 +73,13 @@ class ManagerTeamEmployeeListView(ListAPIView):
             .annotate(
                 active_tasks_count=Count(
                     "assigned_tasks",
-                    filter=~Q(assigned_tasks__status="DONE"),
+                    filter=Q(
+                        assigned_tasks__status__in=[
+                            Task.Status.TODO,
+                            Task.Status.IN_PROGRESS,
+                            Task.Status.REVIEWING,
+                        ]
+                    ),
                     distinct=True,
                 )
             )
@@ -142,72 +148,3 @@ class ManagerTeamEmployeeListView(ListAPIView):
             queryset, many=True, context=serializer_context
         )
         return Response({"summary": summary_header, "results": serializer.data})
-
-
-class ManagerEmployeeDepartmentUpdateView(APIView):
-    """
-    PATCH /api/manager/accounts/employees/{user_id}/department/
-
-    Đổi phòng ban (department) cho một nhân viên.
-    Không sửa accounts/models.py — chỉ cập nhật employee_profiles.department_id.
-
-    Body:
-        {
-            "department_id": 3   // null để xóa khỏi phòng ban
-        }
-
-    Ghi Audit Log sau mỗi lần đổi phòng ban.
-    """
-
-    permission_classes = [
-        IsActiveAuthenticated,
-        IsManagerRole,
-        HasPermissionCode,
-    ]
-    required_permission = "team:assign_department"
-
-    def patch(self, request, user_id):
-        # Tìm nhân viên — chỉ cho phép sửa EMPLOYEE, không sửa MANAGER/ADMIN
-        try:
-            profile = EmployeeProfile.objects.select_related("user", "department").get(
-                user_id=user_id, user__role__code="EMPLOYEE"
-            )
-        except EmployeeProfile.DoesNotExist:
-            raise NotFound(f"Không tìm thấy nhân viên với ID={user_id}.")
-
-        serializer = ManagerDepartmentAssignSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        new_department_id = serializer.validated_data["department_id"]
-
-        # Lưu snapshot trước khi sửa
-        old_values = {
-            "department_id": profile.department_id,
-            "department_name": profile.department.name if profile.department else None,
-        }
-
-        profile.department_id = new_department_id
-        profile.save(update_fields=["department_id", "updated_at"])
-
-        new_values = {
-            "department_id": new_department_id,
-        }
-
-        log_action(
-            user=request.user,
-            action="ASSIGN_DEPARTMENT",
-            table_name="employee_profiles",
-            record_id=user_id,
-            old_values=old_values,
-            new_values=new_values,
-            request=request,
-        )
-
-        return Response(
-            {
-                "user_id": user_id,
-                "department_id": new_department_id,
-                "message": "Cập nhật phòng ban thành công.",
-            },
-            status=status.HTTP_200_OK,
-        )

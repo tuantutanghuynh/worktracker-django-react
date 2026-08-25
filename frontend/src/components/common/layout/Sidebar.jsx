@@ -54,9 +54,9 @@ const MENU_CONFIG = {
       { path: '/manager/team', label: 'Team Members', icon: Users, hasDividerTop: true },
       { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
 
-      // Nhóm 4: Báo cáo & Cài đặt
+      // Nhóm 4: Báo cáo & Kiểm toán
       { path: '/manager/reports', label: 'Reports', icon: BarChart3, hasDividerTop: true },
-      { path: '/manager/settings', label: 'Settings', icon: Settings },
+      { path: '/manager/audit-logs', label: 'Audit Logs', icon: FileText },
     ],
     showRecentJobs: true,
   },

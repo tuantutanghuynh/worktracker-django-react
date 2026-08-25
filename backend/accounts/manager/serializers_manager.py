@@ -64,29 +64,3 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
 
     def get_workload_status(self, obj):
         return self._get_workload_info(obj).get("workload_status", "Normal")
-
-
-# ============================================================
-# Serializer để đổi phòng ban (P3.6)
-# Chỉ nhận department_id — không được sửa accounts/models.py
-# ============================================================
-class ManagerDepartmentAssignSerializer(serializers.Serializer):
-    """
-    Nhận department_id để gán/đổi phòng ban cho nhân viên.
-    Truyền null để bỏ phòng ban.
-    """
-    department_id = serializers.IntegerField(
-        allow_null=True,
-        help_text="ID của phòng ban muốn gán. Null để bỏ phòng ban.",
-    )
-
-    def validate_department_id(self, value):
-        if value is None:
-            return None
-
-        if not Department.objects.filter(pk=value).exists():
-            raise serializers.ValidationError(
-                f"Department với ID={value} không tồn tại."
-            )
-
-        return value

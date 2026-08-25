@@ -290,6 +290,11 @@ export default function ManagerJobsPage() {
         toast.error('Please set a deadline.');
         return;
       }
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      if (formData.deadline && formData.deadline < todayStr) {
+        toast.error('Deadline cannot be in the past.');
+        return;
+      }
       if (formData.start_date && formData.deadline && formData.deadline < formData.start_date) {
         toast.error('Deadline cannot be earlier than start date.');
         return;
@@ -855,6 +860,7 @@ const ALLOWED_TRANSITIONS = {
             <InputField
               label="Deadline Date *"
               type="date"
+              min={drawerMode === 'create' ? format(new Date(), 'yyyy-MM-dd') : undefined}
               value={formData.deadline}
               onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
               required

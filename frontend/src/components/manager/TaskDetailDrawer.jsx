@@ -196,6 +196,11 @@ export default function TaskDetailDrawer() {
       return;
     }
 
+    if (editFormData.deadline && task?.job?.deadline && editFormData.deadline > task.job.deadline) {
+      toast.error(`Task deadline cannot exceed project deadline (${formatDateSafe(task.job.deadline)}).`);
+      return;
+    }
+
     const payload = {
       title: editFormData.title.trim(),
       description: editFormData.description.trim() || '',
@@ -642,6 +647,7 @@ export default function TaskDetailDrawer() {
                   <InputField
                     label="Deadline"
                     type="date"
+                    max={task?.job?.deadline || undefined}
                     value={editFormData.deadline}
                     onChange={(e) => setEditFormData({ ...editFormData, deadline: e.target.value })}
                   />

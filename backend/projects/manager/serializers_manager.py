@@ -153,6 +153,12 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
 
         start_date = attrs.get("start_date")
         deadline = attrs.get("deadline")
+        today = timezone.localdate()
+
+        if deadline and deadline < today:
+            raise serializers.ValidationError(
+                {"deadline": f"Job deadline cannot be in the past (must be on or after {today})."}
+            )
 
         if start_date and deadline and deadline < start_date:
             raise serializers.ValidationError(

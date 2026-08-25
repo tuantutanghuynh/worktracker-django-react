@@ -32,7 +32,7 @@ const ManagerReportsPage = lazy(() => import("../pages/manager/ManagerReportsPag
 const ManagerNotificationsPage = lazy(() => import("../pages/manager/ManagerNotificationsPage"))
 const ManagerChatPage = lazy(() => import("../pages/manager/ManagerChatPage"))
 const ManagerProfilePage = lazy(() => import("../pages/manager/ManagerProfilePage"))
-const ManagerSettingsPage = lazy(() => import("../pages/manager/ManagerSettingsPage"))
+const ManagerAuditLogsPage = lazy(() => import("../pages/manager/ManagerAuditLogsPage"))
 
 // Admin (Minh Anh) — lazy load
 import AdminLayout from "../layouts/AdminLayout"
@@ -116,7 +116,7 @@ export function AppRouter() {
                                 <Route path="chat" element={<ManagerChatPage />} />
                                 <Route path="notifications" element={<ManagerNotificationsPage />} />
                                 <Route path="profile" element={<ManagerProfilePage />} />
-                                <Route path="settings" element={<ManagerSettingsPage />} />
+                                <Route path="audit-logs" element={<ManagerAuditLogsPage />} />
                             </Route>
                         </Route>
 

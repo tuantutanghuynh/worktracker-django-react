@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
 
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
@@ -68,11 +69,22 @@ def get_active_employee_or_error(user_id):
     return user
 
 
-def validate_task_deadline(job, deadline):
-    if deadline and deadline > job.deadline:
+def validate_task_deadline(job, deadline, is_create=False):
+    if not deadline:
+        return
+
+    today = timezone.localdate()
+    if is_create and deadline < today:
         raise ValidationError(
             {
-                "deadline": "Task deadline must not exceed job deadline."
+                "deadline": f"Task deadline cannot be in the past (must be on or after {today})."
+            }
+        )
+
+    if job and job.deadline and deadline > job.deadline:
+        raise ValidationError(
+            {
+                "deadline": f"Task deadline cannot exceed project deadline ({job.deadline})."
             }
         )
 
@@ -163,7 +175,7 @@ def create_task(*, user, data, request=None):
         if job.status not in JOB_STATUS_ALLOW_CREATE:
             raise BusinessRuleError("JOB_STATUS_DOES_NOT_ALLOW_TASK_CREATE")
 
-        validate_task_deadline(job, deadline)
+        validate_task_deadline(job, deadline, is_create=True)
 
         assignee = get_active_employee_or_error(assignee_id)
 

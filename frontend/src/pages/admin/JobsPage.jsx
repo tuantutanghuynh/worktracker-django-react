@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Plus, Search, Pencil, Ban } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
@@ -62,6 +63,10 @@ const jobSchema = z
     description: z.string().optional(),
     start_date: z.string().min(1, 'Start date is required'),
     deadline: z.string().min(1, 'Deadline is required'),
+  })
+  .refine((data) => data.deadline >= format(new Date(), 'yyyy-MM-dd'), {
+    message: 'Deadline cannot be in the past',
+    path: ['deadline'],
   })
   .refine((data) => data.deadline >= data.start_date, {
     message: 'Deadline must be on or after start date',
@@ -425,7 +430,7 @@ export function JobsPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <InputField label="Start Date" type="date" error={errors.start_date?.message} {...register('start_date')} />
-            <InputField label="Deadline" type="date" error={errors.deadline?.message} {...register('deadline')} />
+            <InputField label="Deadline" type="date" min={format(new Date(), 'yyyy-MM-dd')} error={errors.deadline?.message} {...register('deadline')} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
