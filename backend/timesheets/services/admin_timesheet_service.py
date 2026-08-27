@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db.models import Count, Q, Sum, Max
+from django.utils import timezone
 
 from accounts.models import CustomUser
 from timesheets.models import DailyUserTimesheet, LogWork, TimeLock
@@ -27,6 +28,22 @@ def get_month_range(month, year):
 
 def _daily_working_hours():
     return getattr(settings, "DAILY_WORKING_HOURS", 8)
+
+
+def get_elapsed_working_days(start_date, end_date):
+    """
+    Số ngày làm việc đã THỰC SỰ trôi qua tính tới hôm nay.
+
+    Khi đang xem tháng hiện tại, không được so với cả tháng: ngày mai và
+    những ngày còn lại chưa tới thì chưa thể coi là "chưa chấm công". Nếu
+    lấy cả tháng thì giữa tháng ai cũng bị tính thiếu vài ngày và luôn hiện
+    MISSING dù đã log đầy đủ. Với tháng đã qua thì mốc vẫn là cuối tháng.
+    """
+    today = timezone.now().date()
+    if today < start_date:
+        return 0  # tháng ở tương lai — chưa có ngày nào phải chấm công
+    effective_end = min(end_date, today)
+    return calculate_working_days(start_date, effective_end)
 
 
 def get_admin_timesheet_summary(month, year):
@@ -64,7 +81,9 @@ def get_admin_timesheet_summary(month, year):
         total_hours__gt=daily_hours,
     ).count()
 
-    working_days = calculate_working_days(start_date, end_date)
+    # So với số ngày làm việc ĐÃ TRÔI QUA, không phải cả tháng — xem
+    # get_elapsed_working_days().
+    elapsed_working_days = get_elapsed_working_days(start_date, end_date)
     logged_days_by_user = dict(
         DailyUserTimesheet.objects.filter(
             user_id__in=employee_ids,
@@ -76,7 +95,7 @@ def get_admin_timesheet_summary(month, year):
         .values_list("user_id", "days")
     )
     missing_timesheets = sum(
-        max(working_days - logged_days_by_user.get(uid, 0), 0) for uid in employee_ids
+        max(elapsed_working_days - logged_days_by_user.get(uid, 0), 0) for uid in employee_ids
     )
 
     return {
@@ -101,8 +120,15 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
     """
     start_date, end_date = get_month_range(month, year)
     daily_hours = _daily_working_hours()
+
+    # working_days = cả tháng, dùng làm MỤC TIÊU của tháng (target_hours,
+    # thanh tiến độ). elapsed = phần đã trôi qua, dùng để đánh giá nhân viên
+    # có đang theo kịp hay không — mọi so sánh "thiếu / ít giờ" phải dựa vào
+    # mốc này, nếu không thì giữa tháng ai cũng bị coi là thiếu.
     working_days = calculate_working_days(start_date, end_date)
     target_hours = working_days * daily_hours
+    elapsed_working_days = get_elapsed_working_days(start_date, end_date)
+    expected_hours_to_date = elapsed_working_days * daily_hours
 
     employees = CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True).select_related(
         "profile", "profile__department"
@@ -124,6 +150,19 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
         .annotate(total=Sum("hours_spent"))
         .values_list("user_id", "total")
     )
+    # Giờ tính TỚI HÔM NAY — dùng riêng cho avg_per_day. Không được lấy
+    # month_hours (cả tháng) chia cho elapsed_working_days (chỉ phần đã qua):
+    # backend không chặn log ngày tương lai, nên nếu ai đó log trước cho
+    # cuối tháng thì tử số có mà mẫu số chưa có, avg vọt lên vô lý
+    # (vd 208h / 20 ngày = 10.4h/ngày dù thực tế chỉ làm 8h/ngày).
+    elapsed_end = min(end_date, timezone.now().date())
+    hours_to_date_by_user = dict(
+        LogWork.objects.filter(user_id__in=employee_ids, work_date__range=(start_date, elapsed_end))
+        .exclude(review_status=LogWork.ReviewStatus.VOIDED)
+        .values("user_id")
+        .annotate(total=Sum("hours_spent"))
+        .values_list("user_id", "total")
+    ) if elapsed_end >= start_date else {}
     last_entry_by_user = dict(
         LogWork.objects.filter(user_id__in=employee_ids, work_date__range=(start_date, end_date))
         .exclude(review_status=LogWork.ReviewStatus.VOIDED)
@@ -151,14 +190,15 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
     results = []
     for emp in employees:
         logged_hours = decimal_to_float(hours_by_user.get(emp.id))
+        logged_hours_to_date = decimal_to_float(hours_to_date_by_user.get(emp.id))
         violations = violations_by_user.get(emp.id, 0)
-        missing_days = max(working_days - logged_days_by_user.get(emp.id, 0), 0)
+        missing_days = max(elapsed_working_days - logged_days_by_user.get(emp.id, 0), 0)
 
         if violations > 0:
             status = "OVER_LIMIT"
         elif missing_days > 0:
             status = "MISSING"
-        elif target_hours > 0 and logged_hours < target_hours * 0.8:
+        elif expected_hours_to_date > 0 and logged_hours < expected_hours_to_date * 0.8:
             status = "WARNING"
         else:
             status = "NORMAL"
@@ -173,7 +213,13 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
                 "department_name": profile.department.name if (profile and profile.department) else None,
                 "month_hours": round(logged_hours, 2),
                 "target_hours": float(target_hours),
-                "avg_per_day": round(logged_hours / working_days, 2) if working_days else 0.0,
+                # Giờ-tới-hôm-nay chia cho ngày-làm-việc-tới-hôm-nay: cùng
+                # một khoảng thời gian ở cả tử và mẫu.
+                "avg_per_day": (
+                    round(logged_hours_to_date / elapsed_working_days, 2)
+                    if elapsed_working_days
+                    else 0.0
+                ),
                 "violations": violations,
                 "missing_days": missing_days,
                 "status": status,
@@ -191,12 +237,24 @@ def get_admin_employee_timesheet_detail(user_id, month, year):
     start_date, end_date = get_month_range(month, year)
     daily_hours = _daily_working_hours()
     working_days = calculate_working_days(start_date, end_date)
+    elapsed_working_days = get_elapsed_working_days(start_date, end_date)
 
     logs_in_range = LogWork.objects.filter(user_id=user_id, work_date__range=(start_date, end_date)).exclude(
         review_status=LogWork.ReviewStatus.VOIDED
     )
     month_hours = decimal_to_float(logs_in_range.aggregate(total=Sum("hours_spent"))["total"])
     edited_records = logs_in_range.filter(adjusted_by__isnull=False).count()
+
+    # Cùng lý do với hàm danh sách: avg phải lấy giờ-tới-hôm-nay chia
+    # ngày-làm-việc-tới-hôm-nay, không trộn cả tháng với phần đã qua.
+    elapsed_end = min(end_date, timezone.now().date())
+    hours_to_date = (
+        decimal_to_float(
+            logs_in_range.filter(work_date__lte=elapsed_end).aggregate(total=Sum("hours_spent"))["total"]
+        )
+        if elapsed_end >= start_date
+        else 0.0
+    )
 
     daily_over_limit = DailyUserTimesheet.objects.filter(
         user_id=user_id, work_date__range=(start_date, end_date), total_hours__gt=daily_hours
@@ -208,7 +266,7 @@ def get_admin_employee_timesheet_detail(user_id, month, year):
     logged_days = DailyUserTimesheet.objects.filter(
         user_id=user_id, work_date__range=(start_date, end_date), total_hours__gt=0
     ).count()
-    missing_days = max(working_days - logged_days, 0)
+    missing_days = max(elapsed_working_days - logged_days, 0)
 
     # GLOBAL lock covering this period, if any — this page's Lock/Unlock
     # button only ever creates/toggles GLOBAL scope locks (see
@@ -225,7 +283,10 @@ def get_admin_employee_timesheet_detail(user_id, month, year):
     return {
         "month_hours": round(month_hours, 2),
         "working_days": working_days,
-        "avg_per_day": round(month_hours / working_days, 2) if working_days else 0.0,
+        "elapsed_working_days": elapsed_working_days,
+        "avg_per_day": (
+            round(hours_to_date / elapsed_working_days, 2) if elapsed_working_days else 0.0
+        ),
         "edited_records": edited_records,
         "daily_over_limit_count": daily_over_limit,
         "daily_hard_limit_count": daily_hard_limit,

@@ -17,9 +17,10 @@ import {
   useAdminAuditLogSummary,
 } from '../../hooks/queries/admin/useAdminAuditLogs';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
+import { getActionLabel, summarizeLog } from '../../utils/auditLabels';
 
-const PAGE_SIZE = 15;
-const EMPTY_FILTERS = { actor: '', action: '', table_name: '', severity: '', date_from: '', date_to: '' };
+const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
+const EMPTY_FILTERS = { actor: '', action: '', severity: '', date_from: '', date_to: '' };
 const ROLE_TABS = [
   { value: 'ADMIN', label: 'Admin' },
   { value: 'MANAGER', label: 'Manager' },
@@ -31,58 +32,6 @@ const SEVERITY_OPTIONS = [
   { value: 'NORMAL', label: 'Normal' },
 ];
 
-// table_name is the physical DB table (see AuditLog.table_name docstring) —
-// this is purely a display label, matching the "Module" column in the
-// admin audit log design (docs/UI-UX/ADMIN/preview_admin_audit_logs.html
-// on origin/LongNguyen).
-const MODULE_LABELS = {
-  users: 'Users',
-  departments: 'Departments',
-  employee_profiles: 'Employee Profiles',
-  roles: 'Roles',
-  role_permissions: 'Role Permissions',
-  clients: 'Clients',
-  jobs: 'Jobs',
-  tasks: 'Tasks',
-  timesheets: 'Timesheets',
-  time_locks: 'Timesheet Locks',
-  reports: 'Reports',
-};
-
-// Builds a plain-English sentence from the raw action/table_name/record_id
-// — the AuditLog.summary column exists on the model but log_audit_event()
-// (shared across 3 branches, system/utils.py) never populates it, so this
-// derives an equivalent readable line purely from fields that ARE always
-// present, without touching the ~20 call sites across the whole app.
-function summarizeLog(log) {
-  const moduleLabel = MODULE_LABELS[log.table_name] || log.table_name;
-  switch (log.action) {
-    case 'CREATE':
-      return `Created a new ${moduleLabel} record`;
-    case 'UPDATE':
-      return `Updated ${moduleLabel} record #${log.record_id}`;
-    case 'DELETE':
-      return `Deleted ${moduleLabel} record #${log.record_id}`;
-    case 'LOCK_ACCOUNT':
-      return `Locked user account #${log.record_id}`;
-    case 'UNLOCK_ACCOUNT':
-      return `Unlocked user account #${log.record_id}`;
-    case 'ROLE_CHANGED':
-      return `Changed role for user account #${log.record_id}`;
-    case 'RESET_PASSWORD':
-      return `Reset password for user account #${log.record_id}`;
-    case 'ASSIGN_ROLE':
-      return `Updated permissions for role #${log.record_id}`;
-    case 'EXPORT':
-      return 'Exported a system report';
-    case 'LOCK_TIMESHEET':
-      return `Locked timesheet period #${log.record_id}`;
-    case 'UNLOCK_TIMESHEET':
-      return `Unlocked timesheet period #${log.record_id}`;
-    default:
-      return `${log.action} on ${moduleLabel} #${log.record_id}`;
-  }
-}
 
 // Admin page for read-only audit trail browsing. AuditLogViewSet is a
 // ReadOnlyModelViewSet on the backend — no create/update/delete here by
@@ -121,12 +70,11 @@ export function AuditLogsPage() {
   // OrderingFilter handles ?ordering= (default stays -created_at when none
   // is chosen, set via AuditLogViewSet.get_queryset()'s own .order_by()),
   // actor_role scopes the whole tab to that role's actions, and
-  // AdminPageNumberPagination handles ?page= (15/page).
+  // AdminPageNumberPagination handles ?page= (10/page).
   const { data, isLoading } = useAdminAuditLogs({
     actor_role: roleTab,
     actor: filters.actor || undefined,
     action: filters.action || undefined,
-    table_name: filters.table_name || undefined,
     severity: filters.severity || undefined,
     date_from: filters.date_from || undefined,
     date_to: filters.date_to || undefined,
@@ -145,7 +93,7 @@ export function AuditLogsPage() {
   // used for the manager lookups on DepartmentsPage/JobsPage. Also doubles
   // as the options source for the Actor filter dropdown, scoped to the
   // currently selected role tab. page_size=500 opts out of the default
-  // 15/page — needs every user, not a page of them.
+  // 10/page — needs every user, not a page of them.
   const { data: usersPage } = useAdminUsers({ page_size: 500 });
   const users = usersPage?.results || [];
   const userById = Object.fromEntries(users.map((u) => [u.id, u]));
@@ -157,10 +105,9 @@ export function AuditLogsPage() {
   // AuditLogViewSet.filter_options), not hardcoded, so it never drifts out
   // of sync as new action types get added elsewhere in the app.
   const { data: filterOptions } = useAdminAuditLogFilterOptions();
-  const actionOptions = (filterOptions?.actions || []).map((a) => ({ value: a, label: a }));
-  const tableOptions = (filterOptions?.tables || []).map((t) => ({
-    value: t,
-    label: MODULE_LABELS[t] || t,
+  const actionOptions = (filterOptions?.actions || []).map((a) => ({
+    value: a,
+    label: getActionLabel(a),
   }));
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -195,7 +142,6 @@ export function AuditLogsPage() {
               actor_role: roleTab,
               actor: filters.actor || undefined,
               action: filters.action || undefined,
-              table_name: filters.table_name || undefined,
               severity: filters.severity || undefined,
               date_from: filters.date_from || undefined,
               date_to: filters.date_to || undefined,
@@ -245,20 +191,13 @@ export function AuditLogsPage() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <SelectDropdown
             label="Action"
             placeholder="All actions"
             options={actionOptions}
             value={filters.action}
             onChange={(val) => setFilter('action', val)}
-          />
-          <SelectDropdown
-            label="Module"
-            placeholder="All modules"
-            options={tableOptions}
-            value={filters.table_name}
-            onChange={(val) => setFilter('table_name', val)}
           />
           <SelectDropdown
             label="Severity"
@@ -303,30 +242,31 @@ export function AuditLogsPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-sm">
+      {/* table-fixed + width theo % nên bảng luôn vừa khung; cột Actor rộng
+          hơn để email dài hiện đủ, không bị cắt "...". */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Time" sortKey="created_at" ordering={ordering} onSort={handleSort} className="w-24" />
-              <SortableHeader label="Actor" sortKey="user__email" ordering={ordering} onSort={handleSort} className="w-40" />
-              <SortableHeader label="Action" sortKey="action" ordering={ordering} onSort={handleSort} className="w-36" />
-              <SortableHeader label="Module" sortKey="table_name" ordering={ordering} onSort={handleSort} className="w-28" />
-              <th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Summary</th>
-              <SortableHeader label="Severity" sortKey="severity" ordering={ordering} onSort={handleSort} className="w-24" />
-              <th className="w-10 px-4 py-3" />
+              <SortableHeader label="Time" sortKey="created_at" ordering={ordering} onSort={handleSort} className="w-[10%]" />
+              <SortableHeader label="Actor" sortKey="user__email" ordering={ordering} onSort={handleSort} className="w-[26%]" />
+              <SortableHeader label="Action" sortKey="action" ordering={ordering} onSort={handleSort} className="w-[18%]" />
+              <th className="px-3 py-2.5 text-[11px] font-semibold uppercase text-slate-500">Summary</th>
+              <SortableHeader label="Severity" sortKey="severity" ordering={ordering} onSort={handleSort} className="w-[12%]" />
+              <th className="w-8 px-2 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && logs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
                   No audit logs found.
                 </td>
               </tr>
@@ -337,21 +277,22 @@ export function AuditLogsPage() {
                 onClick={() => setSelectedLog(log)}
                 className="cursor-pointer hover:bg-slate-50 transition-colors"
               >
-                <td className="px-4 py-3 font-mono text-[11px] text-slate-500 truncate">
+                <td className="px-3 py-2 text-[11px] text-slate-500 truncate">
                   {format(new Date(log.created_at), 'HH:mm:ss')}
                 </td>
-                <td className="px-4 py-3 text-slate-700 truncate" title={log.user ? userById[log.user]?.email : 'System'}>
+                <td className="px-3 py-2 text-slate-700 truncate" title={log.user ? userById[log.user]?.email : 'System'}>
                   {log.user ? userById[log.user]?.email || `#${log.user}` : 'System'}
                 </td>
-                <td className="px-4 py-3 font-mono font-semibold text-slate-900 truncate">{log.action}</td>
-                <td className="px-4 py-3 text-slate-500 truncate">{MODULE_LABELS[log.table_name] || log.table_name}</td>
-                <td className="px-4 py-3 text-xs text-slate-600 truncate" title={summarizeLog(log)}>
+                <td className="px-3 py-2 font-semibold text-slate-900 truncate" title={getActionLabel(log.action)}>
+                  {getActionLabel(log.action)}
+                </td>
+                <td className="px-3 py-2 text-slate-600 truncate" title={summarizeLog(log)}>
                   {summarizeLog(log)}
                 </td>
-                <td className="px-4 py-3">
-                  <SeverityBadge severity={log.severity} />
+                <td className="px-3 py-2 truncate">
+                  <SeverityBadge severity={log.severity} className="text-[10px] px-2" />
                 </td>
-                <td className="px-4 py-3 text-slate-300">
+                <td className="px-3 py-2 text-slate-300">
                   <ChevronRight className="h-4 w-4" />
                 </td>
               </tr>
@@ -377,7 +318,6 @@ export function AuditLogsPage() {
         {selectedLog && (
           <AuditDiffViewer
             action={selectedLog.action}
-            tableName={selectedLog.table_name}
             recordId={selectedLog.record_id}
             timestamp={selectedLog.created_at}
             user={selectedLog.user ? userById[selectedLog.user] : null}

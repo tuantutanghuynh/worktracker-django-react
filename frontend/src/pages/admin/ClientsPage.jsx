@@ -22,7 +22,7 @@ import {
   useRestoreClient,
 } from '../../hooks/queries/admin/useAdminClients';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
 const clientSchema = z.object({
   client_name: z.string().min(1, 'Client name is required'),
@@ -178,80 +178,84 @@ export function ClientsPage() {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
+      {/* table-fixed + width theo % nên bảng luôn vừa khung, không kéo ngang. */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Client Name" sortKey="client_name" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Tax Code" sortKey="tax_code" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Contact Email" sortKey="contact_email" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} />
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+              <SortableHeader label="Client Name" sortKey="client_name" ordering={ordering} onSort={toggleSort} className="w-[30%]" />
+              <SortableHeader label="Tax Code" sortKey="tax_code" ordering={ordering} onSort={toggleSort} className="w-[16%]" />
+              <SortableHeader label="Contact Email" sortKey="contact_email" ordering={ordering} onSort={toggleSort} className="w-[30%]" />
+              <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} className="w-[12%]" />
+              <th className="w-[12%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && clients.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
                   {search ? 'No clients match your search.' : 'No clients yet.'}
                 </td>
               </tr>
             )}
             {clients.map((client) => (
               <tr key={client.id}>
-                <td className="px-4 py-3 font-medium text-slate-900">
+                <td className="px-3 py-2 font-medium text-slate-900 truncate">
                   <button
                     type="button"
                     onClick={() => setDetailTarget(client)}
-                    className="hover:text-blue-600 hover:underline cursor-pointer text-left"
+                    className="hover:text-blue-600 hover:underline cursor-pointer text-left truncate max-w-full"
+                    title={client.client_name}
                   >
                     {client.client_name}
                   </button>
                 </td>
-                <td className="px-4 py-3 text-slate-500">{client.tax_code}</td>
-                <td className="px-4 py-3 text-slate-500">{client.contact_email || '—'}</td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-2 text-slate-500 truncate">{client.tax_code}</td>
+                <td className="px-3 py-2 text-slate-500 truncate" title={client.contact_email || ''}>
+                  {client.contact_email || '—'}
+                </td>
+                <td className="px-3 py-2 truncate">
                   <span
                     className={
                       client.is_active
-                        ? 'text-xs font-semibold text-emerald-600'
-                        : 'text-xs font-semibold text-rose-500'
+                        ? 'text-[11px] font-semibold text-emerald-600'
+                        : 'text-[11px] font-semibold text-rose-500'
                     }
                   >
                     {client.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
                       onClick={() => openEdit(client)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
                     {client.is_active ? (
                       <button
                         type="button"
                         onClick={() => setDeleteTarget(client)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => restoreMutation.mutate(client.id)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
+                        className="rounded-lg p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                        <RotateCcw className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>

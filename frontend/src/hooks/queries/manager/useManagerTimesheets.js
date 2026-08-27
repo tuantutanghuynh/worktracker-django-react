@@ -17,12 +17,15 @@ export const managerTimesheetKeys = {
 /**
  * Fetch log works list
  */
-export function useLogWorks(params = {}) {
+export function useLogWorks(params = {}, { enabled = true } = {}) {
   return useQuery({
     queryKey: managerTimesheetKeys.logWorks(params),
     queryFn: () => managerTimesheetService.getLogWorks(params),
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
+    // Mac dinh true -> cac noi goi cu khong doi hanh vi. Sidebar truyen
+    // false cho Admin/Employee de khong ban request luon nhan 403.
+    enabled,
   });
 }
 
