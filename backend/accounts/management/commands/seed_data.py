@@ -45,7 +45,7 @@ class Command(BaseCommand):
                 AuditLog.objects.all().delete()
                 Notification.objects.all().delete()
                 EmployeeProfile.objects.all().delete()
-                CustomUser.objects.exclude(is_superuser=True).delete()
+                CustomUser.objects.all().delete()
 
                 # RESET AUTO-INCREMENT SEQUENCES BACK TO ID 1 (SQLITE & POSTGRESQL)
                 with connection.cursor() as cursor:
@@ -62,11 +62,12 @@ class Command(BaseCommand):
                         ]
                         for tbl in target_tables:
                             try:
-                                cursor.execute(f"SELECT pg_get_serial_sequence('{tbl}', 'id')")
-                                row = cursor.fetchone()
-                                if row and row[0]:
-                                    seq_name = row[0]
-                                    cursor.execute(f"ALTER SEQUENCE {seq_name} RESTART WITH 1;")
+                                with transaction.atomic():
+                                    cursor.execute(f"SELECT pg_get_serial_sequence('{tbl}', 'id')")
+                                    row = cursor.fetchone()
+                                    if row and row[0]:
+                                        seq_name = row[0]
+                                        cursor.execute(f"ALTER SEQUENCE {seq_name} RESTART WITH 1;")
                             except Exception:
                                 pass
 
