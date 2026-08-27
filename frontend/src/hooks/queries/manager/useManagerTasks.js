@@ -13,11 +13,14 @@ export const managerTaskKeys = {
 /**
  * 🚀 Hook: Fetch paginated / filtered tasks
  */
-export function useManagerTasks(params = {}) {
+export function useManagerTasks(params = {}, { enabled = true } = {}) {
   return useQuery({
     queryKey: managerTaskKeys.list(params),
     queryFn: () => managerTaskService.getTasks(params),
     staleTime: 1000 * 30, // 30 seconds
+    // Mac dinh true -> 13 noi goi cu khong doi hanh vi. Sidebar truyen
+    // false cho Admin/Employee de khong ban request luon nhan 403.
+    enabled,
   });
 }
 

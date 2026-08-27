@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { Clock, UserCheck, Lock, AlertTriangle, FileWarning, Search, ChevronRight, Unlock } from 'lucide-react';
+import { Lock, Search, ChevronRight, Unlock } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import SideDrawer from '../../components/common/drawer/SideDrawer';
 import InputField from '../../components/common/forms/InputField';
@@ -11,9 +11,7 @@ import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
 import ExportButton from '../../components/common/table/ExportButton';
-import StatCard from '../../components/common/cards/StatCard';
 import {
-  useAdminTimesheetSummary,
   useAdminTimesheetEmployees,
   useAdminTimesheetEmployeeDetail,
   useAdminGlobalTimeLocks,
@@ -25,12 +23,15 @@ import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
+// Nhãn "No Log" thay vì "Missing": hệ thống chưa có model nghỉ phép/ngày
+// lễ, nên một ngày không có log CHƯA CHẮC là quên chấm công — có thể là
+// nghỉ phép. "No Log" mô tả đúng sự thật đo được, không quy kết.
 const STATUS_OPTIONS = [
   { value: 'NORMAL', label: 'Normal' },
-  { value: 'WARNING', label: 'Warning' },
-  { value: 'MISSING', label: 'Missing' },
+  { value: 'WARNING', label: 'Below Target' },
+  { value: 'MISSING', label: 'No Log' },
   { value: 'OVER_LIMIT', label: 'Over Limit' },
 ];
 
@@ -43,15 +44,25 @@ const STATUS_STYLES = {
 
 const STATUS_LABELS = {
   NORMAL: 'Normal',
-  WARNING: 'Warning',
-  MISSING: 'Missing',
+  WARNING: 'Below Target',
+  MISSING: 'No Log',
   OVER_LIMIT: 'Over Limit',
+};
+
+// Giải thích ý nghĩa từng status khi rê chuột — tránh Admin hiểu nhầm
+// "No Log" = quên chấm công (thực tế có thể là nghỉ phép).
+const STATUS_HINTS = {
+  NORMAL: 'Đã log đủ ngày và đạt mức giờ mong đợi tính tới hôm nay.',
+  WARNING: 'Đã log đủ ngày nhưng tổng giờ dưới 80% mức mong đợi tính tới hôm nay.',
+  MISSING: 'Có ngày làm việc chưa có log giờ. Lưu ý: hệ thống chưa quản lý nghỉ phép/ngày lễ, nên ngày nghỉ phép cũng hiện ở đây.',
+  OVER_LIMIT: 'Có ngày log vượt quá số giờ chuẩn trong ngày.',
 };
 
 function StatusPill({ status }) {
   return (
     <span
-      className={`inline-flex px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${STATUS_STYLES[status] || STATUS_STYLES.NORMAL}`}
+      title={STATUS_HINTS[status] || ''}
+      className={`inline-flex whitespace-nowrap px-1.5 py-0.5 text-[9px] font-bold rounded-full border ${STATUS_STYLES[status] || STATUS_STYLES.NORMAL}`}
     >
       {STATUS_LABELS[status] || status}
     </span>
@@ -93,7 +104,6 @@ export function TimesheetControlPage() {
     setPage(1);
   }
 
-  const { data: summary } = useAdminTimesheetSummary({ month, year });
 
   const { data: employeesPage, isLoading } = useAdminTimesheetEmployees({
     month,
@@ -185,12 +195,7 @@ export function TimesheetControlPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900">Timesheet Control</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Monitor, audit, and lock company-wide employee timesheets.
-          </p>
-        </div>
+        <h1 className="text-lg font-bold text-slate-900">Timesheet Control</h1>
         <div className="flex items-center gap-2 self-start sm:self-auto">
         <ExportButton
           url="/admin/timesheets/employees/export/"
@@ -218,44 +223,6 @@ export function TimesheetControlPage() {
           {isPeriodLocked ? 'Unlock Period' : 'Lock Period'}
         </button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          label="Total Logged Hours"
-          value={summary ? `${summary.total_logged_hours}h` : '—'}
-          subtext={`${format(new Date(year, month - 1), 'MMMM yyyy')} Period`}
-          icon={Clock}
-          color="blue"
-        />
-        <StatCard
-          label="Active Employees"
-          value={summary?.active_employees ?? '—'}
-          subtext="Logging work entries"
-          icon={UserCheck}
-          color="emerald"
-        />
-        <StatCard
-          label="Locked Periods"
-          value={summary?.locked_periods_count ?? '—'}
-          subtext="All-time, immutable"
-          icon={Lock}
-          color="purple"
-        />
-        <StatCard
-          label="Timesheet Violations"
-          value={summary?.timesheet_violations ?? '—'}
-          subtext="Daily limit breaches"
-          icon={AlertTriangle}
-          color="rose"
-        />
-        <StatCard
-          label="Missing Timesheets"
-          value={summary?.missing_timesheets ?? '—'}
-          subtext="Employee-days unlogged"
-          icon={FileWarning}
-          color="amber"
-        />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -298,31 +265,33 @@ export function TimesheetControlPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-sm">
+      {/* Không dùng overflow-x-auto: table-fixed + width theo % nên bảng luôn
+          co vừa khung, không bao giờ phải kéo ngang. */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Employee" sortKey="full_name" ordering={ordering} onSort={toggleSort} className="w-52" />
-              <SortableHeader label="Department" sortKey="department_name" ordering={ordering} onSort={toggleSort} className="w-36" />
-              <SortableHeader label="Month Hours" sortKey="month_hours" ordering={ordering} onSort={toggleSort} className="w-48" />
-              <SortableHeader label="Avg/Day" sortKey="avg_per_day" ordering={ordering} onSort={toggleSort} className="w-20" />
-              <SortableHeader label="Violations" sortKey="violations" ordering={ordering} onSort={toggleSort} className="w-24" />
-              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} className="w-28" />
-              <SortableHeader label="Last Entry" sortKey="last_entry" ordering={ordering} onSort={toggleSort} className="w-28" />
-              <th className="w-10 px-4 py-3" />
+              <SortableHeader label="Employee" sortKey="full_name" ordering={ordering} onSort={toggleSort} className="w-[21%]" />
+              <SortableHeader label="Department" sortKey="department_name" ordering={ordering} onSort={toggleSort} className="w-[14%]" />
+              <SortableHeader label="Month Hours" sortKey="month_hours" ordering={ordering} onSort={toggleSort} className="w-[19%]" />
+              <SortableHeader label="Avg/Day" sortKey="avg_per_day" ordering={ordering} onSort={toggleSort} className="w-[10%]" />
+              <SortableHeader label="Issues" sortKey="violations" ordering={ordering} onSort={toggleSort} className="w-[9%]" />
+              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} className="w-[12%]" />
+              <SortableHeader label="Last Log" sortKey="last_entry" ordering={ordering} onSort={toggleSort} className="w-[12%]" />
+              <th className="w-8 px-2 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && employees.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
                   No employees match these filters.
                 </td>
               </tr>
@@ -333,20 +302,28 @@ export function TimesheetControlPage() {
                 onClick={() => setSelectedEmployeeId(emp.user_id)}
                 className="cursor-pointer hover:bg-slate-50 transition-colors"
               >
-                <td className="px-4 py-3 truncate">
-                  <p className="truncate font-semibold text-slate-900">{emp.full_name}</p>
-                  <p className="truncate text-[11px] text-slate-400">{emp.email}</p>
+                <td className="px-3 py-2 truncate">
+                  <p className="truncate font-semibold text-slate-900" title={emp.full_name}>{emp.full_name}</p>
+                  <p className="truncate text-[10px] text-slate-400" title={emp.email}>{emp.email}</p>
                 </td>
-                <td className="px-4 py-3 truncate text-slate-500">{emp.department_name || '—'}</td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-2 truncate text-slate-500" title={emp.department_name || ''}>
+                  {emp.department_name || '—'}
+                </td>
+                {/* Số giờ viết liền một dòng "13h / 208h · 6%" thay vì tách
+                    2 đầu bằng justify-between — cách cũ để lại khoảng trống
+                    lớn giữa ô hẹp, nhìn như 2 cột rời nhau. */}
+                <td className="px-3 py-2">
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-700">
-                      <span className="truncate">{emp.month_hours}h</span>
-                      <span className="shrink-0 truncate text-slate-400">Target {emp.target_hours}h</span>
+                    <div className="flex items-baseline gap-1 text-[11px] leading-none">
+                      <span className="font-bold text-slate-800">{emp.month_hours}h</span>
+                      <span className="text-slate-400">/ {emp.target_hours}h</span>
+                      <span className="ml-auto shrink-0 font-semibold text-slate-500">
+                        {emp.target_hours ? Math.round((emp.month_hours / emp.target_hours) * 100) : 0}%
+                      </span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className={`h-1.5 rounded-full ${emp.status === 'OVER_LIMIT' ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                        className={`h-1 rounded-full ${emp.status === 'OVER_LIMIT' ? 'bg-rose-500' : 'bg-emerald-500'}`}
                         style={{
                           width: `${emp.target_hours ? Math.min((emp.month_hours / emp.target_hours) * 100, 100) : 0}%`,
                         }}
@@ -354,18 +331,18 @@ export function TimesheetControlPage() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-center font-semibold text-slate-700">{emp.avg_per_day}h</td>
-                <td className="px-4 py-3 text-center">
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                <td className="px-3 py-2 text-center font-semibold text-slate-700">{emp.avg_per_day}h</td>
+                <td className="px-3 py-2 text-center">
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
                     {emp.violations}
                   </span>
                 </td>
-                <td className="px-4 py-3 truncate">
+                <td className="px-3 py-2 truncate">
                   <StatusPill status={emp.status} />
                 </td>
-                <td className="px-4 py-3 truncate text-slate-500">{emp.last_entry || '—'}</td>
-                <td className="px-4 py-3 text-slate-300">
-                  <ChevronRight className="h-4 w-4" />
+                <td className="px-3 py-2 truncate text-[11px] text-slate-500">{emp.last_entry || '—'}</td>
+                <td className="px-3 py-2 text-slate-300">
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </td>
               </tr>
             ))}
@@ -431,7 +408,12 @@ export function TimesheetControlPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded bg-slate-800/60">
-                  <span className="text-slate-300 font-medium">Missing working days</span>
+                  <span
+                    className="text-slate-300 font-medium"
+                    title="Ngày làm việc đã qua nhưng chưa có log giờ. Hệ thống chưa quản lý nghỉ phép/ngày lễ nên ngày nghỉ phép cũng được đếm ở đây."
+                  >
+                    Working days without a log
+                  </span>
                   <span className={employeeDetail.missing_days > 0 ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
                     {employeeDetail.missing_days} day(s)
                   </span>

@@ -22,7 +22,7 @@ import {
 } from '../../hooks/queries/admin/useAdminDepartments';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
 const departmentSchema = z.object({
   name: z.string().min(1, 'Department name is required'),
@@ -62,7 +62,7 @@ export function DepartmentsPage() {
   // Managers double as the dropdown options and the lookup table used to
   // render a department's manager email in the table (the department API
   // only returns the manager's id, not a nested user object). page_size=500
-  // opts out of the default 15/page — this needs every manager, not a page.
+  // opts out of the default 10/page — this needs every manager, not a page.
   const { data: managersPage } = useAdminUsers({ role: 'MANAGER', page_size: 500 });
   const managers = managersPage?.results || [];
   const managerOptions = managers.map((m) => ({ value: String(m.id), label: m.email }));
@@ -156,53 +156,56 @@ export function DepartmentsPage() {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
+      {/* table-fixed + width theo % nên bảng luôn vừa khung, không kéo ngang. */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Name" sortKey="name" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Description" sortKey="description" ordering={ordering} onSort={toggleSort} />
-              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} />
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+              <SortableHeader label="Name" sortKey="name" ordering={ordering} onSort={toggleSort} className="w-[25%]" />
+              <SortableHeader label="Description" sortKey="description" ordering={ordering} onSort={toggleSort} className="w-[36%]" />
+              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} className="w-[30%]" />
+              <th className="w-[9%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && departments.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
                   {search ? 'No departments match your search.' : 'No departments yet.'}
                 </td>
               </tr>
             )}
             {departments.map((dept) => (
               <tr key={dept.id}>
-                <td className="px-4 py-3 font-medium text-slate-900">{dept.name}</td>
-                <td className="px-4 py-3 text-slate-500">{dept.description || '—'}</td>
-                <td className="px-4 py-3 text-slate-500">
+                <td className="px-3 py-2 font-medium text-slate-900 truncate" title={dept.name}>{dept.name}</td>
+                <td className="px-3 py-2 text-slate-500 truncate" title={dept.description || ''}>
+                  {dept.description || '—'}
+                </td>
+                <td className="px-3 py-2 text-slate-500 truncate" title={dept.manager ? managerEmailById[dept.manager] || '' : ''}>
                   {dept.manager ? managerEmailById[dept.manager] || dept.manager : '—'}
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
                       onClick={() => openEdit(dept)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(dept)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                      className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </td>
