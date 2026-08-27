@@ -23,6 +23,15 @@ const PRIORITY_OPTIONS = [
     { value: "HIGH", label: "High" },
 ]
 
+// Cùng bảng màu Pending/Approved/Rejected/Voided với TimesheetPage.jsx —
+// đồng bộ ngôn ngữ hình ảnh cho review_status ở mọi nơi hiển thị.
+const LOG_STATUS_STYLES = {
+    PENDING: "bg-amber-50 text-amber-600 border-amber-200",
+    APPROVED: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    REJECTED: "bg-rose-50 text-rose-600 border-rose-200",
+    VOIDED: "bg-slate-100 text-slate-500 border-slate-200",
+}
+
 // Employee My Tasks (Ngày 7) — List view only for now (Kanban view
 // deferred). Filtering is client-side since the list endpoint doesn't
 // take query params yet, and 1 Employee's task count is small.
@@ -231,11 +240,11 @@ function TaskDrawerContent({ task, onClose }) {
                 {task && (
                     <div className="space-y-6">
                         {isLocked && (
-                            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
-                                <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
+                                <Lock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-bold text-amber-200">Task is in {task.status} status</p>
-                                    <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
+                                    <p className="font-bold text-amber-900">Task is in {task.status} status</p>
+                                    <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
                                         {task.status === "REVIEWING"
                                             ? "This task is currently submitted for Manager QA Review. Work logging, edits, and comments are locked. To make adjustments, click 'Recall' on the task table."
                                             : "This task is closed. Work logging, edits, and comments are permanently locked."}
@@ -246,7 +255,7 @@ function TaskDrawerContent({ task, onClose }) {
 
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Description</p>
-                            <p className="text-sm text-slate-200">{task.description}</p>
+                            <p className="text-sm text-slate-800">{task.description}</p>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -256,19 +265,19 @@ function TaskDrawerContent({ task, onClose }) {
 
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Deadline</p>
-                            <p className="text-sm text-slate-200">{task.deadline}</p>
+                            <p className="text-sm font-medium text-slate-800">{task.deadline}</p>
                         </div>
 
                         {/* Log Work — Chỉ hiển thị khi Task chưa bị khóa (TODO hoặc IN_PROGRESS) */}
                         {!isLocked && (
-                            <div className="border-t border-slate-800 pt-4 space-y-2">
+                            <div className="border-t border-slate-100 pt-4 space-y-2">
                                 <p className="text-xs font-semibold text-slate-400 uppercase">Log Work</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     <input
                                         type="date"
                                         value={workDate}
                                         onChange={(e) => setWorkDate(e.target.value)}
-                                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100"
+                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
                                     />
                                     <input
                                         type="number"
@@ -277,14 +286,14 @@ function TaskDrawerContent({ task, onClose }) {
                                         placeholder="Hours"
                                         value={hoursSpent}
                                         onChange={(e) => setHoursSpent(e.target.value)}
-                                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100"
+                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
                                     />
                                 </div>
                                 <textarea
                                     placeholder="What did you work on?"
                                     value={logDescription}
                                     onChange={(e) => setLogDescription(e.target.value)}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100"
+                                    className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
                                     rows={2}
                                 />
                                 <button
@@ -299,7 +308,7 @@ function TaskDrawerContent({ task, onClose }) {
                         )}
 
                         {/* Logged Hours — list các entry đã tạo, Void & Edit chỉ hiện khi chưa bị Lock và còn PENDING */}
-                        <div className="border-t border-slate-800 pt-4 space-y-2">
+                        <div className="border-t border-slate-100 pt-4 space-y-2">
                             <p className="text-xs font-semibold text-slate-400 uppercase">Logged Hours</p>
                             {loadingDetail ? (
                                 <p className="text-xs text-slate-500">Loading...</p>
@@ -308,12 +317,12 @@ function TaskDrawerContent({ task, onClose }) {
                             ) : (
                                 <div className="space-y-2">
                                     {workLogs.map((log) => (
-                                        <div key={log.id} className="bg-slate-800/60 rounded-lg p-2.5 flex items-start justify-between gap-2">
+                                        <div key={log.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 flex items-start justify-between gap-2">
                                             <div>
-                                                <p className="text-xs font-bold text-slate-200">{log.work_date} — {log.hours_spent}h</p>
-                                                <p className="text-[11px] text-slate-400">{log.description}</p>
+                                                <p className="text-xs font-bold text-slate-900">{log.work_date} — {log.hours_spent}h</p>
+                                                <p className="text-[11px] text-slate-500">{log.description}</p>
                                                 {log.review_status === "VOIDED" && (
-                                                    <p className="text-[11px] text-rose-400 mt-1">Voided: {log.adjustment_reason}</p>
+                                                    <p className="text-[11px] text-rose-600 mt-1">Voided: {log.adjustment_reason}</p>
                                                 )}
                                             </div>
                                             {!isLocked && log.review_status === "PENDING" ? (
@@ -321,20 +330,22 @@ function TaskDrawerContent({ task, onClose }) {
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingLog(log)}
-                                                        className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 cursor-pointer"
+                                                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
                                                     >
                                                         Edit
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setVoidingLogId(log.id)}
-                                                        className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 cursor-pointer"
+                                                        className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
                                                     >
                                                         Void
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <span className="text-[11px] font-semibold text-slate-400 shrink-0">{log.review_status}</span>
+                                                <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${LOG_STATUS_STYLES[log.review_status] ?? "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                                                    {log.review_status}
+                                                </span>
                                             )}
                                         </div>
                                     ))}
@@ -343,16 +354,16 @@ function TaskDrawerContent({ task, onClose }) {
                         </div>
 
                         {/* Comments */}
-                        <div className="border-t border-slate-800 pt-4 space-y-3">
+                        <div className="border-t border-slate-100 pt-4 space-y-3">
                             <p className="text-xs font-semibold text-slate-400 uppercase">Comments</p>
                             {loadingDetail ? (
                                 <p className="text-xs text-slate-500">Loading...</p>
                             ) : (
                                 <div className="space-y-2">
                                     {comments.map((c) => (
-                                        <div key={c.id} className="bg-slate-800/60 rounded-lg p-2.5">
-                                            <p className="text-[11px] font-bold text-slate-300">{c.author_name}</p>
-                                            <p className="text-xs text-slate-400">{c.content}</p>
+                                        <div key={c.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                                            <p className="text-[11px] font-bold text-slate-800">{c.author_name}</p>
+                                            <p className="text-xs text-slate-600">{c.content}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -364,7 +375,7 @@ function TaskDrawerContent({ task, onClose }) {
                                         placeholder="Add a comment..."
                                         value={commentText}
                                         onChange={(e) => setCommentText(e.target.value)}
-                                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100"
+                                        className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
                                     />
                                     <button
                                         type="button"
@@ -380,7 +391,7 @@ function TaskDrawerContent({ task, onClose }) {
                             )}
                         </div>
 
-                        {error && <p className="text-xs text-rose-400">{error}</p>}
+                        {error && <p className="text-xs text-rose-600">{error}</p>}
                     </div>
                 )}
             </SideDrawer>
