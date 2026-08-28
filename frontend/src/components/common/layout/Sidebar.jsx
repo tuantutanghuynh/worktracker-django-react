@@ -27,6 +27,7 @@ import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationStore } from '../../../stores/useNotificationStore';
 import { useRecentJobsStore } from '../../../stores/useRecentJobsStore';
+import { useRecentTasksStore } from '../../../stores/useRecentTasksStore';
 import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
 import { useManagerTasks } from '../../../hooks/queries/manager/useManagerTasks';
 import { useLogWorks } from '../../../hooks/queries/manager/useManagerTimesheets';
@@ -67,15 +68,16 @@ const MENU_CONFIG = {
     portalLabel: 'Employee Portal',
     navItems: [
       { path: '/employee/dashboard', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks },
+      { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks, hasDividerTop: true },
       { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
-      { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp },
-      { path: '/employee/chat', label: 'Team Chat', icon: MessageSquare },
-      { path: '/employee/audit-logs', label: 'My Activity', icon: FileText },
+      { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp, hasDividerTop: true },
+      { path: '/employee/chat', label: 'Team Chat', icon: MessageSquare, hasDividerTop: true },
+      { path: '/employee/audit-logs', label: 'My Activity', icon: FileText, hasDividerTop: true },
       { path: '/employee/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
-      { path: '/employee/profile', label: 'Profile', icon: User },
+      { path: '/employee/profile', label: 'Profile', icon: User, hasDividerTop: true },
     ],
     showRecentJobs: false,
+    showRecentTasks: true,
   },
 
   // Cấu hình Menu dành cho ADMIN — khớp đúng 10 trang thật Minh Anh đã
@@ -147,6 +149,7 @@ export default function Sidebar() {
 
   // 🚀 ZUSTAND STORE: Danh sách Jobs xem gần nhất từ LocalStorage
   const { recentJobs, addRecentJob } = useRecentJobsStore();
+  const { recentTasks } = useRecentTasksStore();
 
   // 🚀 REACT QUERY: Lấy danh sách Jobs từ Database làm dữ liệu Fallback nếu chưa có lịch sử xem
   // enabled: chỉ Manager mới hiển thị "Recently Viewed Jobs" (showRecentJobs) — Employee/Admin
@@ -227,6 +230,15 @@ export default function Sidebar() {
         return { dot: 'bg-slate-500', text: 'text-slate-400' };
     }
   };
+
+  const TASK_STATUS_COLORS = {
+    TODO: { dot: 'bg-blue-500', text: 'text-blue-400' },
+    IN_PROGRESS: { dot: 'bg-emerald-500', text: 'text-emerald-400' },
+    REVIEWING: { dot: 'bg-purple-500', text: 'text-purple-400' },
+    COMPLETED: { dot: 'bg-orange-500', text: 'text-orange-400' },
+    CANCELLED: { dot: 'bg-rose-500', text: 'text-rose-400' },
+  };
+  const getTaskStatusColor = (status) => TASK_STATUS_COLORS[status] || { dot: 'bg-slate-500', text: 'text-slate-400' };
 
   return (
     <aside
@@ -367,6 +379,47 @@ export default function Sidebar() {
               className="inline-block px-3 pt-1 text-[11px] font-medium text-blue-400 hover:underline"
             >
               View all jobs →
+            </Link>
+          </div>
+        )}
+
+        {/* RECENTLY VIEWED TASKS (Employee) */}
+        {!isSidebarCollapsed && currentConfig.showRecentTasks && (
+          <div className="space-y-1 pt-2.5 border-t border-slate-800/80">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-0.5">
+              Recently Viewed Tasks
+            </p>
+
+            {recentTasks.length === 0 ? (
+              <p className="px-3 py-1 text-xs text-slate-500 italic">No recent tasks</p>
+            ) : (
+              recentTasks.map((task) => {
+                const colorStyle = getTaskStatusColor(task.status);
+                return (
+                  <div
+                    key={task.id}
+                    onClick={() => navigate('/employee/my-tasks')}
+                    className="px-3 py-1.5 rounded-lg hover:bg-slate-800/40 cursor-pointer flex items-center space-x-2.5 transition-colors"
+                  >
+                    <div className={cn('w-2.5 h-2.5 rounded shrink-0', colorStyle.dot)}></div>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-semibold text-slate-200 truncate leading-tight" title={task.title}>
+                        {task.title}
+                      </p>
+                      <span className={cn('text-[9px] font-bold tracking-wider', colorStyle.text)}>
+                        {task.status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            <Link
+              to="/employee/my-tasks"
+              className="inline-block px-3 pt-1 text-[11px] font-medium text-blue-400 hover:underline"
+            >
+              View all tasks →
             </Link>
           </div>
         )}

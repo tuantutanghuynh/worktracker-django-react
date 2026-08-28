@@ -9,6 +9,7 @@ import StatusBadge from "../../components/common/badges/StatusBadge"
 import PriorityBadge from "../../components/common/badges/PriorityBadge"
 import PromptReasonModal from "../../components/common/modal/PromptReasonModal"
 import EditLogWorkModal from "../../components/employee/EditLogWorkModal"
+import { useRecentTasksStore } from "../../stores/useRecentTasksStore"
 
 const STATUS_OPTIONS = [
     { value: "TODO", label: "To Do" },
@@ -37,6 +38,7 @@ const LOG_STATUS_STYLES = {
 // take query params yet, and 1 Employee's task count is small.
 export function MyTasksPage() {
     const { tasks, loading, error, changeStatus } = useMyTasks()
+    const { addRecentTask } = useRecentTasksStore()
     const [searchQuery, setSearchQuery] = useState("")
     const [statusValue, setStatusValue] = useState("")
     const [priorityValue, setPriorityValue] = useState("")
@@ -160,7 +162,7 @@ export function MyTasksPage() {
                 data={filteredTasks}
                 isLoading={loading}
                 emptyMessage="No tasks assigned yet."
-                onRowClick={(task) => setSelectedTask(task)}
+                onRowClick={(task) => { setSelectedTask(task); addRecentTask(task) }}
             />
 
             <TaskDrawerContent key={selectedTask?.id ?? "none"} task={selectedTask} onClose={() => setSelectedTask(null)} />
