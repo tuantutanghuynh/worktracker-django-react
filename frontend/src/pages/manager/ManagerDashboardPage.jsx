@@ -211,7 +211,7 @@ export default function ManagerDashboardPage() {
               Welcome back, {userName} 👋
             </h1>
             <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-              Project Manager
+             Manager
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 font-medium">
