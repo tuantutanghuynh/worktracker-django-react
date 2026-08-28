@@ -5,6 +5,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
+from system.employee.views_employee import EmployeeAuditLogListView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
@@ -30,6 +32,7 @@ urlpatterns = [
     path("api/employee/", include("tasks.employee.urls_employee")),
     path("api/timesheets/", include("timesheets.employee.urls_employee")),
     path("api/notifications/", include("system.employee.urls_employee")),
+    path("api/employee/audit-logs/", EmployeeAuditLogListView.as_view(), name="employee-audit-log-list"),
 
     # ── CHAT & MESSAGING SCOPE ────────────────────────────────────────────────
     path("api/chat/", include("chat.urls")),

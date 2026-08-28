@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from system.models import Notification
-from system.employee.serializers_employee import NotificationSerializer
+from system.models import Notification, AuditLog
+from system.employee.serializers_employee import NotificationSerializer, EmployeeAuditLogSerializer
+from accounts.permissions import HasPermission
 
 # This file holds the EMPLOYEE-facing (any logged-in user, not role-gated)
 # notification views: list your own notifications, mark one as read, mark
@@ -59,3 +60,15 @@ class NotificationMarkAllReadView(APIView):
         return Response(
             {"marked_read": updated_count}, status=status.HTTP_200_OK
         )
+
+
+# Nhật ký hoạt động CỦA CHÍNH NGƯỜI GỌI — chỉ audit_logs có user=request.user,
+# khác hẳn bản Admin (xem toàn hệ thống) hay Manager (xem cả team quản lý).
+class EmployeeAuditLogListView(APIView):
+    permission_classes = [HasPermission]
+    required_permission = "audit:view"
+
+    def get(self, request):
+        logs = AuditLog.objects.filter(user=request.user).order_by("-created_at")
+        serializer = EmployeeAuditLogSerializer(logs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

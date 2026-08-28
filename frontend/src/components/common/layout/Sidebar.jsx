@@ -70,6 +70,8 @@ const MENU_CONFIG = {
       { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks },
       { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
       { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp },
+      { path: '/employee/chat', label: 'Team Chat', icon: MessageSquare },
+      { path: '/employee/audit-logs', label: 'My Activity', icon: FileText },
       { path: '/employee/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
       { path: '/employee/profile', label: 'Profile', icon: User },
     ],

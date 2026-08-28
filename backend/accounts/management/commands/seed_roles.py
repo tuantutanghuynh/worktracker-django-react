@@ -133,6 +133,7 @@ class Command(BaseCommand):
                 'task:view', 'task:update', 'task:change_status', 'task:comment', 'task:attachment', 'task:follow',
                 'timesheet:view','timesheet:create', 'timesheet:void', 'timesheet:edit', 'timesheet:export',
                 'report:view', 'notification:view',
+                'audit:view',
             ]
             employee_role = Role.objects.get(code='EMPLOYEE')
             for code in employee_codes:
