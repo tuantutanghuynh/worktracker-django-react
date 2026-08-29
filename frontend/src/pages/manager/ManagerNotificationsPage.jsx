@@ -28,8 +28,6 @@ export default function ManagerNotificationsPage() {
     connectWebSocket,
   } = useNotificationStore();
 
-  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'UNREAD' | 'READ'
-
   useEffect(() => {
     // Initial fetch from backend API
     fetchNotifications().catch((err) => {
@@ -41,13 +39,6 @@ export default function ManagerNotificationsPage() {
   }, [fetchNotifications, connectWebSocket]);
 
   const displayNotifications = notifications || [];
-
-  // Lọc thông báo
-  const filteredNotifications = displayNotifications.filter((n) => {
-    if (activeFilter === 'UNREAD') return !n.is_read;
-    if (activeFilter === 'READ') return n.is_read;
-    return true;
-  });
 
   const handleMarkAsRead = async (idOrIds) => {
     try {
@@ -147,47 +138,11 @@ export default function ManagerNotificationsPage() {
         </div>
       </div>
 
-      {/* 🔍 FILTER TABS */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-          <button
-            onClick={() => setActiveFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-              activeFilter === 'ALL'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            All ({displayNotifications.length})
-          </button>
-          <button
-            onClick={() => setActiveFilter('UNREAD')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-              activeFilter === 'UNREAD'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            Unread ({unreadCount})
-          </button>
-          <button
-            onClick={() => setActiveFilter('READ')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-              activeFilter === 'READ'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            Read ({Math.max(0, displayNotifications.length - unreadCount)})
-          </button>
-        </div>
-      </div>
-
       {/* 📋 NOTIFICATIONS TABLE OR EMPTY STATE */}
       <div>
-        {filteredNotifications.length > 0 ? (
+        {displayNotifications.length > 0 ? (
           <NotificationListTable
-            notifications={filteredNotifications}
+            notifications={displayNotifications}
             onMarkAsRead={handleMarkAsRead}
             onMarkAllRead={handleMarkAllRead}
             onDelete={handleDelete}

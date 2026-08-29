@@ -15,42 +15,59 @@ import {
   Filter,
   Check
 } from 'lucide-react';
+import { useAuthStore } from '../../../stores/authStore';
 import { cn } from '../../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
 
 /**
- * Hàm phân giải và chuẩn hóa đường dẫn thông báo thông minh
+ * Hàm phân giải và chuẩn hóa đường dẫn thông báo thông minh theo Role (Manager & Employee)
  * Tránh trường hợp dẫn vào các route ảo/không tồn tại gây redirect về Dashboard
  */
 export function resolveNotificationUrl(url, eventType) {
-  if (!url || typeof url !== 'string') return null;
-  const trimmed = url.trim();
-  if (!trimmed || trimmed === '#' || trimmed === '/') return null;
+  const role = (useAuthStore.getState().user?.role || '').toUpperCase();
+  const isManager = role === 'MANAGER';
+  const isEmployee = role === 'EMPLOYEE';
+  const isAdmin = role === 'ADMIN';
 
-  // Manager task routes: /manager/tasks/123 or /manager/tasks -> /manager/tasks/review
-  if (trimmed.startsWith('/manager/tasks/') && !trimmed.startsWith('/manager/tasks/review')) {
-    return '/manager/tasks/review';
-  }
-  if (trimmed === '/manager/tasks') {
-    return '/manager/tasks/review';
-  }
-
-  // Manager timesheet review subroutes: /manager/jobs/123/timesheets -> /manager/timesheets/review
-  if (trimmed.includes('/timesheets') && trimmed.startsWith('/manager/')) {
-    return '/manager/timesheets/review';
-  }
-
-  // Employee log-work routes: /employee/log-works/123 -> /employee/timesheet
-  if (trimmed.startsWith('/employee/log-works/')) {
-    return '/employee/timesheet';
-  }
-
-  // Employee task routes: /employee/tasks/123 -> /employee/my-tasks
-  if (trimmed.startsWith('/employee/tasks/')) {
-    return '/employee/my-tasks';
+  // 1. Nếu có URL trực tiếp hợp lệ, ưu tiên chuẩn hóa theo URL
+  if (url && typeof url === 'string') {
+    const trimmed = url.trim();
+    if (trimmed && trimmed !== '#' && trimmed !== '/') {
+      if (isManager) {
+        if (trimmed.includes('/timesheet') || trimmed.includes('/log-work')) return '/manager/timesheets/review';
+        if (trimmed.includes('/tasks')) return '/manager/tasks/review';
+        if (trimmed.includes('/jobs')) return '/manager/jobs';
+        if (trimmed.startsWith('/manager/')) return trimmed;
+      }
+      if (isEmployee) {
+        if (trimmed.includes('/timesheet') || trimmed.includes('/log-work')) return '/employee/timesheet';
+        if (trimmed.includes('/tasks')) return '/employee/my-tasks';
+        if (trimmed.startsWith('/employee/')) return trimmed;
+      }
+      if (isAdmin && trimmed.startsWith('/admin/')) {
+        return trimmed;
+      }
+    }
   }
 
-  return trimmed;
+  // 2. Phân giải dựa trên Event Type nếu không có URL cụ thể
+  if (eventType) {
+    if (eventType.startsWith('TIMESHEET_') || eventType.startsWith('LOG_WORK_')) {
+      if (isManager) return '/manager/timesheets/review';
+      if (isEmployee) return '/employee/timesheet';
+    }
+
+    if (eventType.startsWith('TASK_')) {
+      if (isManager) return '/manager/tasks/review';
+      if (isEmployee) return '/employee/my-tasks';
+    }
+
+    if (eventType === 'DATA_QUALITY_ALERT' && isAdmin) {
+      return url || '/admin/dashboard';
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -125,7 +142,7 @@ export default function NotificationListTable({
   const filteredNotifications = notifications.filter(item => {
     if (activeTab === 'UNREAD') return !item.is_read;
     if (activeTab === 'TASKS') return item.event_type?.startsWith('TASK_');
-    if (activeTab === 'TIMESHEET') return item.event_type?.startsWith('TIMESHEET_');
+    if (activeTab === 'TIMESHEET') return item.event_type?.startsWith('TIMESHEET_') || item.event_type?.startsWith('LOG_WORK_');
     return true;
   });
 
@@ -147,10 +164,14 @@ export default function NotificationListTable({
         return { label: 'Timesheet Lock', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
       case 'TIMESHEET_UNLOCK':
         return { label: 'Timesheet Unlock', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'LOG_WORK_SUBMITTED':
+        return { label: 'Log Work Submitted', bg: 'bg-blue-50 text-blue-700 border-blue-200' };
       case 'LOG_WORK_APPROVED':
         return { label: 'Log Work Approved', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'LOG_WORK_REJECTED':
         return { label: 'Log Work Rejected', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
+      case 'LOG_WORK_VOIDED':
+        return { label: 'Log Work Voided', bg: 'bg-slate-100 text-slate-700 border-slate-200' };
       default:
         return { label: 'System Alert', bg: 'bg-slate-100 text-slate-700 border-slate-200' };
     }
@@ -182,8 +203,8 @@ export default function NotificationListTable({
           </div>
         </div>
 
-        {/* Toolbar controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Toolbar controls: Only show Delete Selected when items are checked */}
+        <div className="flex items-center gap-2">
           {selectedIds.length > 0 && onDelete && (
             <button
               type="button"
@@ -195,34 +216,6 @@ export default function NotificationListTable({
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-600" />
               <span>Delete Selected ({selectedIds.length})</span>
-            </button>
-          )}
-
-          {selectedIds.length > 0 && handleMarkReadFn && (
-            <button
-              type="button"
-              onClick={() => {
-                handleMarkReadFn(selectedIds);
-                setSelectedIds([]);
-              }}
-              className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <CheckCheck className="w-3.5 h-3.5" />
-              <span>Mark as Read ({selectedIds.length})</span>
-            </button>
-          )}
-
-          {unreadCount > 0 && handleMarkAllReadFn && (
-            <button
-              type="button"
-              onClick={() => {
-                handleMarkAllReadFn();
-                setSelectedIds([]);
-              }}
-              className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Mark All as Read</span>
             </button>
           )}
         </div>
@@ -264,6 +257,35 @@ export default function NotificationListTable({
         </div>
       ) : (
         <div className="border border-slate-200/80 rounded-2xl overflow-hidden bg-white divide-y divide-slate-100">
+          {/* Select All Header Bar */}
+          {onDelete && (
+            <div className="px-4 py-2.5 bg-slate-50/90 border-b border-slate-100 flex items-center justify-between text-xs text-slate-600 font-semibold select-none">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={
+                    filteredNotifications.length > 0 &&
+                    filteredNotifications.every((n) => selectedIds.includes(n.id))
+                  }
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(filteredNotifications.map((n) => n.id));
+                    } else {
+                      setSelectedIds([]);
+                    }
+                  }}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
+                />
+                <span>Select All ({filteredNotifications.length})</span>
+              </label>
+              {selectedIds.length > 0 && (
+                <span className="text-[11px] font-bold text-blue-600">
+                  {selectedIds.length} selected
+                </span>
+              )}
+            </div>
+          )}
+
           {filteredNotifications.map((item) => {
             const badge = getEventBadge(item.event_type);
             const isSelected = selectedIds.includes(item.id);
@@ -279,14 +301,16 @@ export default function NotificationListTable({
                   isSelected && "bg-blue-50/80"
                 )}
               >
-                {/* Select Checkbox */}
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={(e) => handleSelectRow(e, item.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-1 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
-                />
+                {/* Select Checkbox (only if onDelete is enabled) */}
+                {onDelete && (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => handleSelectRow(e, item.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
+                  />
+                )}
 
                 {/* Read Indicator Dot */}
                 <div className="mt-1 shrink-0">
@@ -336,7 +360,7 @@ export default function NotificationListTable({
                   </div>
                 </div>
 
-                {/* Row Quick Action Menu (1-Click Mark as Read & Delete) */}
+                {/* Row Quick Action: Only 1-Click Mark as Read */}
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {!item.is_read && handleMarkReadFn && (
                     <button
@@ -347,16 +371,6 @@ export default function NotificationListTable({
                     >
                       <Check className="w-3.5 h-3.5" />
                       <span>Mark Read</span>
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button
-                      type="button"
-                      onClick={() => onDelete(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
-                      title="Delete notification"
-                    >
-                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>

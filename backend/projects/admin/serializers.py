@@ -1,6 +1,8 @@
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from ..models import Client, Job
+from tasks.models import Task
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -10,9 +12,38 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 class JobSerializer(serializers.ModelSerializer):
+    initial_team_member_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        write_only=True
+    )
+    project_team = serializers.SerializerMethodField(read_only=True)
+    team_size = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Job
         fields = '__all__'
+
+    def get_team_size(self, obj):
+        return obj.tasks.values('assignee_id').distinct().count()
+
+    def get_project_team(self, obj):
+        tasks = obj.tasks.select_related('assignee', 'assignee__profile', 'assignee__profile__department')
+        seen_ids = set()
+        members = []
+        for task in tasks:
+            user = task.assignee
+            if user and user.id not in seen_ids:
+                seen_ids.add(user.id)
+                dept_name = user.profile.department.name if hasattr(user, 'profile') and user.profile and user.profile.department else "General"
+                full_name = user.profile.full_name if hasattr(user, 'profile') and user.profile and user.profile.full_name else user.email
+                members.append({
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': full_name,
+                    'department_name': dept_name
+                })
+        return members
 
     def validate_client(self, value):
         if not value.is_active:
@@ -57,4 +88,51 @@ class JobSerializer(serializers.ModelSerializer):
         if start_date and deadline and deadline < start_date:
             raise serializers.ValidationError({'deadline': 'Deadline must be on or after start date.'})
         return data
+
+    def create(self, validated_data):
+        initial_team_ids = validated_data.pop('initial_team_member_ids', [])
+        job = super().create(validated_data)
+
+        if initial_team_ids:
+            User = get_user_model()
+            employees = User.objects.filter(id__in=initial_team_ids, is_active=True, role__code='EMPLOYEE')
+            for emp in employees:
+                Task.objects.create(
+                    job=job,
+                    assignee=emp,
+                    creator=job.manager,
+                    title=f"Project Onboarding: {job.job_name}",
+                    description=f"Initial assignment by Admin for project {job.job_name}.",
+                    priority=Task.Priority.MEDIUM,
+                    status=Task.Status.TODO,
+                    deadline=job.deadline,
+                    order_index="0|000000:"
+                )
+
+        return job
+
+    def update(self, instance, validated_data):
+        initial_team_ids = validated_data.pop('initial_team_member_ids', None)
+        job = super().update(instance, validated_data)
+
+        if initial_team_ids is not None:
+            User = get_user_model()
+            existing_assignee_ids = set(job.tasks.values_list('assignee_id', flat=True).distinct())
+            new_member_ids = [uid for uid in initial_team_ids if uid not in existing_assignee_ids]
+            if new_member_ids:
+                employees = User.objects.filter(id__in=new_member_ids, is_active=True, role__code='EMPLOYEE')
+                for emp in employees:
+                    Task.objects.create(
+                        job=job,
+                        assignee=emp,
+                        creator=job.manager,
+                        title=f"Project Onboarding: {job.job_name}",
+                        description=f"Added to project team by Admin for {job.job_name}.",
+                        priority=Task.Priority.MEDIUM,
+                        status=Task.Status.TODO,
+                        deadline=job.deadline,
+                        order_index="0|000000:"
+                    )
+
+        return job
 

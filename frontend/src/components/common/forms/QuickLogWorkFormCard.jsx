@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Clock,
   Send,
@@ -38,9 +38,28 @@ export default function QuickLogWorkFormCard({
   const currentTotal = Number(dailyHoursLogged) + (Number(hoursSpent) || 0);
   const isOverLimit = currentTotal > MAX_DAILY_LIMIT;
 
-  const taskOptions = tasks.map(t => ({
+  // Lọc các task hợp lệ để logwork (IN_PROGRESS hoặc TODO, loại trừ COMPLETED, CANCELLED, REVIEWING, task bị khóa hoặc thuộc dự án đóng băng)
+  const eligibleTasks = tasks.filter(t => {
+    if (t.status === 'COMPLETED' || t.status === 'CANCELLED' || t.status === 'REVIEWING') return false;
+    if (t.description && t.description.includes('[LOCKED_FOR_REASSIGNMENT]')) return false;
+    if ((t.job_status && t.job_status !== 'ACTIVE') || t.job_client_is_active === false) return false;
+    return true;
+  });
+
+  // Tự động chọn task hợp lệ đầu tiên nếu task đang chọn bị đóng băng/vô hiệu hóa
+  useEffect(() => {
+    if (defaultTaskId && eligibleTasks.some(t => String(t.id) === String(defaultTaskId))) {
+      setTaskId(String(defaultTaskId));
+    } else if (eligibleTasks.length > 0 && (!taskId || !eligibleTasks.some(t => String(t.id) === String(taskId)))) {
+      setTaskId(String(eligibleTasks[0].id));
+    } else if (eligibleTasks.length === 0) {
+      setTaskId('');
+    }
+  }, [defaultTaskId, eligibleTasks]);
+
+  const taskOptions = eligibleTasks.map(t => ({
     value: String(t.id),
-    label: t.title,
+    label: `${t.title} [${t.status === 'IN_PROGRESS' ? 'In Progress' : 'To Do'}]`,
     badge: t.job_name || 'Project',
     description: `Deadline: ${t.deadline || 'None'}`
   }));
@@ -85,16 +104,16 @@ export default function QuickLogWorkFormCard({
   };
 
   return (
-    <div className={cn("bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-5 text-slate-100", className)}>
+    <div className={cn("bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm space-y-5 text-slate-800", className)}>
       {/* Form Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
+          <div className="p-2 bg-blue-50 border border-blue-100 rounded-lg text-blue-600">
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100">Quick Log Work Entry</h3>
-            <p className="text-xs text-slate-400">Record daily work log entries</p>
+            <h3 className="text-sm font-bold text-slate-900">Quick Log Work Entry</h3>
+            <p className="text-xs text-slate-500">Record daily work log entries</p>
           </div>
         </div>
 
@@ -102,11 +121,11 @@ export default function QuickLogWorkFormCard({
         <div className={cn(
           "px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5",
           isOverLimit
-            ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-            : "bg-slate-800 text-slate-300 border-slate-700"
+            ? "bg-rose-50 text-rose-600 border-rose-200"
+            : "bg-slate-50 text-slate-600 border-slate-200"
         )}>
           <span>Logged Today:</span>
-          <strong className={isOverLimit ? "text-rose-400" : "text-emerald-400"}>
+          <strong className={isOverLimit ? "text-rose-600" : "text-emerald-600"}>
             {dailyHoursLogged}h / 8.0h
           </strong>
         </div>
@@ -128,6 +147,7 @@ export default function QuickLogWorkFormCard({
           leftIcon={Briefcase}
           required
           searchable
+          theme="light"
         />
 
         {/* Date and Hours Input Row */}
@@ -161,13 +181,13 @@ export default function QuickLogWorkFormCard({
 
             {/* Quick Add Presets Buttons */}
             <div className="flex items-center gap-1.5 pt-1">
-              <span className="text-[11px] text-slate-400 mr-1">Quick Add:</span>
+              <span className="text-[11px] text-slate-500 mr-1">Quick Add:</span>
               {[1, 2, 4, 8].map((h) => (
                 <button
                   key={h}
                   type="button"
                   onClick={() => handleQuickAddHours(h)}
-                  className="px-2 py-0.5 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition cursor-pointer"
+                  className="px-2 py-0.5 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
                 >
                   +{h}h
                 </button>
@@ -178,7 +198,7 @@ export default function QuickLogWorkFormCard({
 
         {/* Work Description Textarea */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-300">
+          <label className="block text-xs font-semibold text-slate-600">
             Work Log Description
           </label>
           <textarea
@@ -186,13 +206,13 @@ export default function QuickLogWorkFormCard({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe work completed during this period..."
-            className="w-full bg-slate-900 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+            className="w-full bg-white border border-slate-200 rounded-lg p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
           />
         </div>
 
         {/* Overlimit Warning Alert */}
         {isOverLimit && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-xs flex items-center gap-2">
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
               Warning: Total daily hours will exceed 8 hours ({currentTotal.toFixed(2)}h)!
@@ -208,7 +228,7 @@ export default function QuickLogWorkFormCard({
             className={cn(
               "px-5 py-2.5 text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2 cursor-pointer",
               isLoading || isOverLimit
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
                 : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30 active:scale-[0.98]"
             )}
           >

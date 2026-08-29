@@ -25,6 +25,9 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
     """Dùng cho Bảng Kanban & Danh sách My Tasks của Nhân viên"""
     job_code = serializers.CharField(source='job.job_code', read_only=True)
     job_name = serializers.CharField(source='job.job_name', read_only=True)
+    job_status = serializers.CharField(source='job.status', read_only=True)
+    job_client_is_active = serializers.BooleanField(source='job.client.is_active', read_only=True, default=True)
+    job_client_name = serializers.CharField(source='job.client.client_name', read_only=True, default=None)
     manager_name = serializers.CharField(source='job.manager.profile.full_name', read_only=True)
 
     class Meta:
@@ -32,6 +35,7 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'status', 'priority',
             'deadline', 'order_index', 'job_id', 'job_code', 'job_name',
+            'job_status', 'job_client_is_active', 'job_client_name',
             'manager_name', 'created_at', 'completed_at'
         ]
 
@@ -46,6 +50,9 @@ class EmployeeTaskDetailSerializer(serializers.ModelSerializer):
     """Dùng khi nhấp xem chi tiết 1 Task"""
     job_code = serializers.CharField(source='job.job_code', read_only=True)
     job_name = serializers.CharField(source='job.job_name', read_only=True)
+    job_status = serializers.CharField(source='job.status', read_only=True)
+    job_client_is_active = serializers.BooleanField(source='job.client.is_active', read_only=True, default=True)
+    job_client_name = serializers.CharField(source='job.client.client_name', read_only=True, default=None)
     manager_name = serializers.CharField(source='job.manager.profile.full_name', read_only=True)
     manager_email = serializers.CharField(source='job.manager.email', read_only=True)
     attachments = EmployeeTaskAttachmentSerializer(many=True, read_only=True)
@@ -57,7 +64,8 @@ class EmployeeTaskDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'status', 'priority',
             'deadline', 'completed_at', 'order_index', 'job_id',
-            'job_code', 'job_name', 'manager_name', 'manager_email',
+            'job_code', 'job_name', 'job_status', 'job_client_is_active', 'job_client_name',
+            'manager_name', 'manager_email',
             'attachments', 'comments', 'work_logs', 'created_at', 'updated_at'
         ]
 

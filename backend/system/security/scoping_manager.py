@@ -185,18 +185,19 @@ def scoped_team_profiles(user):
     return EmployeeProfile.objects.none()
 
 
-def assignment_search_employees_queryset():
+def assignment_search_employees_queryset(job_id=None):
     """
-    Queryset dùng riêng cho màn hình tìm Employee để giao task.
+    Queryset dung rieng cho man hinh tim Employee de giao task (Project Team Scope).
 
-    Theo tài liệu gốc:
-    - Manager được search basic profile của active Employee để giao việc.
-    - Quyền này không đồng nghĩa với quyền xem timesheet/report/performance
-      của Employee ngoài scope.
+    Theo Quy trinh moi:
+    - Khi Manager giao Task trong 1 Job (co job_id):
+      Chi lay nhung Employee da duoc phan bo vao Project Team cua Job do.
+    - Neu Job moi khoi tao hoac khong truyen job_id:
+      Tra ve danh sach Active Employee hop le.
     """
     User = get_user_model()
 
-    return User.objects.filter(
+    qs = User.objects.filter(
         is_active=True,
         role__code=EMPLOYEE_ROLE_CODE,
     ).select_related(
@@ -204,6 +205,13 @@ def assignment_search_employees_queryset():
         "profile",
         "profile__department",
     )
+
+    if job_id:
+        team_user_ids = Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct()
+        if team_user_ids.exists():
+            qs = qs.filter(id__in=team_user_ids)
+
+    return qs
 
 
 def get_scoped_object_or_404(scoped_queryset, **lookup):

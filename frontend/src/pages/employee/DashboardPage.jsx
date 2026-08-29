@@ -8,7 +8,7 @@ import DonutChartCard from "../../components/common/charts/DonutChartCard"
 import { DataTable } from "../../components/common/table/DataTable"
 import StatusBadge from "../../components/common/badges/StatusBadge"
 import PriorityBadge from "../../components/common/badges/PriorityBadge"
-import { AlertTriangle, Clock, TrendingUp } from "lucide-react"
+import { AlertTriangle, Clock, TrendingUp, PauseCircle } from "lucide-react"
 
 // Employee Dashboard (Ngày 6) — hero banner + KPI summary, backed by real
 // data from PersonalKPIView. Recent Tasks (useMyTasks) was added later once
@@ -45,7 +45,25 @@ export function DashboardPage() {
 
     const taskColumns = [
         { accessorKey: "title", header: "Task" },
-        { accessorKey: "job_name", header: "Job / Project" },
+        {
+            accessorKey: "job_name",
+            header: "Job / Project",
+            cell: (info) => {
+                const task = info.row.original
+                const isFrozen = (task.job_status && task.job_status !== "ACTIVE") || task.job_client_is_active === false
+                return (
+                    <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-slate-800 text-xs">{task.job_name || "—"}</span>
+                        {isFrozen && (
+                            <span className="inline-flex items-center gap-1 w-fit text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                <PauseCircle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                <span>Frozen ({task.job_status || "ON_HOLD"})</span>
+                            </span>
+                        )}
+                    </div>
+                )
+            },
+        },
         { accessorKey: "priority", header: "Priority", cell: (info) => <PriorityBadge priority={info.row.original.priority} /> },
         { accessorKey: "status", header: "Status", cell: (info) => <StatusBadge status={info.row.original.status} /> },
         { accessorKey: "deadline", header: "Deadline" },

@@ -99,6 +99,7 @@ class Notification(models.Model):
         TASK_APPROVED = "TASK_APPROVED", "Task Approved"
         TASK_REJECTED = "TASK_REJECTED", "Task Rejected"
         TASK_ATTACHMENT = "TASK_ATTACHMENT", "Task Attachment"
+        LOG_WORK_SUBMITTED = "LOG_WORK_SUBMITTED", "Log Work Submitted"
         LOG_WORK_APPROVED = "LOG_WORK_APPROVED", "Log Work Approved"
         LOG_WORK_REJECTED = "LOG_WORK_REJECTED", "Log Work Rejected"
         LOG_WORK_VOIDED = "LOG_WORK_VOIDED", "Log Work Voided"

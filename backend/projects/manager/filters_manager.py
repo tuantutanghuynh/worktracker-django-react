@@ -30,6 +30,7 @@ class ManagerJobFilter:
         queryset = cls.filter_status(queryset, params)
         queryset = cls.filter_priority(queryset, params) # ➕ BỔ SUNG GỌI LỌC PRIORITY
         queryset = cls.filter_client(queryset, params)
+        queryset = cls.filter_client_is_active(queryset, params)
         queryset = cls.filter_deadline_range(queryset, params)
         queryset = cls.filter_search(queryset, params)
         queryset = cls.filter_is_overdue(queryset, params)
@@ -112,6 +113,14 @@ class ManagerJobFilter:
             )
 
         return queryset.filter(client_id=int(client_id))
+
+    @classmethod
+    def filter_client_is_active(cls, queryset, params):
+        client_is_active = params.get("client_is_active")
+        if client_is_active is not None:
+            val = str(client_is_active).lower().strip() in ["true", "1", "yes"]
+            queryset = queryset.filter(client__is_active=val)
+        return queryset
 
     @classmethod
     def filter_deadline_range(cls, queryset, params):

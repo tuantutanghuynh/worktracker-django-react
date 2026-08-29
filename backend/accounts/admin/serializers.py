@@ -9,19 +9,29 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source='department.name', read_only=True, default=None)
+
     class Meta:
         model = EmployeeProfile
-        fields = ['full_name', 'phone_number', 'department', 'avatar_url', 'joined_date']
+        fields = ['full_name', 'phone_number', 'department', 'department_name', 'avatar_url', 'joined_date']
 
 
 class UserSerializer(serializers.ModelSerializer):
     profile = EmployeeProfileSerializer(read_only=True)
     role_detail = RoleSerializer(source='role', read_only=True)
+    workload = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'role', 'role_detail', 'is_active', 'profile']
+        fields = ['id', 'email', 'role', 'role_detail', 'is_active', 'profile', 'workload']
         extra_kwargs = {'role': {'write_only': True}}
+
+    def get_workload(self, obj):
+        role_code = getattr(getattr(obj, 'role', None), 'code', None)
+        if role_code != 'EMPLOYEE':
+            return None
+        from timesheets.services.manager_employee_utilization_service import calculate_smart_workload_pressure
+        return calculate_smart_workload_pressure(obj)
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

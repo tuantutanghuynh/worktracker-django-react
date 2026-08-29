@@ -15,10 +15,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useQueryClient } from "@tanstack/react-query";
 import BaseModal from "../../components/common/modal/BaseModal";
 import InputField from "../../components/common/forms/InputField";
 import UserAvatar from "../../components/common/avatar/UserAvatar";
 import { cn } from "../../utils/cn";
+import managerTimesheetService from "../../services/manager/managerTimesheetService";
 
 // Query Hooks
 import {
@@ -26,6 +28,7 @@ import {
   useApproveLogWork,
   useRejectLogWork,
   useCorrectLogWork,
+  managerTimesheetKeys,
 } from "../../hooks/queries/manager/useManagerTimesheets";
 import { useManagerJobs } from "../../hooks/queries/manager/useManagerJobs";
 import { useManagerEmployees } from "../../hooks/queries/manager/useManagerTeam";
@@ -91,7 +94,8 @@ export default function ManagerTimesheetReviewPage() {
   const { data: jobsResponse } = useManagerJobs({ page_size: 100 });
   const { data: employeesResponse } = useManagerEmployees({ page_size: 100 });
 
-  // Mutations
+  // Query Client & Mutations
+  const queryClient = useQueryClient();
   const approveMutation = useApproveLogWork();
   const rejectMutation = useRejectLogWork();
   const correctMutation = useCorrectLogWork();
@@ -253,15 +257,26 @@ export default function ManagerTimesheetReviewPage() {
     }
 
     setIsApprovingAll(true);
+    let successCount = 0;
     try {
       for (const item of pendingItems) {
-        await approveMutation.mutateAsync({ id: item.id, note: "Approved full day by manager" });
+        await managerTimesheetService.approveLogWork(item.id, "Approved full day by manager");
+        successCount++;
       }
-      toast.success(`Approved all ${pendingItems.length} tasks for ${selectedDayGroup.employeeName} (${formatDateSafe(selectedDayGroup.work_date)})`);
+      queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      toast.success(
+        `Approved all ${pendingItems.length} task${pendingItems.length > 1 ? "s" : ""} for ${selectedDayGroup.employeeName} (${formatDateSafe(selectedDayGroup.work_date)})`
+      );
       refetch();
       autoAdvanceToNextDay(selectedDayGroup.key);
     } catch (err) {
-      toast.error("Failed to approve some tasks. Please try again.");
+      queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      if (successCount > 0) {
+        toast.warning(`Approved ${successCount}/${pendingItems.length} tasks. Some failed.`);
+        refetch();
+      } else {
+        toast.error("Failed to approve tasks. Please try again.");
+      }
     } finally {
       setIsApprovingAll(false);
     }

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import managerReportService from '../services/manager/managerReportService';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notificationApi';
 import { useAuthStore } from './authStore';
@@ -27,6 +28,11 @@ function loadSeenAlertIds() {
     return [];
   }
 }
+
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+let pingInterval = null;
+let lifecycleAttached = false;
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
@@ -88,7 +94,7 @@ export const useNotificationStore = create((set, get) => ({
         return { notifications: updated, unreadCount: unread };
       });
     } catch (err) {
-      console.error('Failed to mark notification read', err);
+      console.error('Failed to mark notification as read', err);
     }
   },
 
@@ -107,7 +113,7 @@ export const useNotificationStore = create((set, get) => ({
         unreadCount: 0,
       }));
     } catch (err) {
-      console.error('Failed to mark all notifications read', err);
+      console.error('Failed to mark all notifications as read', err);
     }
   },
 
@@ -147,10 +153,18 @@ export const useNotificationStore = create((set, get) => ({
       const unread = notification.is_read ? state.unreadCount : state.unreadCount + 1;
       return { notifications: updated, unreadCount: unread };
     });
+
+    // Bắn Toast thông báo nổi tức thì góc màn hình
+    if (notification.title) {
+      toast.info(notification.title, {
+        description: notification.content || undefined,
+        duration: 5000,
+      });
+    }
   },
 
   /**
-   * Helper to initiate WebSocket connection to ws/notifications/
+   * Helper to initiate WebSocket connection to ws/notifications/ with Enterprise Resilience
    */
   connectWebSocket: (wsUrlOverride) => {
     const existingSocket = get().socket;
@@ -159,37 +173,90 @@ export const useNotificationStore = create((set, get) => ({
     }
 
     const token = useAuthStore.getState().accessToken;
+    if (!token) return;
+
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const wsUrl = wsUrlOverride || `${wsProtocol}//${host}/ws/notifications/?token=${token || ''}`;
+    const wsUrl = wsUrlOverride || `${wsProtocol}//${host}/ws/notifications/?token=${token}`;
+
+    // Tự động lắng nghe sự kiện Tab Focus / Visibility để bù đắp dữ liệu khi user quay lại tab
+    if (!lifecycleAttached && typeof window !== 'undefined') {
+      lifecycleAttached = true;
+      const handleSync = () => {
+        if (document.visibilityState === 'visible' && useAuthStore.getState().accessToken) {
+          get().fetchNotifications();
+          const currentWs = get().socket;
+          if (!currentWs || currentWs.readyState === WebSocket.CLOSED || currentWs.readyState === WebSocket.CLOSING) {
+            get().connectWebSocket();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', handleSync);
+      window.addEventListener('focus', handleSync);
+    }
 
     try {
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         set({ wsConnected: true, socket: ws });
+        reconnectAttempts = 0;
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        // Gap-Healing: Tự động tải lại thông báo ngay khi vừa kết nối để không lỡ tin trong lúc mất mạng
+        get().fetchNotifications();
+
+        // Heartbeat KeepAlive: Định kỳ 25s gửi ping nhẹ để duy trì socket qua các router/proxy
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(JSON.stringify({ type: 'ping' }));
+            } catch (e) {
+              // Ignore send error on closing socket
+            }
+          }
+        }, 25000);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data && data.notification) {
-            get().addRealtimeNotification(data.notification);
-          } else if (data && data.id) {
-            get().addRealtimeNotification(data);
+          if (data && data.type === 'pong') return;
+
+          // Backend NotificationConsumer sends: { type: "notification", data: payload }
+          const notif = data?.data || data?.notification || (data?.id ? data : null);
+          if (notif && notif.id) {
+            get().addRealtimeNotification(notif);
           }
         } catch (e) {
           console.error('Failed to parse WebSocket notification message', e);
         }
       };
 
-      ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
+      ws.onerror = () => {
         set({ wsConnected: false });
       };
 
       ws.onclose = () => {
         set({ wsConnected: false, socket: null });
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
+
+        // Exponential Backoff with Jitter for Reconnection (1s -> 2s -> 4s -> max 30s)
+        if (useAuthStore.getState().accessToken) {
+          const delay = Math.min(30000, 1000 * Math.pow(1.5, reconnectAttempts)) + Math.random() * 1000;
+          reconnectAttempts += 1;
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(() => {
+            get().connectWebSocket();
+          }, delay);
+        }
       };
     } catch (err) {
       console.error('Failed to initialize WebSocket connection:', err);
@@ -200,9 +267,21 @@ export const useNotificationStore = create((set, get) => ({
    * Disconnect active WebSocket
    */
   disconnectWebSocket: () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
     const ws = get().socket;
     if (ws) {
-      ws.close();
+      try {
+        ws.close();
+      } catch (e) {
+        // Ignore close error
+      }
       set({ wsConnected: false, socket: null });
     }
   },

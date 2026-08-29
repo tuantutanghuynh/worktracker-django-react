@@ -4,7 +4,7 @@ from django.utils.dateparse import parse_date
 
 from rest_framework.exceptions import ValidationError
 
-from tasks.models import Task
+from tasks.models import Task, TaskComment
 
 
 class ManagerTaskFilter:
@@ -35,6 +35,9 @@ class ManagerTaskFilter:
         queryset = cls.filter_assignee(queryset, params)
         queryset = cls.filter_deadline_range(queryset, params)
         queryset = cls.filter_is_overdue(queryset, params)
+        queryset = cls.filter_rejections(queryset, params)
+        queryset = cls.filter_review_scope(queryset, params)
+        queryset = cls.filter_submitted_date(queryset, params)
         queryset = cls.filter_search(queryset, params)
         queryset = cls.apply_ordering(queryset, params)
 
@@ -228,6 +231,64 @@ class ManagerTaskFilter:
                 ]
             )
         )
+
+    @classmethod
+    def filter_rejections(cls, queryset, params):
+        has_rejections = params.get("has_rejections")
+        if has_rejections is not None:
+            val = str(has_rejections).lower() in ["true", "1", "yes"]
+            rejection_task_ids = (
+                TaskComment.objects.filter(
+                    Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
+                    | Q(content__startswith="[Rejection Note]")
+                    | Q(content__startswith="[Rework Requested]")
+                )
+                .values_list("task_id", flat=True)
+                .distinct()
+            )
+            if val:
+                queryset = queryset.filter(id__in=rejection_task_ids)
+            else:
+                queryset = queryset.exclude(id__in=rejection_task_ids)
+
+        return queryset
+
+    @classmethod
+    def filter_review_scope(cls, queryset, params):
+        is_review_scope = params.get("is_review_scope")
+        if is_review_scope is not None and str(is_review_scope).lower() in ["true", "1", "yes"]:
+            rejection_task_ids = (
+                TaskComment.objects.filter(
+                    Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
+                    | Q(content__startswith="[Rejection Note]")
+                    | Q(content__startswith="[Rework Requested]")
+                )
+                .values_list("task_id", flat=True)
+                .distinct()
+            )
+            queryset = queryset.filter(
+                Q(status__in=[Task.Status.REVIEWING, Task.Status.COMPLETED])
+                | Q(id__in=rejection_task_ids)
+                | Q(attachments__isnull=False)
+            ).exclude(status=Task.Status.TODO).distinct()
+
+        return queryset
+
+    @classmethod
+    def filter_submitted_date(cls, queryset, params):
+        submitted_date = params.get("submitted_date")
+        if submitted_date:
+            parsed_date = parse_date(submitted_date)
+            if parsed_date is None:
+                raise ValidationError({"submitted_date": "Invalid date format. Use YYYY-MM-DD."})
+            queryset = queryset.filter(
+                Q(updated_at__date=parsed_date)
+                | Q(created_at__date=parsed_date)
+                | Q(comments__created_at__date=parsed_date, comments__comment_type=TaskComment.CommentType.QA_SUBMISSION)
+                | Q(attachments__uploaded_at__date=parsed_date)
+            ).distinct()
+
+        return queryset
 
     @classmethod
     def filter_search(cls, queryset, params):

@@ -17,6 +17,9 @@ import {
   FolderGit2,
   TrendingUp,
   RotateCcw,
+  Users,
+  PauseCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -145,6 +148,7 @@ export default function ManagerJobsPage() {
   const [selectedPriority, setSelectedPriority] = useState('');
   const [selectedClient, setSelectedClient] = useState('');
   const [isOverdueOnly, setIsOverdueOnly] = useState(false);
+  const [isClientInactiveOnly, setIsClientInactiveOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -190,9 +194,10 @@ export default function ManagerJobsPage() {
       status: selectedStatus || undefined,
       priority: selectedPriority || undefined,
       client_id: selectedClient || undefined,
+      client_is_active: isClientInactiveOnly ? 'false' : undefined,
       is_overdue: isOverdueOnly ? 'true' : undefined,
     }),
-    [currentPage, pageSize, debouncedSearch, selectedStatus, selectedPriority, selectedClient, isOverdueOnly]
+    [currentPage, pageSize, debouncedSearch, selectedStatus, selectedPriority, selectedClient, isClientInactiveOnly, isOverdueOnly]
   );
 
   const { data: response, isLoading } = useManagerJobs(queryParams);
@@ -237,6 +242,7 @@ export default function ManagerJobsPage() {
     setSelectedPriority('');
     setSelectedClient('');
     setIsOverdueOnly(false);
+    setIsClientInactiveOnly(false);
     setCurrentPage(1);
   };
 
@@ -401,35 +407,54 @@ const ALLOWED_TRANSITIONS = {
   // Cấu hình Cột cho Bảng DataTable
   const columns = [
     {
-      header: 'Project Code & Name',
+      header: 'Project & Client',
       accessorKey: 'job_name',
       cell: (row) => {
         const isOverdue = row.is_overdue;
+        const isClientInactive = row.client && row.client.is_active === false;
+        const clientName = row.client?.client_name || row.client_name || 'Internal';
+
         return (
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-xs shrink-0 shadow-2xs">
-              <Briefcase className="w-4 h-4" />
+          <div className="py-0.5 space-y-1 min-w-[220px] max-w-[340px]">
+            {/* Dòng 1: Code + Tên Project + Overdue */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-mono font-bold text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/80 shrink-0">
+                {row.job_code || `JOB-${row.id}`}
+              </span>
+              <span
+                className="font-bold text-slate-900 text-xs hover:text-blue-600 transition-colors cursor-pointer truncate"
+                onClick={() => handleJobClick(row)}
+                title={row.job_name}
+              >
+                {row.job_name}
+              </span>
+              {isOverdue && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 shrink-0">
+                  <AlertCircle className="w-2.5 h-2.5 text-rose-600" />
+                  OVERDUE
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-[11px] text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-100">
-                  {row.job_code || `JOB-${row.id}`}
+
+            {/* Dòng 2: Client + Status Inactive nếu có */}
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium truncate">
+              <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+              <span className="truncate max-w-[160px]" title={clientName}>
+                {clientName}
+              </span>
+              {isClientInactive && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 shrink-0">
+                  <PauseCircle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                  Inactive
                 </span>
-                <span
-                  className="font-bold text-slate-900 text-xs hover:text-blue-600 transition-colors cursor-pointer"
-                  onClick={() => handleJobClick(row)}
-                >
-                  {row.job_name}
-                </span>
-                {isOverdue && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
-                    <AlertCircle className="w-3 h-3 text-rose-600" />
-                    OVERDUE
-                  </span>
-                )}
-              </div>
+              )}
               {row.description && (
-                <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{row.description}</p>
+                <>
+                  <span className="text-slate-300 shrink-0">•</span>
+                  <span className="text-slate-400 line-clamp-1 truncate" title={row.description}>
+                    {row.description}
+                  </span>
+                </>
               )}
             </div>
           </div>
@@ -437,21 +462,20 @@ const ALLOWED_TRANSITIONS = {
       },
     },
     {
-      header: 'Client',
-      accessorKey: 'client',
-      cell: (row) => (
-        <div className="flex items-center gap-1.5 text-xs text-slate-700">
-          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span className="font-medium truncate max-w-[140px]">
-            {row.client?.client_name || row.client_name || 'N/A'}
-          </span>
-        </div>
-      ),
-    },
-    {
       header: 'Status',
       accessorKey: 'status',
-      cell: (row) => <JobStatusBadge status={row.status} />,
+      cell: (row) => {
+        const isClientInactive = row.client && row.client.is_active === false;
+        if (isClientInactive) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+              <PauseCircle className="w-3 h-3 text-amber-600 shrink-0" />
+              <span>Frozen (On Hold)</span>
+            </span>
+          );
+        }
+        return <JobStatusBadge status={row.status} />;
+      },
     },
     {
       header: 'Priority',
@@ -459,7 +483,20 @@ const ALLOWED_TRANSITIONS = {
       cell: (row) => <JobPriorityBadge priority={row.priority} />,
     },
     {
-      header: 'Task Progress',
+      header: 'Team',
+      accessorKey: 'team_size',
+      cell: (row) => (
+        <span
+          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-blue-600 transition-colors"
+          title={`${row.team_size || 0} assigned project team members`}
+        >
+          <Users className="w-3.5 h-3.5 text-slate-400" />
+          <span>{row.team_size || 0}</span>
+        </span>
+      ),
+    },
+    {
+      header: 'Progress',
       accessorKey: 'task_counts',
       cell: (row) => {
         const counts = row.task_counts || {};
@@ -468,16 +505,21 @@ const ALLOWED_TRANSITIONS = {
         const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
         return (
-          <div className="w-36 space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600">
+          <div className="w-28 space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
               <span>
                 {completed}/{total} Tasks
               </span>
-              <span className="text-blue-600 font-bold">{pct}%</span>
+              <span className={cn("font-bold text-[10px]", pct === 100 ? "text-emerald-600" : "text-blue-600")}>
+                {pct}%
+              </span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                className={cn(
+                  "h-1.5 rounded-full transition-all duration-300",
+                  pct === 100 ? "bg-emerald-500" : "bg-blue-600"
+                )}
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -486,21 +528,24 @@ const ALLOWED_TRANSITIONS = {
       },
     },
     {
-      header: 'Timeline',
+      header: 'Deadline',
       accessorKey: 'deadline',
-      cell: (row) => (
-        <div className="space-y-0.5 text-xs">
-          <div className="flex items-center gap-1 text-slate-600 font-medium">
-            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>{formatDateSafe(row.deadline)}</span>
-          </div>
-          {row.start_date && (
-            <div className="text-[10px] text-slate-400">
-              Start: {formatDateSafe(row.start_date)}
+      cell: (row) => {
+        const isOverdue = row.is_overdue;
+        return (
+          <div className="space-y-0.5 text-xs">
+            <div className={cn("flex items-center gap-1 font-semibold", isOverdue ? "text-rose-600" : "text-slate-700")}>
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>{formatDateSafe(row.deadline)}</span>
             </div>
-          )}
-        </div>
-      ),
+            {row.start_date && (
+              <div className="text-[10px] text-slate-400">
+                Start: {formatDateSafe(row.start_date)}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Actions',
@@ -510,28 +555,28 @@ const ALLOWED_TRANSITIONS = {
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => handleJobClick(row)}
-            className="p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            className="p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             title="View Details"
           >
             <Eye className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => handleOpenKanban(row, e)}
-            className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             title="Open Kanban Board"
           >
             <Kanban className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => handleOpenEditDrawer(row, e)}
-            className="p-1.5 hover:bg-slate-100 hover:text-slate-900 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            className="p-1.5 hover:bg-slate-100 hover:text-slate-900 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             title="Edit Project"
           >
             <Edit3 className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => handleOpenStatusModal(row, e)}
-            className="p-1.5 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-500 transition-colors cursor-pointer"
+            className="p-1.5 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             title="Change Status"
           >
             <ArrowRightLeft className="w-4 h-4" />
@@ -633,6 +678,25 @@ const ALLOWED_TRANSITIONS = {
           <AlertCircle className="w-3.5 h-3.5" />
           <span>Overdue Only</span>
         </button>
+
+        {/* Client Inactive Quick Filter Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsClientInactiveOnly(!isClientInactiveOnly);
+            setCurrentPage(1);
+          }}
+          className={cn(
+            'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors cursor-pointer',
+            isClientInactiveOnly
+              ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+              : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+          )}
+          title="Filter projects whose client is deactivated"
+        >
+          <PauseCircle className="w-3.5 h-3.5" />
+          <span>Client Inactive Only</span>
+        </button>
       </FilterToolbar>
 
       {/* Main Content: Table or Grid View */}
@@ -711,6 +775,12 @@ const ALLOWED_TRANSITIONS = {
                             OVERDUE
                           </span>
                         )}
+                        {job.client && job.client.is_active === false && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title="Client is deactivated by admin">
+                            <PauseCircle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                            Client Inactive
+                          </span>
+                        )}
                       </div>
                       <JobStatusBadge status={job.status} />
                     </div>
@@ -746,7 +816,10 @@ const ALLOWED_TRANSITIONS = {
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                       <div className="flex items-center gap-1 font-medium truncate max-w-[130px]">
                         <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{job.client?.client_name || job.client_name || 'No Client'}</span>
+                        <span className="truncate">
+                          {job.client?.client_name || job.client_name || 'No Client'}
+                          {job.client && job.client.is_active === false ? ' (Inactive)' : ''}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

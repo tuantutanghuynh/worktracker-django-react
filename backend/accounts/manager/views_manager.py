@@ -12,6 +12,7 @@ from accounts.manager.serializers_manager import (
     ManagerDepartmentMiniSerializer,
     ManagerEmployeeListSerializer,
 )
+from projects.models import Job
 from tasks.models import Task
 from system.security.permissions_manager import (
     IsActiveAuthenticated,
@@ -64,6 +65,9 @@ class ManagerTeamEmployeeListView(ListAPIView):
     serializer_class = ManagerEmployeeListSerializer
 
     def get_queryset(self):
+        user = self.request.user
+        role_code = getattr(getattr(user, "role", None), "code", None)
+
         qs = (
             CustomUser.objects.filter(
                 role__code="EMPLOYEE",
@@ -85,6 +89,16 @@ class ManagerTeamEmployeeListView(ListAPIView):
             )
             .order_by("profile__full_name")
         )
+
+        job_id = self.request.query_params.get("job_id")
+        if job_id:
+            team_user_ids = Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct()
+            qs = qs.filter(id__in=team_user_ids)
+        elif role_code != "ADMIN":
+            # Scoping chuẩn: Manager chỉ thấy các nhân viên thuộc các Job do mình quản lý
+            managed_job_ids = Job.objects.filter(manager_id=user.id).values_list("id", flat=True)
+            team_user_ids = Task.objects.filter(job_id__in=managed_job_ids).values_list("assignee_id", flat=True).distinct()
+            qs = qs.filter(id__in=team_user_ids)
 
         department_id = self.request.query_params.get("department_id")
         if department_id:
