@@ -53,16 +53,59 @@ def notify_other_admins(actor, title, content=None, related_url=None):
     )
 
 
+# ── CHỐT CHẶN KHOÁ MÌNH / KHOÁ ADMIN CUỐI CÙNG ────────────────────────────
+#
+# Không có hai hàm này thì hệ thống tự khoá được chính nó: Admin bấm Lock lên
+# tài khoản của mình, hoặc hạ role mình xuống EMPLOYEE, là không còn ai vào
+# được trang quản trị — phải sửa thẳng vào database mới cứu được. Đây là chốt
+# chặn tiêu chuẩn của Django admin, GitLab, Atlassian.
+#
+# Chặn ở tầng view chứ không phải serializer vì cả 4 đường đều phải qua đây:
+# lock(), unlock(), perform_destroy() (DELETE) và perform_update() (đổi role).
+
+def assert_not_self(actor, target, what):
+    """Cấm Admin thao tác lên chính tài khoản đang đăng nhập."""
+    if actor.id == target.id:
+        raise ValidationError(
+            f"Bạn không thể {what} tài khoản của chính mình. "
+            "Nhờ một Admin khác thực hiện nếu thực sự cần."
+        )
+
+
+def assert_not_last_admin(target, what):
+    """
+    Cấm hạ role hoặc khoá Admin đang hoạt động cuối cùng.
+
+    Khác với assert_not_self ở chỗ nó chặn cả khi Admin KHÁC thao tác — hai
+    Admin khoá lẫn nhau vẫn dẫn tới không còn ai quản trị.
+    """
+    target_is_admin = getattr(target.role, "code", None) == "ADMIN"
+    if not target_is_admin or not target.is_active:
+        return
+    remaining = (
+        CustomUser.objects.filter(role__code="ADMIN", is_active=True)
+        .exclude(id=target.id)
+        .count()
+    )
+    if remaining == 0:
+        raise ValidationError(
+            f"Không thể {what} Admin đang hoạt động cuối cùng. "
+            "Tạo hoặc mở khoá một Admin khác trước."
+        )
+
+
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['email', 'role__code', 'is_active', 'profile__department__name']
+    ordering_fields = ['email', 'role__code', 'is_active', 'profile__department__name', 'profile__manager__email']
 
     def get_queryset(self):
         # Explicit default order for stable pagination — CustomUser has no
         # created_at field, so id is the simplest always-present tiebreaker.
-        qs = CustomUser.objects.select_related("role", "profile", "profile__department").order_by("id")
+        qs = CustomUser.objects.select_related(
+            "role", "profile", "profile__department", "profile__manager"
+        ).order_by("id")
         params = self.request.query_params
         if email := params.get("email"):
             qs = qs.filter(email__icontains=email)
@@ -70,6 +113,14 @@ class UserViewSet(viewsets.ModelViewSet):
             qs = qs.filter(role__code=role)
         if department := params.get("department"):
             qs = qs.filter(profile__department_id=department)
+        # ?manager=<id> lọc theo Manager phụ trách; ?manager=none lấy những
+        # nhân viên chưa được gán ai — đây là bộ lọc Admin cần để dọn nốt số
+        # còn sót sau backfill, nếu không họ sẽ vô hình với mọi Manager.
+        if manager := params.get("manager"):
+            if manager.lower() == "none":
+                qs = qs.filter(role__code="EMPLOYEE", profile__manager__isnull=True)
+            else:
+                qs = qs.filter(profile__manager_id=manager)
         if (is_active := params.get("is_active")) not in (None, ""):
             qs = qs.filter(is_active=is_active.lower() == "true")
         return qs
@@ -123,11 +174,58 @@ class UserViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def perform_update(self, serializer):
         old_role_id = serializer.instance.role_id
+        old_role_code = getattr(serializer.instance.role, "code", None)
+
+        # Chỉ chặn khi thao tác THỰC SỰ đổi role — sửa email của chính mình
+        # vẫn phải cho phép.
+        new_role = serializer.validated_data.get("role")
+        if new_role is not None and new_role.id != old_role_id:
+            assert_not_self(self.request.user, serializer.instance, "đổi role của")
+            assert_not_last_admin(serializer.instance, "hạ role của")
+
         old_values = UserSerializer(serializer.instance).data
         instance = serializer.save()
 
         if instance.role_id != old_role_id:
             require_reauth(instance.id)
+
+            # Hạ một Manager xuống role khác thì tuyến báo cáo trỏ tới họ
+            # không còn hợp lệ. Gỡ toàn bộ nhân viên trực thuộc về "chưa gán"
+            # thay vì để họ trỏ tới một tài khoản không còn là Manager —
+            # trạng thái đó lặng lẽ hỏng: nhân viên vô hình với mọi Manager mà
+            # không có dấu hiệu gì báo cho Admin biết.
+            #
+            # Sau khi gỡ, họ nổi lên trong bộ lọc "Chưa gán Manager" ở trang
+            # User List để Admin gán lại.
+            new_role_code = getattr(instance.role, "code", None)
+            if old_role_code == "MANAGER" and new_role_code != "MANAGER":
+                orphaned = list(
+                    EmployeeProfile.objects.filter(manager_id=instance.id).values_list(
+                        "user_id", flat=True
+                    )
+                )
+                if orphaned:
+                    EmployeeProfile.objects.filter(manager_id=instance.id).update(manager=None)
+                    log_audit_event(
+                        actor=self.request.user,
+                        action="UPDATE",
+                        table_name="employee_profiles",
+                        record_id=instance.id,
+                        old_values={"manager_id": instance.id, "affected_user_ids": orphaned},
+                        new_values={"manager_id": None, "affected_count": len(orphaned)},
+                        request=self.request,
+                        severity=AuditLog.Severity.WARNING,
+                    )
+                    notify_other_admins(
+                        self.request.user,
+                        title="Nhân viên cần gán lại Manager",
+                        content=(
+                            f"{instance.email} không còn là Manager. "
+                            f"{len(orphaned)} nhân viên đã được gỡ khỏi tuyến báo cáo "
+                            f"và đang chờ gán lại."
+                        ),
+                        related_url="/admin/users/search?manager=none",
+                    )
             log_audit_event(
                 actor=self.request.user,
                 action="ROLE_CHANGED",
@@ -151,6 +249,9 @@ class UserViewSet(viewsets.ModelViewSet):
     # DELETE, so Audit Logs reflects what actually happened to the record.
     @transaction.atomic
     def perform_destroy(self, instance):
+        assert_not_self(self.request.user, instance, "xoá")
+        assert_not_last_admin(instance, "xoá")
+
         old_values = UserSerializer(instance).data
         instance.is_active = False
         instance.save()
@@ -175,6 +276,9 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"], url_path="lock")
     def lock(self, request, pk=None):
         user = self.get_object()
+        assert_not_self(request.user, user, "khoá")
+        assert_not_last_admin(user, "khoá")
+
         old_values = UserSerializer(user).data
         user.is_active = False
         user.save()
@@ -294,6 +398,53 @@ class UserViewSet(viewsets.ModelViewSet):
             request=request,
         )
         return Response({"detail": "Department assigned."}, status=status.HTTP_200_OK)
+
+    # Gán Manager phụ trách cho một Employee. Đây là tuyến báo cáo cố định:
+    # Manager chỉ nhìn thấy và chỉ giao việc được cho nhân viên của mình, nên
+    # thao tác này quyết định phạm vi quản lý — vì vậy ghi audit ở mức WARNING
+    # chứ không phải INFO như đổi phòng ban.
+    @transaction.atomic
+    @action(detail=True, methods=["patch"], url_path="assign-manager")
+    def assign_manager(self, request, pk=None):
+        user = self.get_object()
+        manager_id = request.data.get("manager")
+
+        if user.role and user.role.code != "EMPLOYEE":
+            raise ValidationError("Chỉ tài khoản EMPLOYEE mới có Manager phụ trách.")
+
+        # manager_id = None nghĩa là gỡ Manager (đưa về "Chưa gán"), hợp lệ.
+        if manager_id is not None:
+            manager = CustomUser.objects.filter(id=manager_id).select_related("role").first()
+            if manager is None:
+                raise ValidationError("Manager không tồn tại.")
+            if not manager.is_active:
+                raise ValidationError("Không thể gán cho một Manager đã bị khoá.")
+            if not manager.role or manager.role.code != "MANAGER":
+                raise ValidationError("Người được gán phải có role MANAGER.")
+
+        # Cùng cái bẫy đã xử lý ở assign_department: hasattr() không bắt được
+        # DoesNotExist, và full_name là NOT NULL nên phải có defaults.
+        try:
+            old_manager_id = user.profile.manager_id
+        except EmployeeProfile.DoesNotExist:
+            old_manager_id = None
+        profile, _ = EmployeeProfile.objects.get_or_create(
+            user=user, defaults={"full_name": user.email}
+        )
+        profile.manager_id = manager_id
+        profile.save()
+
+        log_audit_event(
+            actor=request.user,
+            action="UPDATE",
+            table_name="employee_profiles",
+            record_id=user.id,
+            old_values={"manager_id": old_manager_id},
+            new_values={"manager_id": manager_id},
+            request=request,
+            severity=AuditLog.Severity.WARNING,
+        )
+        return Response({"detail": "Manager assigned."}, status=status.HTTP_200_OK)
 
 
 class RoleViewSet(viewsets.ReadOnlyModelViewSet):

@@ -37,16 +37,24 @@ def assert_task_in_manager_scope(user, task):
         raise PermissionDenied("TASK_OUT_OF_MANAGER_SCOPE")
 
 
-def get_active_employee_or_error(user_id):
+def get_active_employee_or_error(user_id, manager=None):
     """
     Lấy assignee hợp lệ.
 
     Theo FR-34, task được giao cho Employee.
+
+    Khi truyền `manager`, hàm còn kiểm tra Employee đó có thuộc tuyến báo cáo
+    của Manager này không (EmployeeProfile.manager). Đây là chốt chặn để một
+    Manager không giao được việc cho nhân viên của Manager khác — trước đây
+    chỉ kiểm role nên ai cũng giao cho ai cũng được.
+
+    Đặt luật ở đây chứ không ở serializer vì đây là điểm nghẽn duy nhất: cả
+    create_task lẫn update_task đều đi qua hàm này.
     """
     User = get_user_model()
 
     try:
-        user = User.objects.select_related("role").get(
+        user = User.objects.select_related("role", "profile").get(
             id=user_id,
             is_active=True,
         )
@@ -65,6 +73,18 @@ def get_active_employee_or_error(user_id):
                 "assignee_id": "Assignee must be an active Employee."
             }
         )
+
+    if manager is not None:
+        assignee_manager_id = getattr(getattr(user, "profile", None), "manager_id", None)
+        if assignee_manager_id != manager.id:
+            raise ValidationError(
+                {
+                    "assignee_id": (
+                        "Nhân viên này không thuộc tuyến quản lý của bạn. "
+                        "Liên hệ Admin nếu cần điều chuyển."
+                    )
+                }
+            )
 
     return user
 
@@ -177,7 +197,7 @@ def create_task(*, user, data, request=None):
 
         validate_task_deadline(job, deadline, is_create=True)
 
-        assignee = get_active_employee_or_error(assignee_id)
+        assignee = get_active_employee_or_error(assignee_id, manager=user)
 
         last_key = get_last_order_key(
             job_id=job.id,
@@ -308,7 +328,7 @@ def update_task(*, user, task, data, request=None):
             locked_task.deadline = data["deadline"]
 
         if "assignee_id" in data:
-            new_assignee = get_active_employee_or_error(data["assignee_id"])
+            new_assignee = get_active_employee_or_error(data["assignee_id"], manager=user)
 
             if locked_task.assignee_id != new_assignee.id:
                 locked_task.assignee = new_assignee

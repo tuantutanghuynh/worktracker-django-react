@@ -57,13 +57,26 @@ class TestManagerEmployeeList:
 
 
 # ============================================================
-# Test 2: Đổi phòng ban nhân viên
+# Test 2: Đổi phòng ban / đổi Manager là việc của Admin
 # ============================================================
+#
+# Bộ test cũ ở đây kiểm tra endpoint
+#   PATCH /api/manager/accounts/employees/{id}/department/
+# nhưng endpoint đó chưa bao giờ tồn tại — urls_manager.py chỉ có 2 route
+# đọc. Test được viết trước, code không theo, nên 2 test luôn fail với 404.
+#
+# Quyết định nghiệp vụ: KHÔNG xây endpoint đó. Cơ cấu tổ chức (phòng ban,
+# tuyến báo cáo) thuộc quyền Admin, không phải quản lý dự án — giống Jira
+# hay Asana, nơi PM phân việc chứ không đổi được phòng ban của người khác.
+#
+# Đường đi đúng đã có sẵn và đã được phủ test:
+#   PATCH /api/auth/users/{id}/assign-department/  (accounts/test_users.py)
+#   PATCH /api/auth/users/{id}/assign-manager/     (accounts/test_manager_scope.py)
+#
+# Test dưới đây chốt lại chính quyết định trên: Manager gọi vào endpoint
+# Admin thì phải bị từ chối.
 @pytest.mark.django_db
-class TestManagerDepartmentUpdate:
-    """
-    Kiểm thử API đổi phòng ban nhân viên của Manager.
-    """
+class TestManagerKhongDoiDuocCoCauToChuc:
 
     def setup_method(self):
         cache.clear()
@@ -73,57 +86,41 @@ class TestManagerDepartmentUpdate:
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
 
         perm_view = baker.make("accounts.Permission", code="team:view")
-        perm_assign = baker.make("accounts.Permission", code="team:assign_department")
         baker.make("accounts.RolePermission", role=self.role_manager, permission=perm_view)
-        baker.make("accounts.RolePermission", role=self.role_manager, permission=perm_assign)
 
         self.manager = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser",
+            role=self.role_manager,
+            is_active=True,
+            must_change_password=False,
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser",
+            role=self.role_employee,
+            is_active=True,
+            must_change_password=False,
         )
-
-        # Tạo profile cho employee
-        self.profile = baker.make(
-            "accounts.EmployeeProfile",
-            user=self.employee,
-            full_name="Trần Thị B",
-            department=None,
-        )
-
-        # Tạo 2 phòng ban
         self.dept_new = baker.make("accounts.Department", name="Phòng Kỹ thuật")
 
-        self.url = f"/api/manager/accounts/employees/{self.employee.id}/department/"
-
-    def test_update_employee_department_success(self):
-        """Manager đổi phòng ban của Employee -> 200 OK, department_id được cập nhật."""
+    def test_manager_khong_doi_duoc_phong_ban(self):
+        """IsAdminRole chặn Manager ở endpoint đổi phòng ban."""
         self.client.force_authenticate(user=self.manager)
-        payload = {"department_id": self.dept_new.id}
-        response = self.client.patch(self.url, payload, format="json")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["department_id"] == self.dept_new.id
-
-        # Xác nhận DB đã thay đổi
-        self.profile.refresh_from_db()
-        assert self.profile.department_id == self.dept_new.id
-
-    def test_manager_without_permission_cannot_assign_department(self):
-        """Manager không có quyền team:assign_department -> 403 Forbidden."""
-        # Tạo một Manager không có quyền assign
-        role_manager_no_perm = baker.make("accounts.Role", code="MANAGER_NO_PERM")
-        # Chỉ cấp team:view, không cấp team:assign_department
-        perm_view = baker.make("accounts.Permission", code="team:view_v2")
-        baker.make("accounts.RolePermission", role=role_manager_no_perm, permission=perm_view)
-
-        manager_no_perm = baker.make(
-            "accounts.CustomUser", role=role_manager_no_perm, is_active=True
+        response = self.client.patch(
+            f"/api/auth/users/{self.employee.id}/assign-department/",
+            {"department": self.dept_new.id},
+            format="json",
         )
-        self.client.force_authenticate(user=manager_no_perm)
-        payload = {"department_id": self.dept_new.id}
-        response = self.client.patch(self.url, payload, format="json")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
-        # Không có IsManagerRole nên bị 403
+    def test_manager_khong_doi_duoc_tuyen_bao_cao(self):
+        """
+        Quan trọng hơn cả đổi phòng ban: nếu Manager tự gán được nhân viên
+        cho mình thì toàn bộ cơ chế giới hạn phạm vi trở nên vô nghĩa.
+        """
+        self.client.force_authenticate(user=self.manager)
+        response = self.client.patch(
+            f"/api/auth/users/{self.employee.id}/assign-manager/",
+            {"manager": self.manager.id},
+            format="json",
+        )
         assert response.status_code == status.HTTP_403_FORBIDDEN

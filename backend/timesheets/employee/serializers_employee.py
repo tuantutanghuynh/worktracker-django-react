@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
@@ -30,6 +31,21 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
     def validate_hours_spent(self, value):
         if value <= 0:
             raise serializers.ValidationError("hours_spent must be greater than 0.")
+        return value
+
+    # Chấm công là ghi nhận việc ĐÃ LÀM — chưa tới ngày thì chưa có gì để
+    # ghi. Trước đây backend nhận mọi ngày, đã thử tạo được log cho ngày cách
+    # hôm nay 60 ngày và nhận 201 Created. Dữ liệu đó làm sai lệch mọi báo
+    # cáo tổng giờ, và từng khiến trung bình giờ/ngày vọt lên 10.4h.
+    #
+    # Cho phép log ngày hôm nay; chỉ chặn từ ngày mai trở đi.
+    def validate_work_date(self, value):
+        today = timezone.localdate()
+        if value > today:
+            raise serializers.ValidationError(
+                f"Không thể chấm công cho ngày trong tương lai ({value}). "
+                f"Hôm nay là {today}."
+            )
         return value
 
     # Data Isolation & State Locking: rejects a task that isn't assigned to the caller or is locked.

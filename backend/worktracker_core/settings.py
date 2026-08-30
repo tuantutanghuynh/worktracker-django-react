@@ -130,6 +130,24 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Chong do mat khau: gioi han so lan goi cac endpoint khong can dang
+    # nhap. ScopedRateThrottle chi ap dung cho view nao khai bao
+    # throttle_scope, nen cac API con lai khong bi anh huong.
+    #
+    # Voi request chua dang nhap, DRF dem theo dia chi IP. Bo dem luu trong
+    # cache 'default' (Redis) — Redis phai chay, nhung he thong von da phu
+    # thuoc Redis de xac thuc JWT nen khong phat sinh phu thuoc moi.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        # Nguoi that go sai mat khau vai lan la binh thuong; 10 lan/phut du
+        # rong cho ho nhung chan duoc script do hang nghin lan.
+        'login': os.environ.get('THROTTLE_LOGIN', '10/min'),
+        # Quen mat khau gui email that nen siet chat hon, tranh bi lam dung
+        # de spam hom thu nguoi khac.
+        'password_reset': os.environ.get('THROTTLE_PASSWORD_RESET', '5/min'),
+    },
 }
 
 SIMPLE_JWT = {
@@ -222,6 +240,10 @@ CHANNEL_LAYERS = {
 
 WORK_DAYS_PER_WEEK = int(os.environ.get("WORK_DAYS_PER_WEEK", 6))
 DAILY_WORKING_HOURS = int(os.environ.get("DAILY_WORKING_HOURS", 8))
+# Nguong canh bao cua trang Timesheet Control: log duoi bao nhieu phan tram
+# gio du kien thi gan trang thai WARNING. Truoc day so 0.8 nam cung trong
+# code, khong ai chinh duoc va khong co trong tai lieu dac ta.
+TIMESHEET_WARNING_THRESHOLD = float(os.environ.get("TIMESHEET_WARNING_THRESHOLD", 0.8))
 
 
 # ── CELERY ────────────────────────────────────────────────────────────────────

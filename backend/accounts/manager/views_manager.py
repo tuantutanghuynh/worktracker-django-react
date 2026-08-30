@@ -64,10 +64,19 @@ class ManagerTeamEmployeeListView(ListAPIView):
     serializer_class = ManagerEmployeeListSerializer
 
     def get_queryset(self):
+        # Phạm vi quản lý: Manager CHỈ thấy nhân viên thuộc tuyến báo cáo của
+        # mình (EmployeeProfile.manager). Trước đây endpoint này trả về toàn
+        # bộ nhân viên công ty, nên bất kỳ Manager nào cũng giao việc được cho
+        # bất kỳ ai — không đúng quy trình nghiệp vụ.
+        #
+        # Nhân viên chưa được gán Manager sẽ không hiện với ai cả. Đó là hành
+        # vi mong muốn: Admin phải chủ động gán, không để rơi vào tay ngẫu
+        # nhiên. Trang User List có bộ lọc "Chưa gán" để Admin dọn số này.
         qs = (
             CustomUser.objects.filter(
                 role__code="EMPLOYEE",
                 is_active=True,
+                profile__manager=self.request.user,
             )
             .select_related("profile", "profile__department", "role")
             .annotate(

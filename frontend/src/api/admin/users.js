@@ -26,5 +26,11 @@ export const resetUserPassword = (id, new_password) =>
 export const assignUserDepartment = (id, department) =>
   axiosClient.patch(`/auth/users/${id}/assign-department/`, { department }).then((r) => r.data);
 
+// Gan Manager phu trach cho mot Employee. Truyen manager=null de go
+// (dua ve "Chua gan") — backend coi khoa "manager" bang null la bo gan,
+// giong cach assign-department xu ly.
+export const assignUserManager = (id, manager) =>
+  axiosClient.patch(`/auth/users/${id}/assign-manager/`, { manager }).then((r) => r.data);
+
 export const listRoles = () =>
   axiosClient.get('/auth/roles/').then((r) => r.data);

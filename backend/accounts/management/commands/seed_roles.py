@@ -116,7 +116,10 @@ class Command(BaseCommand):
                 'task:view', 'task:create', 'task:update', 'task:change_status', 'task:review', 'task:cancel', 'task:comment', 'task:attachment', 'task:follow',
                 'timesheet:view', 'timesheet:review', 'timesheet:correct', 'timesheet:void', 'timesheet:export',
                 'timelock:view', 'timelock:lock', 'timelock:unlock',
-                'team:view', 'team:assign_department',
+                # team:assign_department da bo khoi MANAGER: co cau to chuc
+                # (phong ban, tuyen bao cao) thuoc quyen Admin. Manager chi
+                # can team:view de xem nhan vien cua minh ma giao viec.
+                'team:view',
                 'report:view', 'report:export',
                 'notification:view', 'audit:view',
             ]

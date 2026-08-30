@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db.models import Count, Q, Sum, Max
 from django.utils import timezone
 
-from accounts.models import CustomUser
+from accounts.models import CustomUser, EmployeeProfile
 from timesheets.models import DailyUserTimesheet, LogWork, TimeLock
 from timesheets.services.manager_employee_utilization_service import calculate_working_days
 
@@ -30,7 +30,12 @@ def _daily_working_hours():
     return getattr(settings, "DAILY_WORKING_HOURS", 8)
 
 
-def get_elapsed_working_days(start_date, end_date):
+def _warning_threshold():
+    """Tỷ lệ giờ tối thiểu so với chỉ tiêu trước khi bị gắn WARNING."""
+    return getattr(settings, "TIMESHEET_WARNING_THRESHOLD", 0.8)
+
+
+def get_elapsed_working_days(start_date, end_date, joined_date=None):
     """
     Số ngày làm việc đã THỰC SỰ trôi qua tính tới hôm nay.
 
@@ -38,12 +43,24 @@ def get_elapsed_working_days(start_date, end_date):
     những ngày còn lại chưa tới thì chưa thể coi là "chưa chấm công". Nếu
     lấy cả tháng thì giữa tháng ai cũng bị tính thiếu vài ngày và luôn hiện
     MISSING dù đã log đầy đủ. Với tháng đã qua thì mốc vẫn là cuối tháng.
+
+    `joined_date` dời mốc BẮT ĐẦU đếm về ngày nhân viên vào làm. Người vào
+    ngày 20 không thể bị tính thiếu công từ mùng 1 — họ chưa thuộc công ty.
+    Không truyền thì đếm từ đầu tháng như cũ (dùng cho chỉ số toàn công ty).
     """
     today = timezone.now().date()
     if today < start_date:
         return 0  # tháng ở tương lai — chưa có ngày nào phải chấm công
+
+    effective_start = start_date
+    if joined_date and joined_date > start_date:
+        effective_start = joined_date
+
     effective_end = min(end_date, today)
-    return calculate_working_days(start_date, effective_end)
+    if effective_start > effective_end:
+        # Vào làm sau khoảng đang xem (hoặc sau hôm nay) — chưa có ngày công nào
+        return 0
+    return calculate_working_days(effective_start, effective_end)
 
 
 def get_admin_timesheet_summary(month, year):
@@ -94,9 +111,22 @@ def get_admin_timesheet_summary(month, year):
         .annotate(days=Count("id"))
         .values_list("user_id", "days")
     )
-    missing_timesheets = sum(
-        max(elapsed_working_days - logged_days_by_user.get(uid, 0), 0) for uid in employee_ids
+    # Mốc riêng cho từng người theo ngày vào làm — cộng dồn con số của mỗi
+    # nhân viên chứ không nhân chung một mốc, nếu không nhân viên mới sẽ đội
+    # số "thiếu chấm công" của toàn công ty lên.
+    joined_by_user = dict(
+        EmployeeProfile.objects.filter(user_id__in=employee_ids)
+        .values_list("user_id", "joined_date")
     )
+    missing_timesheets = 0
+    for uid in employee_ids:
+        joined = joined_by_user.get(uid)
+        days = (
+            get_elapsed_working_days(start_date, end_date, joined)
+            if joined
+            else elapsed_working_days
+        )
+        missing_timesheets += max(days - logged_days_by_user.get(uid, 0), 0)
 
     return {
         "total_logged_hours": round(total_logged_hours, 1),
@@ -128,7 +158,6 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
     working_days = calculate_working_days(start_date, end_date)
     target_hours = working_days * daily_hours
     elapsed_working_days = get_elapsed_working_days(start_date, end_date)
-    expected_hours_to_date = elapsed_working_days * daily_hours
 
     employees = CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True).select_related(
         "profile", "profile__department"
@@ -189,21 +218,34 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
 
     results = []
     for emp in employees:
+        profile = getattr(emp, "profile", None)
         logged_hours = decimal_to_float(hours_by_user.get(emp.id))
         logged_hours_to_date = decimal_to_float(hours_to_date_by_user.get(emp.id))
         violations = violations_by_user.get(emp.id, 0)
-        missing_days = max(elapsed_working_days - logged_days_by_user.get(emp.id, 0), 0)
+
+        # Mốc đếm riêng cho từng người: ai vào làm giữa tháng thì chỉ bị tính
+        # từ ngày vào làm trở đi. Dùng chung một con số cho cả công ty sẽ báo
+        # nhân viên mới thiếu công những ngày họ chưa thuộc công ty — và người
+        # quản lý sẽ nhanh chóng học cách bỏ qua cảnh báo của hệ thống.
+        joined_date = profile.joined_date if profile else None
+        emp_elapsed_days = (
+            get_elapsed_working_days(start_date, end_date, joined_date)
+            if joined_date
+            else elapsed_working_days
+        )
+        emp_expected_hours = emp_elapsed_days * daily_hours
+
+        missing_days = max(emp_elapsed_days - logged_days_by_user.get(emp.id, 0), 0)
 
         if violations > 0:
             status = "OVER_LIMIT"
         elif missing_days > 0:
             status = "MISSING"
-        elif expected_hours_to_date > 0 and logged_hours < expected_hours_to_date * 0.8:
+        elif emp_expected_hours > 0 and logged_hours < emp_expected_hours * _warning_threshold():
             status = "WARNING"
         else:
             status = "NORMAL"
 
-        profile = getattr(emp, "profile", None)
         results.append(
             {
                 "user_id": emp.id,
@@ -216,8 +258,8 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
                 # Giờ-tới-hôm-nay chia cho ngày-làm-việc-tới-hôm-nay: cùng
                 # một khoảng thời gian ở cả tử và mẫu.
                 "avg_per_day": (
-                    round(logged_hours_to_date / elapsed_working_days, 2)
-                    if elapsed_working_days
+                    round(logged_hours_to_date / emp_elapsed_days, 2)
+                    if emp_elapsed_days
                     else 0.0
                 ),
                 "violations": violations,
@@ -237,7 +279,12 @@ def get_admin_employee_timesheet_detail(user_id, month, year):
     start_date, end_date = get_month_range(month, year)
     daily_hours = _daily_working_hours()
     working_days = calculate_working_days(start_date, end_date)
-    elapsed_working_days = get_elapsed_working_days(start_date, end_date)
+    joined_date = (
+        EmployeeProfile.objects.filter(user_id=user_id)
+        .values_list("joined_date", flat=True)
+        .first()
+    )
+    elapsed_working_days = get_elapsed_working_days(start_date, end_date, joined_date)
 
     logs_in_range = LogWork.objects.filter(user_id=user_id, work_date__range=(start_date, end_date)).exclude(
         review_status=LogWork.ReviewStatus.VOIDED
