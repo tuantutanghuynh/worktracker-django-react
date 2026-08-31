@@ -69,6 +69,7 @@ const MENU_CONFIG = {
     navItems: [
       { path: '/employee/dashboard', label: 'Dashboard', icon: LayoutGrid },
       { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks, hasDividerTop: true },
+      { path: '/employee/team', label: 'My Team', icon: Users },
       { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
       { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp, hasDividerTop: true },
       { path: '/employee/chat', label: 'Team Chat', icon: MessageSquare, hasDividerTop: true },

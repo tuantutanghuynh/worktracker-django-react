@@ -19,6 +19,7 @@ import { MyTasksPage } from "../pages/employee/MyTasksPage"
 import { TimesheetPage } from "../pages/employee/TimesheetPage"
 import { EmployeeChatPage } from "../pages/employee/EmployeeChatPage"
 import { EmployeeAuditLogsPage } from "../pages/employee/EmployeeAuditLogsPage"
+import MyTeamPage from "../pages/employee/MyTeamPage"
 
 // Manager (Long) — lazy load
 import ManagerLayout from "../layouts/ManagerLayout"
@@ -95,6 +96,7 @@ export function AppRouter() {
                             <Route path="/employee/notifications" element={<NotificationsPage />} />
                             <Route path="/my-tasks" element={<MyTasksPage />} />
                             <Route path="/employee/my-tasks" element={<MyTasksPage />} />
+                            <Route path="/employee/team" element={<MyTeamPage />} />
                             <Route path="/employee/timesheet" element={<TimesheetPage />} />
                             <Route path="/employee/chat" element={<EmployeeChatPage />} />
                             <Route path="/employee/audit-logs" element={<EmployeeAuditLogsPage />} />
