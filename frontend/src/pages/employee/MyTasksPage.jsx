@@ -166,7 +166,11 @@ export function MyTasksPage() {
             className: "max-w-[160px]",
             cell: (info) => {
                 const task = info.row.original
-                const frozen = isTaskFrozen(task)
+                // Dùng isFrozenOpenTask (không phải isTaskFrozen thô) — task đã
+                // COMPLETED/CANCELLED thì job không ACTIVE cũng không còn hành
+                // động nào bị chặn, hiện badge "Frozen" ở đây sẽ gây hiểu lầm
+                // (đặc biệt mâu thuẫn với việc task đó vẫn nằm ở tab Active).
+                const frozen = isFrozenOpenTask(task)
                 return (
                     <div className="flex flex-col gap-0.5 truncate" title={task.job_name}>
                         <span className="truncate">{task.job_name || "—"}</span>
@@ -408,7 +412,11 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
     const [editingLog, setEditingLog] = useState(null)
 
     const isLocked = task?.status === "REVIEWING" || task?.status === "COMPLETED" || task?.status === "CANCELLED"
-    const isFrozen = isTaskFrozen(task)
+    // isFrozenOpenTask (không phải isTaskFrozen thô) — 1 task đã COMPLETED/
+    // CANCELLED thì job không ACTIVE cũng chẳng còn hành động nào để chặn,
+    // hiện banner "Project Frozen" lúc đó chỉ gây nhiễu bên cạnh banner
+    // "Task is CLOSED" (isLocked) đã đủ giải thích rồi.
+    const isFrozen = isFrozenOpenTask(task ?? {})
     const totalLoggedHours = workLogs
         .filter((log) => log.review_status !== "VOIDED")
         .reduce((sum, log) => sum + Number(log.hours_spent), 0)
