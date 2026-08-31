@@ -16,7 +16,10 @@ import { cn } from '../../utils/cn';
 import { useMyTeam } from '../../hooks/queries/employee/useMyTeam';
 
 // Job.status / Job.priority choices, đúng thứ tự với backend (projects/models.py).
+// value: '' đứng đầu mỗi list — chỗ để quay lại "không lọc", vì SelectDropdown
+// không có nút clear riêng, chỉ chọn được trong chính danh sách option.
 const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
   { value: 'PLANNING', label: 'Planning' },
   { value: 'ACTIVE', label: 'Active' },
   { value: 'ON_HOLD', label: 'On Hold' },
@@ -25,6 +28,7 @@ const STATUS_OPTIONS = [
 ];
 
 const PRIORITY_OPTIONS = [
+  { value: '', label: 'All Priorities' },
   { value: 'HIGH', label: 'High' },
   { value: 'MEDIUM', label: 'Medium' },
   { value: 'LOW', label: 'Low' },
@@ -67,7 +71,10 @@ export default function MyTeamPage() {
         seen.set(job.manager.id, job.manager.full_name || job.manager.email);
       }
     }
-    return Array.from(seen, ([value, label]) => ({ value: String(value), label }));
+    return [
+      { value: '', label: 'All Managers' },
+      ...Array.from(seen, ([value, label]) => ({ value: String(value), label })),
+    ];
   }, [jobs]);
 
   const filteredJobs = useMemo(() => {
