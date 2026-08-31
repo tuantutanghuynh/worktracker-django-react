@@ -3,20 +3,6 @@ from rest_framework import serializers
 from projects.models import Job
 
 
-class EmployeeMyTeamUserMiniSerializer(serializers.Serializer):
-    """Thông tin tối thiểu của 1 người (Manager hoặc đồng nghiệp) —
-    chỉ danh tính/liên hệ, KHÔNG có số liệu workload."""
-    id = serializers.IntegerField()
-    full_name = serializers.CharField(allow_null=True)
-    email = serializers.EmailField()
-    avatar_url = serializers.CharField(allow_null=True, required=False)
-
-
-class EmployeeMyTeamTeammateSerializer(EmployeeMyTeamUserMiniSerializer):
-    is_active = serializers.BooleanField()
-    is_me = serializers.BooleanField()
-
-
 class EmployeeMyTeamJobSerializer(serializers.ModelSerializer):
     """1 dự án mà Employee đang tham gia, kèm Manager + đồng nghiệp
     cùng dự án. `teammates_by_job` (dict job_id -> list) được truyền

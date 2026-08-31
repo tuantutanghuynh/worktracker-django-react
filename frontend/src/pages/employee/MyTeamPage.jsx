@@ -5,7 +5,7 @@ import { Users, Search, Mail, MessageSquare, Briefcase } from 'lucide-react';
 import UserAvatar from '../../components/common/avatar/UserAvatar';
 import StatusBadge from '../../components/common/badges/StatusBadge';
 import PriorityBadge from '../../components/common/badges/PriorityBadge';
-import { cn } from '../../utils/cn';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 import { useMyTeam } from '../../hooks/queries/employee/useMyTeam';
 
@@ -13,7 +13,7 @@ export default function MyTeamPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: jobs = [], isLoading } = useMyTeam();
+  const { data: jobs = [], isLoading, error } = useMyTeam();
 
   const filteredJobs = useMemo(() => {
     if (!searchQuery.trim()) return jobs;
@@ -53,6 +53,8 @@ export default function MyTeamPage() {
         <div className="py-12 flex justify-center">
           <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : error ? (
+        <p className="text-xs text-rose-500">{getErrorMessage(error, "Failed to load your team")}</p>
       ) : filteredJobs.length === 0 ? (
         <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-1">
           <Users className="w-8 h-8 text-slate-300 mx-auto" />
