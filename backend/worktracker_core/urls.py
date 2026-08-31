@@ -30,6 +30,7 @@ urlpatterns = [
     # ── EMPLOYEE SCOPE (TuanTu) ────────────────────────────────────────────────
     path("api/employee/", include("accounts.employee.urls_employee")),
     path("api/employee/", include("tasks.employee.urls_employee")),
+    path("api/employee/", include("projects.employee.urls_employee")),
     path("api/timesheets/", include("timesheets.employee.urls_employee")),
     path("api/notifications/", include("system.employee.urls_employee")),
     path("api/employee/audit-logs/", EmployeeAuditLogListView.as_view(), name="employee-audit-log-list"),
