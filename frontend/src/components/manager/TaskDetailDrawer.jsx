@@ -24,6 +24,7 @@ import {
   Edit3,
   PauseCircle,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -43,6 +44,7 @@ import {
   useApproveTask,
   useRejectTask,
   useCancelTask,
+  useDeleteTask,
   useChangeTaskStatus,
   useTaskComments,
   useCreateTaskComment,
@@ -103,6 +105,9 @@ export default function TaskDetailDrawer() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
+  // State cho Delete Task Modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
   // State cho Comment input
   const [commentInput, setCommentInput] = useState('');
 
@@ -122,6 +127,7 @@ export default function TaskDetailDrawer() {
   const approveTaskMutation = useApproveTask();
   const rejectTaskMutation = useRejectTask();
   const cancelTaskMutation = useCancelTask();
+  const deleteTaskMutation = useDeleteTask();
   const changeTaskStatusMutation = useChangeTaskStatus();
   const createCommentMutation = useCreateTaskComment(selectedTaskId);
   const uploadAttachmentMutation = useUploadTaskAttachment(selectedTaskId);
@@ -131,10 +137,11 @@ export default function TaskDetailDrawer() {
   // Đồng bộ Form khi nạp xong Task
   useEffect(() => {
     if (task) {
+      const isManager = task.assignee?.role === 'MANAGER' || (task.job?.manager && task.assignee?.id === task.job.manager.id);
       setEditFormData({
         title: task.title || '',
         description: task.description || '',
-        assignee_id: task.assignee?.id ? String(task.assignee.id) : '',
+        assignee_id: isManager ? '' : (task.assignee?.id ? String(task.assignee.id) : ''),
         priority: task.priority || 'MEDIUM',
         deadline: task.deadline || '',
       });
@@ -515,12 +522,34 @@ export default function TaskDetailDrawer() {
 
             <div>
               <span className="text-slate-400 font-semibold text-[11px] block">Assignee</span>
-              <div className="flex items-center gap-1.5 mt-1">
-                {task.assignee && <UserAvatar user={task.assignee} size="xs" />}
-                <span className="font-bold text-slate-900 text-xs truncate max-w-[120px]">
-                  {task.assignee?.full_name || task.assignee?.email || 'Unassigned'}
-                </span>
-              </div>
+              {(() => {
+                const isUnassigned =
+                  !task.assignee ||
+                  task.assignee?.role === 'MANAGER' ||
+                  (task.job?.manager && (task.assignee?.id === task.job.manager.id || task.assignee?.email === task.job.manager.email));
+
+                if (isUnassigned) {
+                  return (
+                    <div className="flex items-center gap-1.5 mt-1 text-amber-700">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 font-extrabold text-[9px] flex items-center justify-center shrink-0">
+                        ?
+                      </div>
+                      <span className="font-bold text-xs text-amber-700 italic">
+                        Unassigned
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {task.assignee && <UserAvatar user={task.assignee} size="xs" />}
+                    <span className="font-bold text-slate-900 text-xs truncate max-w-[120px]">
+                      {task.assignee?.full_name || task.assignee?.email}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div>
@@ -628,19 +657,34 @@ export default function TaskDetailDrawer() {
                   )}
                 </div>
 
-                {/* Cancel Task Link */}
-                {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' && (
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCancelReason('');
-                        setCancelModalOpen(true);
-                      }}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-bold transition hover:underline cursor-pointer"
-                    >
-                      Cancel this task
-                    </button>
+                {/* Cancel or Delete Task Links */}
+                {task.status !== 'COMPLETED' && (
+                  <div className="pt-2 flex items-center justify-end gap-3">
+                    {/* Nút Xóa vĩnh viễn (nếu task ở TODO hoặc chưa có logwork) */}
+                    {(task.status === 'TODO' || totalLoggedHours === 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteModalOpen(true)}
+                        className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 font-bold transition hover:underline cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete task</span>
+                      </button>
+                    )}
+
+                    {/* Nút Cancel task */}
+                    {task.status !== 'CANCELLED' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCancelReason('');
+                          setCancelModalOpen(true);
+                        }}
+                        className="text-xs text-slate-400 hover:text-slate-600 font-bold transition hover:underline cursor-pointer"
+                      >
+                        Cancel task
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -661,7 +705,7 @@ export default function TaskDetailDrawer() {
                 </div>
 
                 <InputField
-                  label="Task Title *"
+                  label="Task Title"
                   value={editFormData.title}
                   onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
                   placeholder="Task title..."
@@ -673,9 +717,10 @@ export default function TaskDetailDrawer() {
                   <select
                     value={editFormData.assignee_id}
                     onChange={(e) => setEditFormData({ ...editFormData, assignee_id: e.target.value })}
+                    required
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">-- Unassigned (Assign later) --</option>
+                    <option value="">-- Select an employee * --</option>
                     {employeeOptions.map((emp) => (
                       <option key={emp.value} value={emp.value}>
                         {emp.label}
@@ -1067,6 +1112,46 @@ export default function TaskDetailDrawer() {
             </button>
           </div>
         </form>
+      </BaseModal>
+
+      {/* Modal: Xóa vĩnh viễn Task (Delete Task) */}
+      <BaseModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Delete Task Permanently"
+        description={`Are you sure you want to permanently delete task "${task?.title}"? This action cannot be undone.`}
+      >
+        <div className="space-y-4 text-xs">
+          <p className="text-slate-600 leading-relaxed">
+            This task has not been worked on yet. Deleting it will permanently remove it from the database, keeping your project task list clean and accurate.
+          </p>
+
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(false)}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deleteTaskMutation.isPending}
+              onClick={async () => {
+                try {
+                  await deleteTaskMutation.mutateAsync(task.id);
+                  setDeleteModalOpen(false);
+                  closeTaskDrawer();
+                } catch (e) {
+                  // handled by mutation onError toast
+                }
+              }}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition"
+            >
+              {deleteTaskMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+            </button>
+          </div>
+        </div>
       </BaseModal>
     </SideDrawer>
   );

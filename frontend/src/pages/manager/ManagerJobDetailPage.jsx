@@ -30,6 +30,9 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 import DataTable from '../../components/common/table/DataTable';
 import SideDrawer from '../../components/common/drawer/SideDrawer';
@@ -45,6 +48,19 @@ import { useManagerTasks, useCreateTask } from '../../hooks/queries/manager/useM
 import { useManagerEmployees } from '../../hooks/queries/manager/useManagerTeam';
 import { useRecentJobsStore } from '../../stores/useRecentJobsStore';
 import { useUIStore } from '../../stores/useUIStore';
+
+// Zod Schema cho Form Tạo Task Mới (Đồng bộ với chuẩn Auth/Admin)
+const createTaskSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Task title is required.')
+    .max(255, 'Task title cannot exceed 255 characters.'),
+  assignee_id: z.string().optional().or(z.literal('')),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('MEDIUM'),
+  deadline: z.string().optional().or(z.literal('')),
+  description: z.string().optional().or(z.literal('')),
+});
 
 // 3 Tab Cốt lõi của Trang Chi tiết Job
 const TABS = [
@@ -81,15 +97,6 @@ export default function ManagerJobDetailPage() {
   const [newStatusValue, setNewStatusValue] = useState('ACTIVE');
   const [statusReason, setStatusReason] = useState('');
 
-  // Form State tạo Task mới
-  const [taskFormData, setTaskFormData] = useState({
-    title: '',
-    description: '',
-    assignee_id: '',
-    priority: 'MEDIUM',
-    deadline: '',
-  });
-
   // 🚀 TANSTACK REACT QUERY HOOKS: Nạp dữ liệu Job, Tasks và Employees (Scoped to this Job's Project Team)
   const { data: job, isLoading: jobLoading } = useManagerJobDetail(id);
   const { data: taskResponse, isLoading: tasksLoading } = useManagerTasks({ job_id: id });
@@ -98,6 +105,24 @@ export default function ManagerJobDetailPage() {
   // Mutations
   const createTaskMutation = useCreateTask();
   const changeJobStatusMutation = useChangeJobStatus();
+
+  // 📋 React Hook Form + Zod cho Form Tạo Task Mới
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createTaskSchema),
+    defaultValues: {
+      title: '',
+      assignee_id: '',
+      priority: 'MEDIUM',
+      deadline: '',
+      description: '',
+    },
+  });
 
   // 🌟 Tự động lưu Job vào Store Recently Viewed Jobs
   useEffect(() => {
@@ -112,19 +137,21 @@ export default function ManagerJobDetailPage() {
       ? employeesResponse
       : employeesResponse.results || [];
     return list.map((emp) => {
-      const name = emp.full_name || emp.email;
-      const dept = emp.department?.name || emp.department_name || 'Staff';
-      const workloadInfo = emp.daily_required_hours !== undefined
-        ? ` · ~${emp.daily_required_hours}h/d [${emp.workload_status || 'AVAILABLE'}]`
-        : '';
+      const swp = emp.smart_workload_pressure;
+      const statusLabel =
+        swp?.workload_status === 'OVERLOADED'
+          ? '🔴 Overloaded'
+          : swp?.workload_status === 'BALANCED'
+          ? '🟢 Balanced'
+          : '⚪ Available';
       return {
         value: String(emp.user_id || emp.id),
-        label: `${name} (${dept})${workloadInfo}`,
+        label: `${emp.full_name || emp.email} (${emp.department_name || 'Staff'}) [${statusLabel}]`,
       };
     });
   }, [employeesResponse]);
 
-  // Chuẩn hóa dữ liệu Tasks
+  // Chuẩn hóa danh sách Tasks
   const tasks = useMemo(() => {
     if (Array.isArray(taskResponse)) return taskResponse;
     if (taskResponse && Array.isArray(taskResponse.results)) return taskResponse.results;
@@ -194,43 +221,31 @@ export default function ManagerJobDetailPage() {
     return Object.values(memberMap);
   }, [tasks, job?.project_team, employeesResponse]);
 
-  // Xử lý Tạo Task Mới
-  const handleCreateTask = (e) => {
-    e.preventDefault();
-    if (!taskFormData.title.trim()) {
-      toast.error('Task title is required.');
-      return;
-    }
-
+  // Xử lý Tạo Task Mới (React Hook Form + Zod)
+  const onSubmitCreateTask = (data) => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    if (taskFormData.deadline && taskFormData.deadline < todayStr) {
+    if (data.deadline && data.deadline < todayStr) {
       toast.error('Task deadline cannot be in the past.');
       return;
     }
-    if (taskFormData.deadline && job?.deadline && taskFormData.deadline > job.deadline) {
+    if (data.deadline && job?.deadline && data.deadline > job.deadline) {
       toast.error(`Task deadline cannot exceed project deadline (${formatDateSafe(job.deadline)}).`);
       return;
     }
 
     const payload = {
-      title: taskFormData.title.trim(),
-      description: taskFormData.description.trim() || undefined,
+      title: data.title.trim(),
+      description: data.description?.trim() || undefined,
       job_id: Number(id),
-      assignee_id: taskFormData.assignee_id ? Number(taskFormData.assignee_id) : undefined,
-      priority: taskFormData.priority,
-      deadline: taskFormData.deadline || undefined,
+      assignee_id: data.assignee_id ? Number(data.assignee_id) : undefined,
+      priority: data.priority,
+      deadline: data.deadline || undefined,
     };
 
     createTaskMutation.mutate(payload, {
       onSuccess: () => {
         setCreateTaskDrawerOpen(false);
-        setTaskFormData({
-          title: '',
-          description: '',
-          assignee_id: '',
-          priority: 'MEDIUM',
-          deadline: '',
-        });
+        reset();
       },
     });
   };
@@ -337,16 +352,35 @@ const ALLOWED_TRANSITIONS = {
     {
       header: 'Assignee',
       accessorKey: 'assignee',
-      cell: (row) => (
-        <div className="flex items-center gap-2 text-xs text-slate-800 font-semibold">
-          <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-extrabold uppercase shrink-0 shadow-2xs">
-            {(row.assignee?.full_name || row.assignee?.email || 'U')[0]}
+      cell: (row) => {
+        const isUnassigned =
+          !row.assignee ||
+          (job?.manager && (row.assignee.id === job.manager.id || row.assignee.email === job.manager.email));
+
+        if (isUnassigned) {
+          return (
+            <div className="flex items-center gap-2 text-xs font-semibold">
+              <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 border border-amber-300 flex items-center justify-center text-[10px] font-extrabold shrink-0 shadow-2xs">
+                ?
+              </div>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-800">
+                Unassigned
+              </span>
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex items-center gap-2 text-xs text-slate-800 font-semibold">
+            <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-extrabold uppercase shrink-0 shadow-2xs">
+              {(row.assignee?.full_name || row.assignee?.email || 'U')[0]}
+            </div>
+            <span className="truncate max-w-[140px]">
+              {row.assignee?.full_name || row.assignee?.email}
+            </span>
           </div>
-          <span className="truncate max-w-[140px]">
-            {row.assignee?.full_name || row.assignee?.email || 'Unassigned'}
-          </span>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Status',
@@ -966,23 +1000,34 @@ const ALLOWED_TRANSITIONS = {
         onClose={() => setCreateTaskDrawerOpen(false)}
         title={`Add Task to ${job.job_name}`}
       >
-        <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
-          <InputField
-            label="Task Title *"
-            value={taskFormData.title}
-            onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
-            placeholder="e.g. Design Database Schema"
-            required
-          />
+        <form onSubmit={handleSubmit(onSubmitCreateTask)} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Task Title <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...register('title')}
+              placeholder="e.g. Design Database Schema"
+              className={cn(
+                'w-full bg-slate-50 border rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
+                errors.title ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-200'
+              )}
+            />
+            {errors.title && (
+              <p className="mt-1 text-[11px] text-rose-500 font-semibold">{errors.title.message}</p>
+            )}
+          </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Assign to Employee</label>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Assign to Employee <span className="text-slate-400 font-normal">(Optional)</span>
+            </label>
             <select
-              value={taskFormData.assignee_id}
-              onChange={(e) => setTaskFormData({ ...taskFormData, assignee_id: e.target.value })}
+              {...register('assignee_id')}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">-- Unassigned (Assign later) --</option>
+              <option value="">-- Select an employee (Optional) --</option>
               {employeeOptions.map((emp) => (
                 <option key={emp.value} value={emp.value}>
                   {emp.label}
@@ -992,42 +1037,61 @@ const ALLOWED_TRANSITIONS = {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <SelectDropdown
-              label="Priority"
-              value={taskFormData.priority}
-              onChange={(val) => setTaskFormData({ ...taskFormData, priority: val })}
-              options={[
-                { value: 'HIGH', label: 'High Priority' },
-                { value: 'MEDIUM', label: 'Medium Priority' },
-                { value: 'LOW', label: 'Low Priority' },
-              ]}
+            <Controller
+              name="priority"
+              control={control}
+              render={({ field }) => (
+                <SelectDropdown
+                  label="Priority"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={[
+                    { value: 'HIGH', label: 'High Priority' },
+                    { value: 'MEDIUM', label: 'Medium Priority' },
+                    { value: 'LOW', label: 'Low Priority' },
+                  ]}
+                />
+              )}
             />
 
-            <InputField
-              label="Deadline"
-              type="date"
-              min={format(new Date(), 'yyyy-MM-dd')}
-              max={job?.deadline || undefined}
-              value={taskFormData.deadline}
-              onChange={(e) => setTaskFormData({ ...taskFormData, deadline: e.target.value })}
-            />
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Deadline</label>
+              <input
+                type="date"
+                {...register('deadline')}
+                min={format(new Date(), 'yyyy-MM-dd')}
+                max={job?.deadline || undefined}
+                className={cn(
+                  'w-full bg-slate-50 border rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors',
+                  errors.deadline ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-200'
+                )}
+              />
+              {errors.deadline && (
+                <p className="mt-1 text-[11px] text-rose-500 font-semibold">{errors.deadline.message}</p>
+              )}
+            </div>
           </div>
 
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Description & Scope</label>
             <textarea
               rows={4}
-              value={taskFormData.description}
-              onChange={(e) => setTaskFormData({ ...taskFormData, description: e.target.value })}
+              {...register('description')}
               placeholder="Provide clear technical instructions and acceptance criteria..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
             />
+            {errors.description && (
+              <p className="mt-1 text-[11px] text-rose-500 font-semibold">{errors.description.message}</p>
+            )}
           </div>
 
           <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setCreateTaskDrawerOpen(false)}
+              onClick={() => {
+                setCreateTaskDrawerOpen(false);
+                reset();
+              }}
               className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer font-medium"
             >
               Cancel

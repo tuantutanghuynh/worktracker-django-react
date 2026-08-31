@@ -276,6 +276,24 @@ export function useCancelTask() {
 }
 
 /**
+ * 🗑️ Mutation: Delete Task (Hard Delete for unstarted tasks)
+ */
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => managerTaskService.deleteTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: managerTaskKeys.all });
+      toast.success('Task deleted permanently!');
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, 'Failed to delete task'));
+    },
+  });
+}
+
+/**
  * 💬 Hook: Fetch Task Comments
  */
 export function useTaskComments(taskId) {

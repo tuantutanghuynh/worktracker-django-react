@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutGrid,
   Briefcase,
@@ -32,6 +33,7 @@ import { useManagerTasks } from '../../../hooks/queries/manager/useManagerTasks'
 import { useLogWorks } from '../../../hooks/queries/manager/useManagerTimesheets';
 import { useMyTasks } from '../../../hooks/queries/employee/useMyTasks';
 import { useProfile } from '../../../hooks/queries/common/useProfile';
+import { chatService } from '../../../services/common/chatService';
 import UserAvatar from '../avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
 
@@ -54,7 +56,7 @@ const MENU_CONFIG = {
 
       // Nhóm 3: Quản lý Nhân sự & Trao đổi
       { path: '/manager/team', label: 'Team Members', icon: Users, hasDividerTop: true },
-      { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
+      { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare, isChatBadge: true },
 
       // Nhóm 4: Báo cáo & Kiểm toán
       { path: '/manager/reports', label: 'Reports', icon: BarChart3, hasDividerTop: true },
@@ -185,6 +187,20 @@ export default function Sidebar() {
     });
     return uniqueDays.size;
   }, [pendingLogWorksData]);
+
+  // 🚀 REACT QUERY: Lấy tổng số tin nhắn chưa đọc từ các phòng chat
+  const { data: chatRoomsData } = useQuery({
+    queryKey: ['chat-rooms'],
+    queryFn: () => chatService.getRooms(),
+    staleTime: 10000,
+    refetchInterval: 15000,
+  });
+  const chatUnreadCount = useMemo(() => {
+    if (!chatRoomsData) return 0;
+    const channels = Array.isArray(chatRoomsData.job_channels) ? chatRoomsData.job_channels : [];
+    const dms = Array.isArray(chatRoomsData.direct_messages) ? chatRoomsData.direct_messages : [];
+    return [...channels, ...dms].reduce((sum, r) => sum + (r.unread_count || 0), 0);
+  }, [chatRoomsData]);
 
   // 🚀 REACT QUERY: Lấy số lượng Task đang cần làm (TODO / IN_PROGRESS) của Employee
   const isEmployee = userRole === 'EMPLOYEE';
@@ -333,6 +349,12 @@ export default function Sidebar() {
                   {item.isTimesheetBadge && pendingTimesheetCount > 0 && (
                     <span className="bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
                       {pendingTimesheetCount > 99 ? '99+' : pendingTimesheetCount}
+                    </span>
+                  )}
+
+                  {item.isChatBadge && chatUnreadCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs animate-pulse">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                     </span>
                   )}
                 </NavLink>

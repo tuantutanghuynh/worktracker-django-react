@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { chatService } from '../../../services/common/chatService';
 import { useAuth } from '../../../hooks/useAuth';
 import { cn } from '../../../utils/cn';
@@ -83,6 +84,7 @@ export default function ChatContainer({
   customTitle,
 }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // State quản lý danh sách phòng & phòng đang chọn
   const [jobChannels, setJobChannels] = useState([]);
@@ -127,6 +129,24 @@ export default function ChatContainer({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // 🧹 HÀM XÓA BADGE UNREAD CỤC BỘ & ĐỒNG BỘ REACT QUERY
+  const clearRoomUnread = useCallback((roomId) => {
+    if (!roomId) return;
+    setJobChannels((prev) =>
+      prev.map((r) => (r.id === roomId ? { ...r, unread_count: 0 } : r))
+    );
+    setDirectMessages((prev) =>
+      prev.map((r) => (r.id === roomId ? { ...r, unread_count: 0 } : r))
+    );
+    queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
+  }, [queryClient]);
+
+  const handleSelectRoom = useCallback((room) => {
+    if (!room) return;
+    setActiveRoom(room);
+    clearRoomUnread(room.id);
+  }, [clearRoomUnread]);
+
   // ============================================================
   // 1. NẠP DANH SÁCH CÁC PHÒNG CHAT TỪ BACKEND
   // ============================================================
@@ -147,6 +167,7 @@ export default function ChatContainer({
             setJobChannels(channels);
             setDirectMessages(dms);
             setActiveRoom(found);
+            clearRoomUnread(found.id);
             if (dms.some((d) => d.id === found.id)) setActiveTab('DIRECT');
             return;
           }
@@ -160,6 +181,7 @@ export default function ChatContainer({
               setJobChannels(channels);
               setDirectMessages(dms);
               setActiveRoom(dmRoom);
+              clearRoomUnread(dmRoom.id);
               setActiveTab('DIRECT');
               return;
             }
@@ -179,6 +201,7 @@ export default function ChatContainer({
             setJobChannels(channels);
             setDirectMessages(dms);
             setActiveRoom(targetChannel);
+            clearRoomUnread(targetChannel.id);
             setActiveTab('CHANNELS');
             return;
           }
@@ -193,7 +216,9 @@ export default function ChatContainer({
             const updated = [...channels, ...dms].find((r) => r.id === prev.id);
             return updated || prev;
           }
-          return channels[0] || dms[0] || null;
+          const defaultRoom = channels[0] || dms[0] || null;
+          if (defaultRoom) clearRoomUnread(defaultRoom.id);
+          return defaultRoom;
         });
       } catch (err) {
         console.error('Failed to load chat rooms:', err);
@@ -202,7 +227,7 @@ export default function ChatContainer({
         setLoadingRooms(false);
       }
     },
-    []
+    [clearRoomUnread]
   );
 
   useEffect(() => {
@@ -222,6 +247,7 @@ export default function ChatContainer({
         const data = await chatService.getRoomMessages(activeRoom.id);
         if (isMounted) {
           setMessages(data.messages || []);
+          clearRoomUnread(activeRoom.id);
           setTimeout(scrollToBottom, 100);
         }
       } catch (err) {
@@ -236,9 +262,12 @@ export default function ChatContainer({
     // ============================================================
     // 3. THIẾT LẬP KẾT NỐI WEBSOCKET REALTIME CHO PHÒNG ĐANG CHỌN
     // ============================================================
+    const token = localStorage.getItem('access_token');
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const wsUrl = `${protocol}//${wsHost}/ws/chat/${activeRoom.id}/`;
+    const wsUrl = token
+      ? `${protocol}//${wsHost}/ws/chat/${activeRoom.id}/?token=${token}`
+      : `${protocol}//${wsHost}/ws/chat/${activeRoom.id}/`;
 
     if (wsRef.current) {
       wsRef.current.close();
@@ -602,7 +631,7 @@ export default function ChatContainer({
                         return (
                           <button
                             key={`job-${room.id}`}
-                            onClick={() => setActiveRoom(room)}
+                            onClick={() => handleSelectRoom(room)}
                             className={cn(
                               'w-full text-left p-2.5 rounded-xl flex items-start gap-2.5 transition-all relative cursor-pointer',
                               isActive
@@ -695,7 +724,7 @@ export default function ChatContainer({
                         return (
                           <button
                             key={`dm-${room.id}`}
-                            onClick={() => setActiveRoom(room)}
+                            onClick={() => handleSelectRoom(room)}
                             className={cn(
                               'w-full text-left p-2.5 rounded-xl flex items-start gap-2.5 transition-all relative cursor-pointer',
                               isActive

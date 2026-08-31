@@ -62,7 +62,15 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         ]
 
     def get_team_size(self, obj):
-        return obj.tasks.values("assignee_id").distinct().count()
+        from chat.models import ChatParticipant
+        task_assignee_ids = set(obj.tasks.values_list("assignee_id", flat=True).distinct())
+        team_participant_ids = set(
+            ChatParticipant.objects.filter(room__job=obj, room__room_type='JOB')
+            .exclude(user=obj.manager)
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        return len(task_assignee_ids | team_participant_ids)
 
     def get_task_counts(self, obj):
         annotated_fields = [
@@ -123,8 +131,16 @@ class ManagerJobDetailSerializer(ManagerJobListSerializer):
 
     def get_project_team(self, obj):
         from accounts.models import CustomUser
-        assignee_ids = obj.tasks.values_list("assignee_id", flat=True).distinct()
-        users = CustomUser.objects.filter(id__in=assignee_ids, is_active=True).select_related("profile", "profile__department")
+        from chat.models import ChatParticipant
+        task_assignee_ids = set(obj.tasks.values_list("assignee_id", flat=True).distinct())
+        team_participant_ids = set(
+            ChatParticipant.objects.filter(room__job=obj, room__room_type='JOB')
+            .exclude(user=obj.manager)
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        all_member_ids = task_assignee_ids | team_participant_ids
+        users = CustomUser.objects.filter(id__in=all_member_ids, is_active=True).select_related("profile", "profile__department")
         return [
             {
                 "id": u.id,

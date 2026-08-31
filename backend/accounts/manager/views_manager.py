@@ -92,12 +92,26 @@ class ManagerTeamEmployeeListView(ListAPIView):
 
         job_id = self.request.query_params.get("job_id")
         if job_id:
-            team_user_ids = Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct()
+            from chat.models import ChatParticipant
+            task_assignee_ids = set(Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct())
+            team_participant_ids = set(
+                ChatParticipant.objects.filter(room__job_id=job_id, room__room_type='JOB')
+                .values_list('user_id', flat=True)
+                .distinct()
+            )
+            team_user_ids = task_assignee_ids | team_participant_ids
             qs = qs.filter(id__in=team_user_ids)
         elif role_code != "ADMIN":
             # Scoping chuẩn: Manager chỉ thấy các nhân viên thuộc các Job do mình quản lý
+            from chat.models import ChatParticipant
             managed_job_ids = Job.objects.filter(manager_id=user.id).values_list("id", flat=True)
-            team_user_ids = Task.objects.filter(job_id__in=managed_job_ids).values_list("assignee_id", flat=True).distinct()
+            task_assignee_ids = set(Task.objects.filter(job_id__in=managed_job_ids).values_list("assignee_id", flat=True).distinct())
+            team_participant_ids = set(
+                ChatParticipant.objects.filter(room__job_id__in=managed_job_ids, room__room_type='JOB')
+                .values_list('user_id', flat=True)
+                .distinct()
+            )
+            team_user_ids = task_assignee_ids | team_participant_ids
             qs = qs.filter(id__in=team_user_ids)
 
         department_id = self.request.query_params.get("department_id")

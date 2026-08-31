@@ -10,6 +10,7 @@ from tasks.services.task_deadline_calculator_service import calculate_task_deadl
 class ManagerUserMiniSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     email = serializers.EmailField()
+    role = serializers.CharField(source="role.code", read_only=True)
     full_name = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
@@ -172,7 +173,10 @@ class ManagerTaskDetailSerializer(ManagerTaskListSerializer):
 
 class ManagerTaskCreateSerializer(serializers.Serializer):
     job_id = serializers.IntegerField()
-    assignee_id = serializers.IntegerField()
+    assignee_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
     title = serializers.CharField(max_length=255)
     description = serializers.CharField(
         required=False,
@@ -202,13 +206,14 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
         return value
 
     def validate_assignee_id(self, value):
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        user = User.objects.filter(id=value, is_active=True).select_related("role").first()
-        if not user:
-            raise serializers.ValidationError("Active assignee does not exist.")
-        if getattr(getattr(user, "role", None), "code", None) != "EMPLOYEE":
-            raise serializers.ValidationError("Assignee must have an active EMPLOYEE role.")
+        if value:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.filter(id=value, is_active=True).select_related("role").first()
+            if not user:
+                raise serializers.ValidationError("Active assignee does not exist.")
+            if getattr(getattr(user, "role", None), "code", None) != "EMPLOYEE":
+                raise serializers.ValidationError("Assignee must have an active EMPLOYEE role.")
         return value
 
 

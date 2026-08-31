@@ -268,18 +268,12 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      {/* 📊 TIER 1: 5 CORE OPERATIONAL STATCARDS (BALANCED & COMPLETE) */}
+      {/* 📊 TIER 1: 5 CORE OPERATIONAL STATCARDS (CLEAN KPI TILES) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* CARD 1: MANAGED JOBS */}
-        <div
-          onClick={() => navigate('/manager/jobs')}
-          className="p-4 sm:p-5 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3 group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Folder className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition" />
+        <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <Folder className="w-4 h-4" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-500 block">Managed Jobs</span>
@@ -290,21 +284,12 @@ export default function ManagerDashboardPage() {
               <span className="text-xs font-semibold text-slate-400">in scope</span>
             </div>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center text-xs text-blue-600 font-bold">
-            <span>Active projects →</span>
-          </div>
         </div>
 
         {/* CARD 2: TEAM MEMBERS */}
-        <div
-          onClick={() => navigate('/manager/team')}
-          className="p-4 sm:p-5 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3 group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition" />
+        <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <Users className="w-4 h-4" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-500 block">Team Members</span>
@@ -315,21 +300,12 @@ export default function ManagerDashboardPage() {
               <span className="text-xs font-semibold text-slate-400">assigned</span>
             </div>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center text-xs text-indigo-600 font-bold">
-            <span>Workforce →</span>
-          </div>
         </div>
 
         {/* CARD 3: PENDING TIMESHEETS */}
-        <div
-          onClick={() => navigate('/manager/timesheet')}
-          className="p-4 sm:p-5 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3 group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Hourglass className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition" />
+        <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <Hourglass className="w-4 h-4" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-500 block">Pending Timesheets</span>
@@ -340,21 +316,12 @@ export default function ManagerDashboardPage() {
               <span className="text-xs font-semibold text-slate-400">waiting review</span>
             </div>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center text-xs text-amber-600 font-bold">
-            <span>Approval queue →</span>
-          </div>
         </div>
 
         {/* CARD 4: TEAM WORK HOURS */}
-        <div
-          onClick={() => navigate('/manager/timesheet')}
-          className="p-4 sm:p-5 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3 group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition" />
+        <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <Clock className="w-4 h-4" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-500 block">Team Work Hours</span>
@@ -365,28 +332,19 @@ export default function ManagerDashboardPage() {
               <span className="text-xs font-semibold text-slate-400">logged</span>
             </div>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center text-xs text-emerald-600 font-bold">
-            <span>Total effort →</span>
-          </div>
         </div>
 
-        {/* CARD 5: OVERDUE TASK RATE (PLACED AT LAST SLOT - SOFT ROSE COLOR) */}
-        <div
-          onClick={() => navigate('/manager/kanban')}
-          className="p-4 sm:p-5 bg-white hover:bg-rose-50/30 border border-slate-200/80 hover:border-rose-200 rounded-2xl shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3 group"
-        >
-          <div className="flex items-center justify-between">
-            <div
-              className={cn(
-                'w-9 h-9 rounded-xl flex items-center justify-center',
-                metrics.overdue_rate_num > 10
-                  ? 'bg-rose-50 text-rose-500 border border-rose-100'
-                  : 'bg-emerald-50 text-emerald-600'
-              )}
-            >
-              <TriangleAlert className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-rose-400 transition" />
+        {/* CARD 5: OVERDUE TASK RATE */}
+        <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3">
+          <div
+            className={cn(
+              'w-9 h-9 rounded-xl flex items-center justify-center',
+              metrics.overdue_rate_num > 10
+                ? 'bg-rose-50 text-rose-500 border border-rose-100'
+                : 'bg-emerald-50 text-emerald-600'
+            )}
+          >
+            <TriangleAlert className="w-4 h-4" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-500 block">Overdue Task Rate</span>
@@ -403,9 +361,6 @@ export default function ManagerDashboardPage() {
                 ({metrics.overdue_count} of {metrics.active_tasks_count})
               </span>
             </div>
-          </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center text-xs text-rose-600 font-bold">
-            <span>Attention required →</span>
           </div>
         </div>
       </div>

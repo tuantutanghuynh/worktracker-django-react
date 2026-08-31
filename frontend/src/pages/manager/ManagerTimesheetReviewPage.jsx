@@ -642,7 +642,7 @@ export default function ManagerTimesheetReviewPage() {
                             </div>
                           </div>
 
-                          {/* Task Title */}
+                          {/* Task Title /}
                           <h4 className="font-extrabold text-slate-900 text-sm truncate">{taskTitle}</h4>
 
                           {/* Work Description */}

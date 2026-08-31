@@ -62,6 +62,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         "get",
         "post",
         "patch",
+        "delete",
         "head",
         "options",
     ]
@@ -72,6 +73,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             "retrieve": "task:view",
             "create": "task:create",
             "partial_update": "task:update",
+            "destroy": ["task:cancel", "task:update"],
             "change_status": "task:change_status",
             "approve_task": "task:review",
             "reject_task": "task:review",
@@ -217,12 +219,46 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Không cho xóa vật lý Task.
-
-        Nếu không còn dùng task, dùng endpoint cancel:
-            POST /api/manager/tasks/{id}/cancel/
+        DELETE /api/manager/tasks/{id}/
+        
+        Cho phép xóa vật lý Task khi:
+        1. Task đang ở trạng thái TODO hoặc CANCELLED.
+        2. Task chưa có giờ làm việc (LogWork) nào.
+        
+        Nếu task đã có LogWork hoặc đang IN_PROGRESS/REVIEWING/COMPLETED, 
+        yêu cầu dùng endpoint cancel để bảo toàn dữ liệu chấm công.
         """
-        raise MethodNotAllowed("DELETE")
+        task = self.get_object()
+
+        # Kiểm tra xem đã có logwork chưa
+        if hasattr(task, 'log_works') and task.log_works.exists():
+            raise ValidationError(
+                {"detail": "Cannot delete task with existing work logs. Please cancel the task instead to preserve audit and timesheet records."}
+            )
+
+        if task.status in [Task.Status.IN_PROGRESS, Task.Status.REVIEWING, Task.Status.COMPLETED]:
+            raise ValidationError(
+                {"detail": "Cannot delete task that is in progress or completed. Please cancel the task instead."}
+            )
+
+        task_id = task.id
+        task_code = f"TSK-{task.id}"
+        task_title = task.title
+
+        log_action(
+            user=request.user,
+            action="DELETE_TASK",
+            table_name="tasks",
+            record_id=task_id,
+            old_values={"task_code": task_code, "title": task_title, "job_id": task.job_id},
+            new_values=None,
+            summary=f"Deleted unstarted task #{task_id}: {task_title}",
+            request=request,
+        )
+
+        task.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], url_path="status")
     def change_status(self, request, pk=None):

@@ -25,25 +25,37 @@ class JobSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_team_size(self, obj):
-        return obj.tasks.values('assignee_id').distinct().count()
+        from chat.models import ChatParticipant
+        task_assignee_ids = set(obj.tasks.values_list('assignee_id', flat=True).distinct())
+        team_participant_ids = set(
+            ChatParticipant.objects.filter(room__job=obj, room__room_type='JOB')
+            .exclude(user=obj.manager)
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        return len(task_assignee_ids | team_participant_ids)
 
     def get_project_team(self, obj):
-        tasks = obj.tasks.select_related('assignee', 'assignee__profile', 'assignee__profile__department')
-        seen_ids = set()
-        members = []
-        for task in tasks:
-            user = task.assignee
-            if user and user.id not in seen_ids:
-                seen_ids.add(user.id)
-                dept_name = user.profile.department.name if hasattr(user, 'profile') and user.profile and user.profile.department else "General"
-                full_name = user.profile.full_name if hasattr(user, 'profile') and user.profile and user.profile.full_name else user.email
-                members.append({
-                    'id': user.id,
-                    'email': user.email,
-                    'full_name': full_name,
-                    'department_name': dept_name
-                })
-        return members
+        from chat.models import ChatParticipant
+        User = get_user_model()
+        task_assignee_ids = set(obj.tasks.values_list('assignee_id', flat=True).distinct())
+        team_participant_ids = set(
+            ChatParticipant.objects.filter(room__job=obj, room__room_type='JOB')
+            .exclude(user=obj.manager)
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        all_member_ids = task_assignee_ids | team_participant_ids
+        users = User.objects.filter(id__in=all_member_ids, is_active=True).select_related('profile', 'profile__department')
+        return [
+            {
+                'id': u.id,
+                'email': u.email,
+                'full_name': getattr(getattr(u, 'profile', None), 'full_name', '') or u.email,
+                'department_name': getattr(getattr(getattr(u, 'profile', None), 'department', None), 'name', 'General'),
+            }
+            for u in users
+        ]
 
     def validate_client(self, value):
         if not value.is_active:
@@ -93,21 +105,22 @@ class JobSerializer(serializers.ModelSerializer):
         initial_team_ids = validated_data.pop('initial_team_member_ids', [])
         job = super().create(validated_data)
 
+        # Khởi tạo Kênh Chat Dự án và gán Project Team (KHÔNG tạo task rác)
+        from chat.models import ChatRoom, ChatParticipant
+        room_name = f"#{job.job_code or f'JOB-{job.id}'}: {job.job_name}"
+        room, _ = ChatRoom.objects.get_or_create(
+            room_type=ChatRoom.RoomType.JOB,
+            job=job,
+            defaults={"name": room_name},
+        )
+        if job.manager:
+            ChatParticipant.objects.get_or_create(room=room, user=job.manager)
+
         if initial_team_ids:
             User = get_user_model()
             employees = User.objects.filter(id__in=initial_team_ids, is_active=True, role__code='EMPLOYEE')
             for emp in employees:
-                Task.objects.create(
-                    job=job,
-                    assignee=emp,
-                    creator=job.manager,
-                    title=f"Project Onboarding: {job.job_name}",
-                    description=f"Initial assignment by Admin for project {job.job_name}.",
-                    priority=Task.Priority.MEDIUM,
-                    status=Task.Status.TODO,
-                    deadline=job.deadline,
-                    order_index="0|000000:"
-                )
+                ChatParticipant.objects.get_or_create(room=room, user=emp)
 
         return job
 
@@ -115,24 +128,22 @@ class JobSerializer(serializers.ModelSerializer):
         initial_team_ids = validated_data.pop('initial_team_member_ids', None)
         job = super().update(instance, validated_data)
 
+        # Cập nhật Project Team qua ChatParticipant của Job (KHÔNG tạo task rác)
+        from chat.models import ChatRoom, ChatParticipant
+        room_name = f"#{job.job_code or f'JOB-{job.id}'}: {job.job_name}"
+        room, _ = ChatRoom.objects.get_or_create(
+            room_type=ChatRoom.RoomType.JOB,
+            job=job,
+            defaults={"name": room_name},
+        )
+        if job.manager:
+            ChatParticipant.objects.get_or_create(room=room, user=job.manager)
+
         if initial_team_ids is not None:
             User = get_user_model()
-            existing_assignee_ids = set(job.tasks.values_list('assignee_id', flat=True).distinct())
-            new_member_ids = [uid for uid in initial_team_ids if uid not in existing_assignee_ids]
-            if new_member_ids:
-                employees = User.objects.filter(id__in=new_member_ids, is_active=True, role__code='EMPLOYEE')
-                for emp in employees:
-                    Task.objects.create(
-                        job=job,
-                        assignee=emp,
-                        creator=job.manager,
-                        title=f"Project Onboarding: {job.job_name}",
-                        description=f"Added to project team by Admin for {job.job_name}.",
-                        priority=Task.Priority.MEDIUM,
-                        status=Task.Status.TODO,
-                        deadline=job.deadline,
-                        order_index="0|000000:"
-                    )
+            employees = User.objects.filter(id__in=initial_team_ids, is_active=True, role__code='EMPLOYEE')
+            for emp in employees:
+                ChatParticipant.objects.get_or_create(room=room, user=emp)
 
         return job
 

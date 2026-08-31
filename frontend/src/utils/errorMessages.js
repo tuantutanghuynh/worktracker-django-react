@@ -46,6 +46,7 @@ export const ERROR_DICTIONARY = {
   TASK_LOCKED_FOR_REASSIGNMENT_EMPLOYEE_PHASE_OUT: 'This task is locked for reassignment because the assigned employee is currently in phase-out.',
   ASSIGNEE_NOT_IN_JOB_PROJECT_TEAM: 'Assignee must belong to this project team roster.',
   EMPLOYEE_IN_PHASE_OUT_CANNOT_RECEIVE_NEW_TASKS: 'Cannot assign new tasks to an employee undergoing project transfer (Phase-out).',
+  MUST_ASSIGN_TO_EMPLOYEE_BEFORE_STARTING: 'Please assign this task to a team member before moving it to In Progress.',
 
   // =================================================================
   // 4. TIMESHEETS & TIMELOCK MANAGEMENT (timesheets)

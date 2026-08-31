@@ -41,6 +41,7 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['manager-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['manager-tasks'] });
             queryClient.invalidateQueries({ queryKey: ['manager-timesheets'] });
+            queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
           }
         }
       } catch (e) {

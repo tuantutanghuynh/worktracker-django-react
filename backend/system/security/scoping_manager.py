@@ -207,9 +207,18 @@ def assignment_search_employees_queryset(job_id=None):
     )
 
     if job_id:
-        team_user_ids = Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct()
-        if team_user_ids.exists():
+        from chat.models import ChatParticipant
+        task_assignee_ids = set(Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct())
+        team_participant_ids = set(
+            ChatParticipant.objects.filter(room__job_id=job_id, room__room_type='JOB')
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        team_user_ids = task_assignee_ids | team_participant_ids
+        if team_user_ids:
             qs = qs.filter(id__in=team_user_ids)
+        else:
+            qs = qs.none()
 
     return qs
 

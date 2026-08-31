@@ -172,11 +172,13 @@ def assert_actor(user, task, allowed_actors):
 
 
 def validate_transition(task, to_status, reason=None):
-    # 0. Chặn thao tác khi Client bị vô hiệu hóa hoặc Job không ở trạng thái ACTIVE
-    if task.job.client and not task.job.client.is_active:
+    # 0. Chặn thao tác khi Client bị vô hiệu hóa (trừ khi Cancel task)
+    if task.job.client and not task.job.client.is_active and to_status != Task.Status.CANCELLED:
         raise BusinessRuleError("CLIENT_DEACTIVATED_CANNOT_TRANSITION_TASK")
 
-    if task.job.status != "ACTIVE":
+    # Cho phép Hủy Task (CANCELLED) bất kể Job đang ở PLANNING, ON_HOLD hay ACTIVE.
+    # Nhưng chặn các hành động thực thi sản xuất (In Progress, Reviewing, Completed) nếu Job không ACTIVE.
+    if task.job.status != "ACTIVE" and to_status != Task.Status.CANCELLED:
         raise BusinessRuleError("JOB_NOT_ACTIVE_CANNOT_TRANSITION_TASK")
 
     transition_key = (task.status, to_status)
@@ -189,6 +191,10 @@ def validate_transition(task, to_status, reason=None):
         task.status == Task.Status.TODO
         and to_status == Task.Status.IN_PROGRESS
     ):
+        # Chặn nếu Task vẫn đang tạm đứng tên Manager (chưa giao cho Nhân viên thực tế)
+        if task.assignee and getattr(getattr(task.assignee, "role", None), "code", None) == "MANAGER":
+            raise BusinessRuleError("MUST_ASSIGN_TO_EMPLOYEE_BEFORE_STARTING")
+
         if task.description and "[LOCKED_FOR_REASSIGNMENT]" in task.description:
             raise BusinessRuleError("TASK_LOCKED_FOR_REASSIGNMENT_EMPLOYEE_PHASE_OUT")
 

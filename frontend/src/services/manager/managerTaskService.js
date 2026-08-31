@@ -82,6 +82,15 @@ export const managerTaskService = {
   },
 
   /**
+   * Delete task permanently (Hard Delete for unstarted tasks)
+   * @param {number|string} id - Task ID
+   */
+  deleteTask: async (id) => {
+    const response = await axiosClient.delete(`/manager/tasks/${id}/`);
+    return response.data;
+  },
+
+  /**
    * LexoRank drag-and-drop move task
    * @param {number|string} id - Task ID being moved
    * @param {Object} moveParams - { to_status, prev_task_id, next_task_id, reason }

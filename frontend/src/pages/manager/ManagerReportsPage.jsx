@@ -3,44 +3,19 @@ import {
   BarChart3,
   FileSpreadsheet,
   FileText,
-  Download,
-  Calendar,
-  Filter,
-  Search,
   RotateCcw,
-  Briefcase,
-  Users,
-  CheckCircle2,
-  Clock,
-  TrendingUp,
-  FileCode,
-  Layers,
-  ArrowUpRight,
-  AlertTriangle,
-  PieChart as PieIcon,
-  Activity
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  CartesianGrid,
-  LabelList,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 import DataTable from '../../components/common/table/DataTable';
-import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import { cn } from '../../utils/cn';
+
+// Modular Sub-Components
+import ReportFilterToolbar from '../../components/manager/reports/ReportFilterToolbar';
+import TaskSummaryAnalyticsView from '../../components/manager/reports/TaskSummaryAnalyticsView';
+import TimesheetDetailAnalyticsView from '../../components/manager/reports/TimesheetDetailAnalyticsView';
 
 import managerReportService from '../../services/manager/managerReportService';
 import { useManagerJobs } from '../../hooks/queries/manager/useManagerJobs';
@@ -529,435 +504,37 @@ export default function ManagerReportsPage() {
         </div>
       </div>
 
-      {/* 🧭 REPORT TYPE TABS */}
-      <div className="flex items-center gap-2 p-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs max-w-md">
-        <button
-          onClick={() => setReportType('TASK_SUMMARY')}
-          className={cn(
-            'flex-1 py-2 text-center rounded-xl text-xs font-bold transition-all cursor-pointer',
-            reportType === 'TASK_SUMMARY' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
-          )}
-        >
-          Task Delivery Summary
-        </button>
-        <button
-          onClick={() => setReportType('TIMESHEET_DETAIL')}
-          className={cn(
-            'flex-1 py-2 text-center rounded-xl text-xs font-bold transition-all cursor-pointer',
-            reportType === 'TIMESHEET_DETAIL' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
-          )}
-        >
-          Detailed Timesheet Effort
-        </button>
-      </div>
-
-      {/* 🔍 FILTER TOOLBAR */}
-      <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-slate-500 uppercase">Project</label>
-          <SelectDropdown
-            value={selectedJobId}
-            onChange={(val) => setSelectedJobId(val)}
-            options={[{ value: '', label: 'All Projects' }, ...jobOptions]}
-            placeholder="Select project..."
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-slate-500 uppercase">
-            {reportType === 'TASK_SUMMARY' ? 'Assignee' : 'Employee'}
-          </label>
-          <SelectDropdown
-            value={selectedEmployeeId}
-            onChange={(val) => setSelectedEmployeeId(val)}
-            options={[{ value: '', label: 'All Personnel' }, ...employeeOptions]}
-            placeholder="Select personnel..."
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-slate-500 uppercase">Status</label>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 border border-transparent focus:border-blue-400 focus:bg-white focus:outline-none"
-          >
-            <option value="">All Statuses</option>
-            {reportType === 'TASK_SUMMARY' ? (
-              <>
-                <option value="TODO">To Do</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="REVIEWING">Reviewing (QA)</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </>
-            ) : (
-              <>
-                <option value="PENDING">Pending Review</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="VOIDED">Voided</option>
-              </>
-            )}
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-slate-500 uppercase">
-            {reportType === 'TASK_SUMMARY' ? 'Deadline From' : 'Work Date From'}
-          </label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 border border-transparent focus:border-blue-400 focus:bg-white focus:outline-none"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-slate-500 uppercase">
-            {reportType === 'TASK_SUMMARY' ? 'Deadline To' : 'Work Date To'}
-          </label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 border border-transparent focus:border-blue-400 focus:bg-white focus:outline-none"
-          />
-        </div>
-      </div>
+      {/* 🧭 REPORT TYPE TABS & 🔍 FILTER TOOLBAR */}
+      <ReportFilterToolbar
+        reportType={reportType}
+        setReportType={setReportType}
+        selectedJobId={selectedJobId}
+        setSelectedJobId={setSelectedJobId}
+        jobOptions={jobOptions}
+        selectedEmployeeId={selectedEmployeeId}
+        setSelectedEmployeeId={setSelectedEmployeeId}
+        employeeOptions={employeeOptions}
+        selectedStatus={selectedStatus}
+        setSelectedStatus={setSelectedStatus}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
+      />
 
       {/* 📊 SUMMARY STATCARDS & CHARTS */}
       {reportType === 'TASK_SUMMARY' ? (
-        <div className="space-y-6">
-          {/* HÀNG 1: 3 THẺ CHỈ SỐ KPI TRẢI NGANG */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tasks in Scope</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-slate-900">{kpis.totalTasks}</span>
-                <span className="text-xs font-semibold text-slate-400">tasks</span>
-              </div>
-            </div>
-
-            <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 shadow-2xs space-y-1">
-              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Completion Rate</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-emerald-700">{kpis.completionRate}%</span>
-                <span className="text-xs font-semibold text-emerald-600">({kpis.completed} completed)</span>
-              </div>
-            </div>
-
-            <div className="p-5 bg-rose-50/50 rounded-2xl border border-rose-200/80 shadow-2xs space-y-1">
-              <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Overdue Deliverables</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-rose-700">{kpis.overdueTasks}</span>
-                <span className="text-xs font-semibold text-rose-600">tasks past deadline</span>
-              </div>
-            </div>
-          </div>
-
-          {/* HÀNG 2: 2 BIỂU ĐỒ (CỘT BÊN TRÁI, TRÒN BÊN PHẢI) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Biểu đồ Cột bên trái (7 cols): Phân bổ Theo Dự án */}
-            <div className="lg:col-span-7 p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div className="w-full flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tasks by Project</span>
-                <Activity className="w-4 h-4 text-slate-400" />
-              </div>
-
-              {chartEffortData.length === 0 ? (
-                <div className="h-88 flex items-center justify-center text-xs text-slate-400 italic">
-                  No project distribution data
-                </div>
-              ) : (
-                <div className="w-full h-88">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartEffortData} margin={{ top: 25, right: 15, left: -15, bottom: 50 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis
-                        dataKey="code"
-                        height={55}
-                        tick={{ fontSize: 12, fontWeight: 700, fill: '#334155' }}
-                        interval={0}
-                        angle={-15}
-                        textAnchor="end"
-                        dy={6}
-                        axisLine={{ stroke: '#E2E8F0' }}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fontWeight: 600, fill: '#64748b' }}
-                        allowDecimals={false}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900/95 backdrop-blur-sm text-white p-3 rounded-xl shadow-2xl border border-slate-800 text-xs space-y-1.5 min-w-44">
-                                <div className="font-bold border-b border-slate-800 pb-1 flex items-center justify-between gap-2">
-                                  <span className="text-blue-400 font-mono font-extrabold">{data.code}</span>
-                                  <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full font-bold border border-emerald-800/60">
-                                    {data.rate}% Done
-                                  </span>
-                                </div>
-                                <div className="text-[11px] text-slate-300 font-medium truncate">{data.name}</div>
-                                <div className="flex justify-between items-center text-slate-400 pt-1">
-                                  <span>Total Tasks:</span>
-                                  <span className="font-bold text-white">{data.tasks}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-emerald-400">
-                                  <span>Completed:</span>
-                                  <span className="font-bold">{data.completed}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-blue-400">
-                                  <span>In Progress / Open:</span>
-                                  <span className="font-bold">{data.inProgress}</span>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', paddingTop: '36px' }} />
-                      {/* Biểu đồ Cột Chồng: Completed ở đáy, In Progress / Open ở trên */}
-                      <Bar dataKey="completed" stackId="a" fill="#10B981" name="Completed Tasks" maxBarSize={40} />
-                      <Bar dataKey="inProgress" stackId="a" fill="#3B82F6" name="In Progress / Open" radius={[6, 6, 0, 0]} maxBarSize={40}>
-                        <LabelList
-                          dataKey="tasks"
-                          position="top"
-                          formatter={(val) => (val > 0 ? `${val}` : '')}
-                          style={{ fontSize: '11px', fontWeight: 'bold', fill: '#334155' }}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-
-            {/* Biểu đồ Tròn bên phải (5 cols): Phân bổ Trạng thái Task */}
-            <div className="lg:col-span-5 p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-between">
-              <div className="w-full flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Task Status Distribution</span>
-                <PieIcon className="w-4 h-4 text-slate-400" />
-              </div>
-
-              {chartStatusData.length === 0 ? (
-                <div className="h-88 flex items-center justify-center text-xs text-slate-400 italic">
-                  No task data available
-                </div>
-              ) : (
-                <div className="w-full h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartStatusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {chartStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(val, name) => [`${val} tasks`, name]}
-                        contentStyle={{
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-bold text-slate-700 mt-2">
-                {chartStatusData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="truncate">{item.name}: {item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TaskSummaryAnalyticsView
+          kpis={kpis}
+          chartEffortData={chartEffortData}
+          chartStatusData={chartStatusData}
+        />
       ) : (
-        /* KPI & BIỂU ĐỒ CHO TIMESHEET DETAIL */
-        <div className="space-y-6">
-          {/* HÀNG 1: 3 THẺ CHỈ SỐ KPI TIMESHEET TRẢI NGANG */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Work Log Entries</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-slate-900">{kpis.totalLogs}</span>
-                <span className="text-xs font-semibold text-slate-400">records</span>
-              </div>
-            </div>
-
-            <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-200/80 shadow-2xs space-y-1">
-              <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">Total Actual Effort</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-blue-700">{parseFloat(kpis.totalHours).toFixed(1)}</span>
-                <span className="text-xs font-semibold text-blue-600">hours logged</span>
-              </div>
-            </div>
-
-            <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 shadow-2xs space-y-1">
-              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Approved Effort</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-emerald-700">{parseFloat(kpis.approvedHours).toFixed(1)}</span>
-                <span className="text-xs font-semibold text-emerald-600">hrs verified ({kpis.approvedCount} logs)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* HÀNG 2: 2 BIỂU ĐỒ (CỘT BÊN TRÁI, TRÒN BÊN PHẢI) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Biểu đồ Cột bên trái (7 cols): Giờ làm việc theo Nhân viên */}
-            <div className="lg:col-span-7 p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div className="w-full flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Top Personnel Actual Effort (Hours)</span>
-                <Clock className="w-4 h-4 text-slate-400" />
-              </div>
-
-              {chartEffortData.length === 0 ? (
-                <div className="h-88 flex items-center justify-center text-xs text-slate-400 italic">
-                  No employee effort data available
-                </div>
-              ) : (
-                <div className="w-full h-88">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartEffortData} margin={{ top: 25, right: 15, left: -15, bottom: 50 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis
-                        dataKey="name"
-                        height={55}
-                        tick={{ fontSize: 12, fontWeight: 700, fill: '#334155' }}
-                        interval={0}
-                        angle={-15}
-                        textAnchor="end"
-                        dy={6}
-                        axisLine={{ stroke: '#E2E8F0' }}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fontWeight: 600, fill: '#64748b' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900/95 backdrop-blur-sm text-white p-3 rounded-xl shadow-2xl border border-slate-800 text-xs space-y-1.5 min-w-44">
-                                <div className="font-bold border-b border-slate-800 pb-1 flex items-center justify-between gap-2">
-                                  <span className="text-blue-400 font-bold">{data.name}</span>
-                                  <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full font-bold border border-emerald-800/60">
-                                    {data.rate}% Verified
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center text-slate-400 pt-1">
-                                  <span>Total Logged:</span>
-                                  <span className="font-bold text-white">{data.hours}h</span>
-                                </div>
-                                <div className="flex justify-between items-center text-emerald-400">
-                                  <span>Approved:</span>
-                                  <span className="font-bold">{data.approved}h</span>
-                                </div>
-                                <div className="flex justify-between items-center text-blue-400">
-                                  <span>Pending Review:</span>
-                                  <span className="font-bold">{data.pending}h</span>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', paddingTop: '36px' }} />
-                      <Bar dataKey="approved" stackId="b" fill="#10B981" name="Approved Hours" maxBarSize={40} />
-                      <Bar dataKey="pending" stackId="b" fill="#3B82F6" name="Pending Review" radius={[6, 6, 0, 0]} maxBarSize={40}>
-                        <LabelList
-                          dataKey="hours"
-                          position="top"
-                          formatter={(val) => (val > 0 ? `${val}h` : '')}
-                          style={{ fontSize: '11px', fontWeight: 'bold', fill: '#334155' }}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-
-            {/* Biểu đồ Tròn bên phải (5 cols): Phân bổ Giờ theo Dự án */}
-            <div className="lg:col-span-5 p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-between">
-              <div className="w-full flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Hours by Project</span>
-                <PieIcon className="w-4 h-4 text-slate-400" />
-              </div>
-
-              {chartTimesheetPieData.length === 0 ? (
-                <div className="h-88 flex items-center justify-center text-xs text-slate-400 italic">
-                  No project hours distribution
-                </div>
-              ) : (
-                <div className="w-full h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartTimesheetPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={75}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {chartTimesheetPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(val, name) => [`${val} hrs`, name]}
-                        contentStyle={{
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              <div className="w-full grid grid-cols-2 gap-2.5 text-xs font-bold text-slate-700 mt-2">
-                {chartTimesheetPieData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="truncate">{item.name}: {item.value}h</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TimesheetDetailAnalyticsView
+          kpis={kpis}
+          chartEffortData={chartEffortData}
+          chartTimesheetPieData={chartTimesheetPieData}
+        />
       )}
 
       {/* 📋 BẢNG DỮ LIỆU CHI TIẾT CÓ PHÂN TRANG (PREVIEW DATA TABLE WITH PAGINATION) */}

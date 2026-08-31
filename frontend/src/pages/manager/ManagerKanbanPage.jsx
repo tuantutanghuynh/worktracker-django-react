@@ -114,12 +114,27 @@ function KanbanTaskCard({ task, onClick, isMutating, onMoveToTop, isFirstInColum
       )}
 
       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-        <div className="flex items-center gap-1.5 font-medium min-w-0">
-          <div className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[9px] flex items-center justify-center shrink-0">
-            {task.assignee?.full_name ? task.assignee.full_name.substring(0, 2).toUpperCase() : 'EM'}
-          </div>
-          <span className="truncate max-w-[90px]">{task.assignee?.full_name || 'Unassigned'}</span>
-        </div>
+        {(() => {
+          const isUnassigned = !task.assignee || task.assignee?.role === 'MANAGER';
+          if (isUnassigned) {
+            return (
+              <div className="flex items-center gap-1.5 font-semibold text-amber-700 min-w-0">
+                <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 font-extrabold text-[9px] flex items-center justify-center shrink-0">
+                  ?
+                </div>
+                <span className="truncate max-w-[90px] text-[10px] text-amber-700 italic">Unassigned</span>
+              </div>
+            );
+          }
+          return (
+            <div className="flex items-center gap-1.5 font-medium min-w-0">
+              <div className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[9px] flex items-center justify-center shrink-0">
+                {task.assignee?.full_name ? task.assignee.full_name.substring(0, 2).toUpperCase() : 'EM'}
+              </div>
+              <span className="truncate max-w-[90px]">{task.assignee?.full_name || 'Staff'}</span>
+            </div>
+          );
+        })()}
 
         {formattedDeadline && (
           <div className="flex items-center gap-1 text-slate-400 font-medium shrink-0">
