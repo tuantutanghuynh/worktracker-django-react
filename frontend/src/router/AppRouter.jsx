@@ -17,6 +17,8 @@ import { MyPerformancePage } from "../pages/employee/MyPerformancePage"
 import { NotificationsPage } from "../pages/employee/NotificationsPage"
 import { MyTasksPage } from "../pages/employee/MyTasksPage"
 import { TimesheetPage } from "../pages/employee/TimesheetPage"
+import { EmployeeChatPage } from "../pages/employee/EmployeeChatPage"
+import { EmployeeAuditLogsPage } from "../pages/employee/EmployeeAuditLogsPage"
 
 // Manager (Long) — lazy load
 import ManagerLayout from "../layouts/ManagerLayout"
@@ -94,6 +96,8 @@ export function AppRouter() {
                             <Route path="/my-tasks" element={<MyTasksPage />} />
                             <Route path="/employee/my-tasks" element={<MyTasksPage />} />
                             <Route path="/employee/timesheet" element={<TimesheetPage />} />
+                            <Route path="/employee/chat" element={<EmployeeChatPage />} />
+                            <Route path="/employee/audit-logs" element={<EmployeeAuditLogsPage />} />
                         </Route>
 
                         {/* Phân hệ MANAGER */}

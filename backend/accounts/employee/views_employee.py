@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.core.files.storage import default_storage
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, F
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.views import APIView
@@ -118,6 +118,28 @@ class PersonalKPIView(APIView):
         completed_count = completion_tasks.filter(status=Task.Status.COMPLETED).count()
         completion_rate = (completed_count / total_count) if total_count else None
 
+        # On-time rate — trong số task đã COMPLETED (có completed_at), bao
+        # nhiêu % hoàn thành đúng hạn (completed_at <= deadline).
+        completed_with_date_qs = completion_tasks.filter(
+            status=Task.Status.COMPLETED, completed_at__isnull=False
+        )
+        completed_with_date_count = completed_with_date_qs.count()
+        on_time_count = completed_with_date_qs.filter(
+            completed_at__date__lte=F("deadline")
+        ).count()
+        on_time_rate = (
+            (on_time_count / completed_with_date_count) if completed_with_date_count else None
+        )
+
+        # Productivity — số task hoàn thành trên mỗi giờ đã log (all-time,
+        # loại VOIDED/REJECTED giống mọi chỗ tính giờ khác trong view này).
+        hours_logged_total = LogWork.objects.filter(user=user).exclude(
+            review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED]
+        ).aggregate(total=Sum("hours_spent"))["total"] or Decimal("0.00")
+        productivity_rate = (
+            (completed_count / float(hours_logged_total)) if hours_logged_total > 0 else None
+        )
+
                 # Task status breakdown — how many of the user's own tasks sit in
         # each status. Excludes CANCELLED, same as completion_rate above,
         # so a cancelled task doesn't skew either metric.
@@ -173,6 +195,16 @@ class PersonalKPIView(APIView):
                 "completed": completed_count,
                 "total": total_count,
                 "rate": completion_rate,
+            },
+            "on_time_rate": {
+                "on_time": on_time_count,
+                "completed_with_date": completed_with_date_count,
+                "rate": on_time_rate,
+            },
+            "productivity": {
+                "tasks_completed": completed_count,
+                "hours_logged": float(hours_logged_total),
+                "tasks_per_hour": productivity_rate,
             },
             "task_status_breakdown": task_status_breakdown,
             "hours_by_project": hours_by_project,
