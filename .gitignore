@@ -51,3 +51,6 @@ TuDocs/
 *.njsproj
 *.sln
 *.sw?
+
+# Subagent-driven-development scratch workspaces (per-plan, not project docs)
+.superpowers/
