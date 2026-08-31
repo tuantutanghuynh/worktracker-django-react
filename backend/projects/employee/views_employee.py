@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from django.db.models import Count
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -53,8 +54,23 @@ class EmployeeMyTeamView(APIView):
                 "is_me": row["assignee_id"] == request.user.id,
             })
 
+        # Tiến độ TOÀN BỘ dự án (mọi task, không chỉ của riêng request.user) —
+        # cùng công thức % đã dùng ở ManagerJobDetailPage (frontend):
+        # pct = completed / total, total tính cả CANCELLED (không loại trừ).
+        status_rows = (
+            Task.objects.filter(job_id__in=job_ids)
+            .values("job_id", "status")
+            .annotate(count=Count("id"))
+        )
+        task_stats_by_job = defaultdict(lambda: defaultdict(int))
+        for row in status_rows:
+            task_stats_by_job[row["job_id"]][row["status"]] = row["count"]
+
         serializer = EmployeeMyTeamJobSerializer(
             jobs, many=True,
-            context={"teammates_by_job": teammates_by_job},
+            context={
+                "teammates_by_job": teammates_by_job,
+                "task_stats_by_job": task_stats_by_job,
+            },
         )
         return Response(serializer.data)

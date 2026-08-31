@@ -216,6 +216,8 @@ function JobCard({ job, onMessage }) {
         )}
       </div>
 
+      <ProgressSection progress={job.task_progress} />
+
       <div className="pt-3 border-t border-slate-100 space-y-2">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
           Managed by
@@ -229,6 +231,59 @@ function JobCard({ job, onMessage }) {
         <span>Updated {formatUpdatedAt(job.updated_at)}</span>
         {job.deadline && <span>Due {formatDeadline(job.deadline)}</span>}
       </div>
+    </div>
+  );
+}
+
+// Tiến độ toàn bộ dự án (mọi task của cả team, không chỉ của riêng
+// Employee đang xem) — bấm "View breakdown" để giãn thẻ ra xem chi
+// tiết theo từng trạng thái, không điều hướng sang trang khác.
+function ProgressSection({ progress }) {
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  if (!progress || progress.total === 0) return null;
+
+  const barColor =
+    progress.pct >= 80 ? 'bg-emerald-500' : progress.pct >= 40 ? 'bg-blue-500' : 'bg-amber-500';
+
+  return (
+    <div className="pt-3 border-t border-slate-100 space-y-1.5">
+      <div className="flex items-center justify-between text-xs font-bold">
+        <span className="text-slate-500">Progress</span>
+        <span className="text-slate-900">{progress.pct}%</span>
+      </div>
+      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all', barColor)}
+          style={{ width: `${progress.pct}%` }}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => setShowBreakdown((v) => !v)}
+        className="text-[11px] text-slate-400 hover:text-blue-600 flex items-center gap-1 cursor-pointer"
+      >
+        {progress.completed} / {progress.total} tasks completed
+        <ChevronDown className={cn('w-3 h-3 transition-transform', showBreakdown && 'rotate-180')} />
+      </button>
+
+      {showBreakdown && (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1 text-[11px] text-slate-500">
+          <BreakdownRow label="To Do" value={progress.todo} />
+          <BreakdownRow label="In Progress" value={progress.in_progress} />
+          <BreakdownRow label="Reviewing" value={progress.reviewing} />
+          <BreakdownRow label="Completed" value={progress.completed} />
+          {progress.cancelled > 0 && <BreakdownRow label="Cancelled" value={progress.cancelled} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BreakdownRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span>{label}</span>
+      <span className="font-mono font-bold text-slate-700">{value}</span>
     </div>
   );
 }
