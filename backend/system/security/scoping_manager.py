@@ -162,6 +162,23 @@ def scoped_team_user_ids(user):
     )
 
 
+def employee_job_ids(user):
+    """
+    Danh sách job id mà Employee đang có ít nhất 1 task được giao.
+
+    Dùng cho "My Team" — Employee xem đồng nghiệp cùng dự án.
+    Đối xứng với scoped_team_user_ids() (bản phía Manager).
+    """
+    if not is_employee(user):
+        return Task.objects.none().values_list("job_id", flat=True)
+
+    return (
+        Task.objects.filter(assignee_id=user.id)
+        .values_list("job_id", flat=True)
+        .distinct()
+    )
+
+
 def scoped_team_profiles(user):
     """
     Profile Employee thuộc Team Directory của Manager.
