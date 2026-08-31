@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react"
-import { Send, Paperclip, RotateCcw, Lock, AlertTriangle } from "lucide-react"
+import { Send, Paperclip, RotateCcw, Lock, AlertTriangle, PauseCircle } from "lucide-react"
 import { differenceInCalendarDays, format, parseISO, formatDistanceToNowStrict } from "date-fns"
 import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { useTaskDetail } from "../../hooks/queries/employee/useTaskDetail"
@@ -51,6 +51,16 @@ const DEADLINE_TONE_STYLES = {
     overdue: "text-rose-600",
     today: "text-amber-600",
     upcoming: "text-slate-400",
+}
+
+// 1 task được coi là "frozen" (đông cứng) khi dự án của nó không còn ACTIVE
+// (vd. ON_HOLD, CANCELLED...) hoặc Client của dự án đã bị Admin vô hiệu hóa —
+// backend (task_transition_manager_service.validate_transition, nhánh của
+// Long) đã thật sự CHẶN mọi status transition trong 2 trường hợp này; ở đây
+// chỉ tái dùng đúng công thức đó để hiển thị đúng UI, không tự nghĩ thêm.
+function isTaskFrozen(task) {
+    if (!task) return false
+    return (task.job_status && task.job_status !== "ACTIVE") || task.job_client_is_active === false
 }
 
 // Employee My Tasks (Ngày 7) — List view only for now (Kanban view
@@ -138,8 +148,22 @@ export function MyTasksPage() {
         {
             accessorKey: "job_name",
             header: "Job / Project",
-            className: "max-w-[160px] truncate",
-            cell: (info) => <span title={info.row.original.job_name}>{info.row.original.job_name}</span>,
+            className: "max-w-[160px]",
+            cell: (info) => {
+                const task = info.row.original
+                const frozen = isTaskFrozen(task)
+                return (
+                    <div className="flex flex-col gap-0.5 truncate" title={task.job_name}>
+                        <span className="truncate">{task.job_name || "—"}</span>
+                        {frozen && (
+                            <span className="inline-flex items-center gap-1 w-fit text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                <PauseCircle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                <span>Frozen ({task.job_status || "Client Inactive"})</span>
+                            </span>
+                        )}
+                    </div>
+                )
+            },
         },
         {
             accessorKey: "priority",
@@ -172,7 +196,35 @@ export function MyTasksPage() {
             header: "Action",
             cell: (info) => {
                 const task = info.row.original
+                const frozen = isTaskFrozen(task)
+
                 if (task.status === "TODO") {
+                    // Reassignment lock (phase-out) luôn ưu tiên cao nhất — nếu
+                    // đang trong quá trình chuyển giao cho người khác thì dù dự
+                    // án có ACTIVE hay không cũng không cho bấm Start Task.
+                    const isReassigning = task.description && task.description.includes("[LOCKED_FOR_REASSIGNMENT]")
+                    if (isReassigning) {
+                        return (
+                            <span
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg"
+                                title="This task is being reassigned by manager due to your project transfer (phase-out)"
+                            >
+                                <Lock className="w-3 h-3 text-amber-600" />
+                                <span>Reassigning (Phase-out)</span>
+                            </span>
+                        )
+                    }
+                    if (frozen) {
+                        return (
+                            <span
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg"
+                                title="Project is on hold, cancelled, or client is inactive. Task cannot be started."
+                            >
+                                <PauseCircle className="w-3 h-3 text-slate-400" />
+                                <span>Project Frozen</span>
+                            </span>
+                        )
+                    }
                     return (
                         <button
                             type="button"
@@ -184,6 +236,17 @@ export function MyTasksPage() {
                     )
                 }
                 if (task.status === "IN_PROGRESS") {
+                    if (frozen) {
+                        return (
+                            <span
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg"
+                                title="Project is on hold, cancelled, or client is inactive. Cannot submit for review."
+                            >
+                                <PauseCircle className="w-3 h-3 text-slate-400" />
+                                <span>Project Frozen</span>
+                            </span>
+                        )
+                    }
                     return (
                         <button
                             type="button"
@@ -307,6 +370,7 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
     const [editingLog, setEditingLog] = useState(null)
 
     const isLocked = task?.status === "REVIEWING" || task?.status === "COMPLETED" || task?.status === "CANCELLED"
+    const isFrozen = isTaskFrozen(task)
     const totalLoggedHours = workLogs
         .filter((log) => log.review_status !== "VOIDED")
         .reduce((sum, log) => sum + Number(log.hours_spent), 0)
@@ -319,7 +383,7 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
     }
 
     async function handleLogWork() {
-        if (!hoursSpent || isLocked) return
+        if (!hoursSpent || isLocked || isFrozen) return
         const ok = await submitLogWork({ work_date: workDate, hours_spent: hoursSpent, description: logDescription })
         if (ok) {
             setHoursSpent("")
@@ -330,21 +394,21 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
     // Only a PENDING entry can be voided (enforced server-side too) — the
     // modal only ever opens from a button that's already gated on that.
     async function handleConfirmVoid(reason) {
-        if (!voidingLogId) return
+        if (!voidingLogId || isFrozen) return
         const ok = await submitVoidLogWork(voidingLogId, reason)
         if (ok) setVoidingLogId(null)
     }
 
     async function handleConfirmEdit(hoursSpent, description, reason) {
-        if (!editingLog) return
+        if (!editingLog || isFrozen) return
         const ok = await submitEditLogWork(editingLog.id, hoursSpent, description, reason)
         if (ok) setEditingLog(null)
     }
 
-    // null khi task không có action nào (COMPLETED/CANCELLED) — SideDrawer
-    // chỉ vẽ khung footer khi prop này truthy, nên phải tính trước thay vì
-    // luôn truyền 1 element rồi để nó tự render null bên trong.
-    const footerAction = task ? getFooterAction(task, { onStartTask, onRequestSubmit, onRequestRecall }) : null
+    // null khi task không có action nào (đã COMPLETED/CANCELLED, hoặc dự án
+    // đang frozen nên backend sẽ từ chối mọi transition) — SideDrawer chỉ vẽ
+    // khung footer khi prop này truthy, nên phải tính trước.
+    const footerAction = task ? getFooterAction(task, isFrozen, { onStartTask, onRequestSubmit, onRequestRecall }) : null
 
     return (
         <>
@@ -366,6 +430,20 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
                                 <PriorityBadge priority={task.priority} />
                             </div>
                         </div>
+
+                        {isFrozen && (
+                            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                                <PauseCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold text-amber-900">Project is Frozen ({task.job_status || "Client Inactive"})</p>
+                                    <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                                        {task.job_client_is_active === false
+                                            ? "The client for this project is inactive. Task status transitions and work logging are temporarily locked."
+                                            : "This project is currently on hold or cancelled. Task status transitions and work logging are paused."}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         {isLocked && (
                             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
@@ -404,8 +482,16 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
                             </p>
                         )}
 
-                        {/* Log Work — Chỉ hiển thị khi Task chưa bị khóa (TODO hoặc IN_PROGRESS) */}
-                        {!isLocked && (
+                        {/* Log Work — ẩn hẳn khi dự án đang frozen (backend sẽ từ
+                            chối), chỉ hiện khi Task chưa bị khóa (TODO hoặc IN_PROGRESS) */}
+                        {isFrozen ? (
+                            <div className="border-t border-slate-100 pt-4">
+                                <p className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Log Work</p>
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 italic">
+                                    Work logging is disabled because this project is currently frozen ({task.job_status || "Client Inactive"}).
+                                </div>
+                            </div>
+                        ) : !isLocked && (
                             <div className="border-t border-slate-100 pt-4 space-y-2">
                                 <p className="text-xs font-semibold text-slate-400 uppercase">Log Work</p>
                                 <div className="grid grid-cols-2 gap-2">
@@ -452,7 +538,7 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
                             </div>
                         )}
 
-                        {/* Logged Hours — list các entry đã tạo, Void & Edit chỉ hiện khi chưa bị Lock và còn PENDING */}
+                        {/* Logged Hours — list các entry đã tạo, Void & Edit chỉ hiện khi chưa bị Lock/Frozen và còn PENDING */}
                         <div className="border-t border-slate-100 pt-4 space-y-2">
                             <div className="flex items-center justify-between">
                                 <p className="text-xs font-semibold text-slate-400 uppercase">Logged Hours</p>
@@ -477,7 +563,7 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
                                                     <p className="text-[11px] text-rose-600 mt-1">Voided: {log.adjustment_reason}</p>
                                                 )}
                                             </div>
-                                            {!isLocked && log.review_status === "PENDING" ? (
+                                            {!isLocked && !isFrozen && log.review_status === "PENDING" ? (
                                                 <div className="flex items-center gap-2.5 shrink-0">
                                                     <button
                                                         type="button"
@@ -583,8 +669,18 @@ function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequ
 // tổng hợp thao tác chính theo status, thay vì bắt người dùng đóng
 // drawer rồi tìm nút ở table. Trả về null (không phải component rỗng)
 // khi task không còn action nào — SideDrawer chỉ vẽ khung footer khi
-// giá trị truyền vào truthy.
-function getFooterAction(task, { onStartTask, onRequestSubmit, onRequestRecall }) {
+// giá trị truyền vào truthy. Khi dự án đang frozen, backend sẽ từ chối
+// mọi transition (task_transition_manager_service.validate_transition) —
+// nên hiện luôn thông báo thay vì 1 nút bấm sẽ chỉ báo lỗi 400.
+function getFooterAction(task, isFrozen, { onStartTask, onRequestSubmit, onRequestRecall }) {
+    if (isFrozen && (task.status === "TODO" || task.status === "IN_PROGRESS")) {
+        return (
+            <p className="w-full py-2 text-center text-xs font-bold text-slate-500 bg-slate-100 rounded-lg flex items-center justify-center gap-1.5">
+                <PauseCircle size={13} />
+                Project Frozen — actions disabled
+            </p>
+        )
+    }
     if (task.status === "TODO") {
         return (
             <button

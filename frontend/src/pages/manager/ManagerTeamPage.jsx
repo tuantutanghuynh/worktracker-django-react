@@ -31,16 +31,19 @@ import SideDrawer from '../../components/common/drawer/SideDrawer';
 import StatusBadge from '../../components/common/badges/StatusBadge';
 import PriorityBadge from '../../components/common/badges/PriorityBadge';
 import UserAvatar from '../../components/common/avatar/UserAvatar';
+import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import { cn } from '../../utils/cn';
 
 import { useManagerEmployees } from '../../hooks/queries/manager/useManagerTeam';
 import { useManagerTasks } from '../../hooks/queries/manager/useManagerTasks';
+import { useManagerJobs } from '../../hooks/queries/manager/useManagerJobs';
 
 export default function ManagerTeamPage() {
   // View mode & filters
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL'); // 'ALL' | 'OVERLOADED' | 'BALANCED' | 'AVAILABLE'
+  const [selectedJobId, setSelectedJobId] = useState('');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,50 +55,56 @@ export default function ManagerTeamPage() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedStatusFilter]);
+  }, [searchQuery, selectedStatusFilter, selectedJobId]);
 
   // 🚀 TANSTACK REACT QUERY HOOKS
-  const { data: employeesResponse, isLoading, isFetching, refetch } = useManagerEmployees();
+  const { data: jobsResponse } = useManagerJobs({ page_size: 100 });
+  const { data: employeesResponse, isLoading, isFetching, refetch } = useManagerEmployees({
+    job_id: selectedJobId || undefined,
+  });
 
-  // Chuẩn hóa danh sách nhân sự
+  const jobOptions = useMemo(() => {
+    const list = Array.isArray(jobsResponse?.results)
+      ? jobsResponse.results
+      : Array.isArray(jobsResponse)
+        ? jobsResponse
+        : [];
+    return [
+      { value: '', label: 'All My Projects / Jobs' },
+      ...list.map((j) => ({
+        value: String(j.id),
+        label: `${j.job_code ? `[${j.job_code}] ` : ''}${j.job_name}`,
+      })),
+    ];
+  }, [jobsResponse]);
+
+  // Chuẩn hóa danh sách nhân sự (100% Server-Driven Smart Workload)
   const employeesList = useMemo(() => {
     const raw = Array.isArray(employeesResponse)
       ? employeesResponse
       : employeesResponse?.results || [];
 
     return raw.map((emp) => {
-      const departmentName = emp.department?.name || emp.department_name || 'General Staff';
+      const departmentName = emp.department_name || emp.department?.name || 'General Staff';
       const departmentId = emp.department?.id
         ? String(emp.department.id)
         : emp.department_id
           ? String(emp.department_id)
           : '';
-      const activeTasks =
-        emp.active_tasks_count !== undefined
-          ? emp.active_tasks_count
-          : emp.tasks_count || 0;
-
-      const loggedHours = parseFloat(emp.logged_hours || 0);
-      const capacityHours = parseFloat(emp.capacity_hours || 160.0);
-      const capacityRate =
-        emp.utilization_rate !== undefined && emp.utilization_rate !== null
-          ? Math.round(parseFloat(emp.utilization_rate))
-          : capacityHours > 0
-            ? Math.round((loggedHours / capacityHours) * 100)
-            : 0;
-
-      let workloadStatus = 'AVAILABLE';
-      if (capacityRate > 100 || emp.workload_status === 'Overloaded') workloadStatus = 'OVERLOADED';
-      else if (capacityRate >= 70 || emp.workload_status === 'High') workloadStatus = 'BALANCED';
+      const activeTasks = emp.active_tasks_count || 0;
+      const activeJobs = emp.active_jobs_count || 0;
+      const dailyRequiredHours = parseFloat(emp.daily_required_hours || 0);
+      const capacityPct = emp.capacity_pct !== undefined && emp.capacity_pct !== null ? parseFloat(emp.capacity_pct) : 0;
+      const workloadStatus = emp.smart_workload_status || emp.workload_status || 'AVAILABLE';
 
       return {
         ...emp,
         departmentName,
         departmentId,
         activeTasks,
-        loggedHours,
-        capacityHours,
-        capacityRate,
+        activeJobs,
+        dailyRequiredHours,
+        capacityPct,
         workloadStatus,
       };
     });
@@ -170,51 +179,60 @@ export default function ManagerTeamPage() {
       accessorKey: 'activeTasks',
       cell: (row) => (
         <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200">
-          {row.activeTasks} tasks
+          {row.activeTasks} Tasks
         </span>
       ),
     },
     {
-      header: 'Workload Utilization',
-      accessorKey: 'capacityRate',
+      header: 'Active Jobs',
+      accessorKey: 'activeJobs',
       cell: (row) => (
-        <div className="w-40 space-y-1">
+        <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200">
+          {row.activeJobs} Jobs
+        </span>
+      ),
+    },
+    {
+      header: 'Capacity Pressure',
+      accessorKey: 'capacityPct',
+      cell: (row) => (
+        <div className="w-44 space-y-1">
           <div className="flex items-center justify-between text-[11px] font-bold">
             <span
               className={cn(
                 row.workloadStatus === 'OVERLOADED' && 'text-rose-600',
-                row.workloadStatus === 'BALANCED' && 'text-emerald-600',
-                row.workloadStatus === 'AVAILABLE' && 'text-blue-600'
+                row.workloadStatus === 'BALANCED' && 'text-amber-600',
+                row.workloadStatus === 'AVAILABLE' && 'text-emerald-600'
               )}
             >
-              {row.capacityRate}%
+              {row.capacityPct}%
             </span>
             <span className="text-[10px] text-slate-400 font-mono font-normal">
-              {row.loggedHours.toFixed(1)}h / {row.capacityHours.toFixed(0)}h
+              ~{row.dailyRequiredHours}h / day
             </span>
           </div>
-          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
               className={cn(
                 'h-full rounded-full transition-all',
                 row.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
-                row.workloadStatus === 'BALANCED' && 'bg-emerald-500',
-                row.workloadStatus === 'AVAILABLE' && 'bg-blue-500'
+                row.workloadStatus === 'BALANCED' && 'bg-amber-500',
+                row.workloadStatus === 'AVAILABLE' && 'bg-emerald-500'
               )}
-              style={{ width: `${Math.min(row.capacityRate, 100)}%` }}
+              style={{ width: `${Math.min(row.capacityPct, 100)}%` }}
             />
           </div>
         </div>
       ),
     },
     {
-      header: 'Capacity Status',
+      header: 'Status',
       accessorKey: 'workloadStatus',
       cell: (row) => {
         const config = {
           OVERLOADED: 'bg-rose-50 text-rose-700 border-rose-200',
-          BALANCED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-          AVAILABLE: 'bg-blue-50 text-blue-700 border-blue-200',
+          BALANCED: 'bg-amber-50 text-amber-700 border-amber-200',
+          AVAILABLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         }[row.workloadStatus] || 'bg-slate-100 text-slate-700 border-slate-200';
 
         return (
@@ -255,7 +273,7 @@ export default function ManagerTeamPage() {
             Team Members & Workload Capacity
           </h1>
           <p className="text-slate-500 text-xs mt-0.5">
-            Monitor real-time employee workload utilization, assigned active tasks, and department assignments.
+            Monitor real-time employee workload utilization, assigned active tasks, and project team allocations.
           </p>
         </div>
 
@@ -276,42 +294,50 @@ export default function ManagerTeamPage() {
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Members</span>
             <Users className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline justify-between pt-0.5">
             <span className="text-2xl font-extrabold text-slate-900">{kpis.total}</span>
-            <span className="text-xs font-semibold text-slate-400">staff members</span>
+            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">
+              Total Staff
+            </span>
           </div>
         </div>
 
-        <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 shadow-2xs space-y-2">
+        <div className="bg-rose-50/40 p-4 rounded-2xl border border-rose-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">Overloaded</span>
+            <span className="text-xs font-bold text-rose-700 uppercase tracking-wider">Overloaded</span>
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline justify-between pt-0.5">
             <span className="text-2xl font-extrabold text-rose-900">{kpis.overloaded}</span>
-            <span className="text-xs font-semibold text-rose-700">&gt;100% capacity</span>
+            <span className="text-[10px] font-extrabold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200/60">
+              &gt;100% Load
+            </span>
           </div>
         </div>
 
-        <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 shadow-2xs space-y-2">
+        <div className="bg-amber-50/40 p-4 rounded-2xl border border-amber-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Balanced</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Balanced</span>
+            <CheckCircle2 className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-emerald-900">{kpis.balanced}</span>
-            <span className="text-xs font-semibold text-emerald-700">70% - 100%</span>
+          <div className="flex items-baseline justify-between pt-0.5">
+            <span className="text-2xl font-extrabold text-amber-900">{kpis.balanced}</span>
+            <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200/60">
+              Optimal (50–100%)
+            </span>
           </div>
         </div>
 
-        <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-2xs space-y-2">
+        <div className="bg-emerald-50/40 p-4 rounded-2xl border border-emerald-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Available</span>
-            <Zap className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Available</span>
+            <Zap className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-blue-900">{kpis.available}</span>
-            <span className="text-xs font-semibold text-blue-700">ready for tasks</span>
+          <div className="flex items-baseline justify-between pt-0.5">
+            <span className="text-2xl font-extrabold text-emerald-900">{kpis.available}</span>
+            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200/60">
+              Ready to Assign
+            </span>
           </div>
         </div>
       </div>
@@ -319,6 +345,16 @@ export default function ManagerTeamPage() {
       {/* 🔍 FILTER TOOLBAR & VIEW TOGGLE */}
       <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-1 flex-wrap">
+          {/* Bộ lọc Chọn Dự án / Job */}
+          <div className="w-full sm:w-56">
+            <SelectDropdown
+              options={jobOptions}
+              value={selectedJobId}
+              onChange={setSelectedJobId}
+              placeholder="All My Projects / Jobs"
+            />
+          </div>
+
           {/* Lọc Status Tải */}
           <div className="flex items-center p-0.5 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 flex-wrap">
             <button
@@ -335,13 +371,13 @@ export default function ManagerTeamPage() {
             </button>
             <button
               onClick={() => setSelectedStatusFilter('BALANCED')}
-              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'BALANCED' && 'bg-white text-emerald-700 shadow-xs')}
+              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'BALANCED' && 'bg-white text-amber-700 shadow-xs')}
             >
               Balanced ({kpis.balanced})
             </button>
             <button
               onClick={() => setSelectedStatusFilter('AVAILABLE')}
-              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'AVAILABLE' && 'bg-white text-blue-700 shadow-xs')}
+              className={cn('px-3 py-1.5 rounded-lg transition cursor-pointer', selectedStatusFilter === 'AVAILABLE' && 'bg-white text-emerald-700 shadow-xs')}
             >
               Available ({kpis.available})
             </button>
@@ -350,13 +386,13 @@ export default function ManagerTeamPage() {
 
         <div className="flex items-center gap-3">
           {/* Ô Tìm kiếm */}
-          <div className="relative w-full md:w-64">
+          <div className="relative w-full md:w-56">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, email, department..."
+              placeholder="Search employee..."
               className="w-full pl-9 pr-3 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs rounded-xl border border-transparent focus:border-blue-400 focus:outline-none transition"
             />
           </div>
@@ -389,14 +425,14 @@ export default function ManagerTeamPage() {
               <div
                 key={`emp-card-${emp.id || emp.user_id}`}
                 onClick={() => setSelectedMember(emp)}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all space-y-4 relative group cursor-pointer"
+                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-blue-300 transition-all space-y-4 relative group cursor-pointer"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3 min-w-0">
                     <UserAvatar user={emp} size="md" showStatus={true} isOnline={true} />
                     <div className="min-w-0">
-                      <h3 className="font-bold text-sm text-slate-900 group-hover:text-purple-700 transition truncate">
+                      <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-700 transition truncate">
                         {emp.full_name || emp.email}
                       </h3>
                       <p className="text-xs text-slate-400 truncate">{emp.email}</p>
@@ -411,43 +447,44 @@ export default function ManagerTeamPage() {
                 {/* Workload Progress Bar */}
                 <div className="space-y-1.5 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-slate-500">Workload Utilization:</span>
+                    <span className="text-slate-500">Workload Capacity:</span>
                     <span
                       className={cn(
                         emp.workloadStatus === 'OVERLOADED' && 'text-rose-600',
-                        emp.workloadStatus === 'BALANCED' && 'text-emerald-600',
-                        emp.workloadStatus === 'AVAILABLE' && 'text-blue-600'
+                        emp.workloadStatus === 'BALANCED' && 'text-amber-600',
+                        emp.workloadStatus === 'AVAILABLE' && 'text-emerald-600'
                       )}
                     >
-                      {emp.capacityRate}% ({emp.loggedHours.toFixed(1)}h / {emp.capacityHours.toFixed(0)}h)
+                      {emp.capacityPct}% (~{emp.dailyRequiredHours}h/day)
                     </span>
                   </div>
-                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className={cn(
                         'h-full rounded-full transition-all',
                         emp.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
-                        emp.workloadStatus === 'BALANCED' && 'bg-emerald-500',
-                        emp.workloadStatus === 'AVAILABLE' && 'bg-blue-500'
+                        emp.workloadStatus === 'BALANCED' && 'bg-amber-500',
+                        emp.workloadStatus === 'AVAILABLE' && 'bg-emerald-500'
                       )}
-                      style={{ width: `${Math.min(emp.capacityRate, 100)}%` }}
+                      style={{ width: `${Math.min(emp.capacityPct, 100)}%` }}
                     />
                   </div>
                 </div>
 
-                {/* Card Footer: Active Tasks count & Status */}
+                {/* Card Footer: Active Tasks & Jobs count & Status */}
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{emp.activeTasks} Active Tasks</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-[11px]">
+                    <span>{emp.activeTasks} Tasks</span>
+                    <span className="text-slate-300">|</span>
+                    <span>{emp.activeJobs} Jobs</span>
                   </div>
 
                   <span
                     className={cn(
                       'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
                       emp.workloadStatus === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200',
-                      emp.workloadStatus === 'BALANCED' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                      emp.workloadStatus === 'AVAILABLE' && 'bg-blue-50 text-blue-700 border-blue-200'
+                      emp.workloadStatus === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
+                      emp.workloadStatus === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     )}
                   >
                     {emp.workloadStatus}
@@ -602,14 +639,14 @@ function MemberDetailDrawer({ member, onClose }) {
         <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Workload & Capacity Status
+              Smart Workload Pressure
             </h3>
             <span
               className={cn(
                 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
                 member.workloadStatus === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200',
-                member.workloadStatus === 'BALANCED' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                member.workloadStatus === 'AVAILABLE' && 'bg-blue-50 text-blue-700 border-blue-200'
+                member.workloadStatus === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
+                member.workloadStatus === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200'
               )}
             >
               {member.workloadStatus}
@@ -618,38 +655,42 @@ function MemberDetailDrawer({ member, onClose }) {
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold">
-              <span className="text-slate-600">Monthly Capacity Utilization:</span>
+              <span className="text-slate-600">Workload Capacity:</span>
               <span
                 className={cn(
                   member.workloadStatus === 'OVERLOADED' && 'text-rose-600',
-                  member.workloadStatus === 'BALANCED' && 'text-emerald-600',
-                  member.workloadStatus === 'AVAILABLE' && 'text-blue-600'
+                  member.workloadStatus === 'BALANCED' && 'text-amber-600',
+                  member.workloadStatus === 'AVAILABLE' && 'text-emerald-600'
                 )}
               >
-                {member.capacityRate}% ({member.loggedHours.toFixed(1)}h / {member.capacityHours.toFixed(0)}h)
+                {member.capacityPct || 0}% (~{member.dailyRequiredHours || 0}h / day)
               </span>
             </div>
-            <div className="w-full h-3 bg-slate-200/70 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-slate-200/70 rounded-full overflow-hidden">
               <div
                 className={cn(
                   'h-full rounded-full transition-all',
                   member.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
-                  member.workloadStatus === 'BALANCED' && 'bg-emerald-500',
-                  member.workloadStatus === 'AVAILABLE' && 'bg-blue-500'
+                  member.workloadStatus === 'BALANCED' && 'bg-amber-500',
+                  member.workloadStatus === 'AVAILABLE' && 'bg-emerald-500'
                 )}
-                style={{ width: `${Math.min(member.capacityRate, 100)}%` }}
+                style={{ width: `${Math.min(member.capacityPct || 0, 100)}%` }}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2 text-xs border-t border-slate-200">
-            <div className="p-3 rounded-xl bg-white border border-slate-200/80">
-              <p className="text-[10px] text-slate-400 font-bold uppercase">Total Hours Logged</p>
-              <p className="text-base font-extrabold text-slate-900 mt-0.5">{member.loggedHours.toFixed(1)}h</p>
+          <div className="grid grid-cols-3 gap-2 pt-2 text-xs border-t border-slate-200">
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 text-center">
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Capacity %</p>
+              <p className="text-base font-extrabold text-slate-900 mt-0.5">{member.capacityPct || 0}%</p>
             </div>
-            <div className="p-3 rounded-xl bg-white border border-slate-200/80">
-              <p className="text-[10px] text-slate-400 font-bold uppercase">Active Assigned Tasks</p>
-              <p className="text-base font-extrabold text-purple-700 mt-0.5">{member.activeTasks} Tasks</p>
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 text-center">
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Active Tasks</p>
+              <p className="text-base font-extrabold text-blue-700 mt-0.5">{member.activeTasks || 0}</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 text-center">
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Active Jobs</p>
+              <p className="text-base font-extrabold text-indigo-700 mt-0.5">{member.activeJobs || 0}</p>
             </div>
           </div>
         </div>

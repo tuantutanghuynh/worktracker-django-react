@@ -6,11 +6,15 @@ import { useNotificationStore } from '../stores/useNotificationStore';
 
 export default function ManagerLayout() {
   const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
+  const connectWebSocket = useNotificationStore((state) => state.connectWebSocket);
+  const disconnectWebSocket = useNotificationStore((state) => state.disconnectWebSocket);
 
-  // Nạp danh sách thông báo ban đầu khi Mount Layout
+  // Nạp danh sách thông báo ban đầu và duy trì kết nối WebSocket real-time
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    connectWebSocket();
+    return () => disconnectWebSocket();
+  }, [fetchNotifications, connectWebSocket, disconnectWebSocket]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">

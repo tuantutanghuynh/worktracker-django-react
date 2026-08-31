@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Clock,
   Send,
@@ -38,9 +38,28 @@ export default function QuickLogWorkFormCard({
   const currentTotal = Number(dailyHoursLogged) + (Number(hoursSpent) || 0);
   const isOverLimit = currentTotal > MAX_DAILY_LIMIT;
 
-  const taskOptions = tasks.map(t => ({
+  // Lọc các task hợp lệ để logwork (IN_PROGRESS hoặc TODO, loại trừ COMPLETED, CANCELLED, REVIEWING, task bị khóa hoặc thuộc dự án đóng băng)
+  const eligibleTasks = tasks.filter(t => {
+    if (t.status === 'COMPLETED' || t.status === 'CANCELLED' || t.status === 'REVIEWING') return false;
+    if (t.description && t.description.includes('[LOCKED_FOR_REASSIGNMENT]')) return false;
+    if ((t.job_status && t.job_status !== 'ACTIVE') || t.job_client_is_active === false) return false;
+    return true;
+  });
+
+  // Tự động chọn task hợp lệ đầu tiên nếu task đang chọn bị đóng băng/vô hiệu hóa
+  useEffect(() => {
+    if (defaultTaskId && eligibleTasks.some(t => String(t.id) === String(defaultTaskId))) {
+      setTaskId(String(defaultTaskId));
+    } else if (eligibleTasks.length > 0 && (!taskId || !eligibleTasks.some(t => String(t.id) === String(taskId)))) {
+      setTaskId(String(eligibleTasks[0].id));
+    } else if (eligibleTasks.length === 0) {
+      setTaskId('');
+    }
+  }, [defaultTaskId, eligibleTasks]);
+
+  const taskOptions = eligibleTasks.map(t => ({
     value: String(t.id),
-    label: t.title,
+    label: `${t.title} [${t.status === 'IN_PROGRESS' ? 'In Progress' : 'To Do'}]`,
     badge: t.job_name || 'Project',
     description: `Deadline: ${t.deadline || 'None'}`
   }));

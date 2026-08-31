@@ -22,6 +22,8 @@ import {
   ArrowRight,
   RotateCcw,
   Edit3,
+  PauseCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -113,7 +115,7 @@ export default function TaskDetailDrawer() {
   const { data: commentsResponse = [] } = useTaskComments(selectedTaskId);
   const { data: attachmentsResponse = [] } = useTaskAttachments(selectedTaskId);
   const { data: followersResponse = [] } = useTaskFollowers(selectedTaskId);
-  const { data: employeesResponse = [] } = useManagerEmployees();
+  const { data: employeesResponse = [] } = useManagerEmployees(task?.job?.id ? { job_id: task.job.id } : {});
 
   // Mutations
   const updateTaskMutation = useUpdateTask();
@@ -337,6 +339,56 @@ export default function TaskDetailDrawer() {
       ) : (
         <div className="space-y-4 text-xs text-slate-700">
           
+          {/* 🌟 1. BANNER CẢNH BÁO LUÂN CHUYỂN NHÂN SỰ (PHASE-OUT) */}
+          {task.description && (task.description.includes('[LOCKED_FOR_REASSIGNMENT]') || task.description.includes('[PHASE_OUT]')) && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-2xs">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-extrabold text-amber-950 text-xs">Staff Transition Warning (Phase-out)</p>
+                  <p className="text-[11px] text-amber-700">
+                    This employee is undergoing project transfer. Please re-assign this task to another active team member.
+                  </p>
+                </div>
+              </div>
+              {!isEditing && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition cursor-pointer shrink-0 shadow-2xs flex items-center gap-1"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Re-assign</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ⚠️ 1.1 BANNER CẢNH BÁO CLIENT INACTIVE / PROJECT FROZEN */}
+          {task.job && (task.job.client_is_active === false || task.job.status === 'ON_HOLD') && (
+            <div className="p-3 bg-amber-500/10 border border-amber-300 rounded-xl flex items-center justify-between gap-3 shadow-2xs text-amber-950">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-extrabold text-amber-950 text-xs">Project & Task Frozen ({task.job.status || 'ON_HOLD'})</p>
+                  <p className="text-[11px] text-amber-800">
+                    {task.job.client_is_active === false
+                      ? 'The client for this project is inactive. Task status transitions are temporarily locked.'
+                      : `Project is in ${task.job.status} state. Task transitions are paused until project is Active.`}
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                <PauseCircle className="w-3 h-3 text-amber-700" />
+                <span>Frozen</span>
+              </span>
+            </div>
+          )}
+
           {/* 🌟 1. BANNER TRẠNG THÁI GỌN GÀNG (NẾU REVIEWING / COMPLETED / CANCELLED) */}
           {task.status === 'REVIEWING' && (
             <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs">

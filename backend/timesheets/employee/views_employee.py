@@ -51,6 +51,9 @@ class EmployeeVoidLogWorkView(APIView):
             if log_work.review_status != LogWork.ReviewStatus.PENDING:
                 raise ValidationError("Only a PENDING log work can be voided.")
 
+            if log_work.task.job.status != "ACTIVE":
+                raise ValidationError(f"Cannot void log work because its project is frozen or on hold ({log_work.task.job.status}).")
+
             # Time Lock check — kỳ công đã khoá thì không được void, kể cả
             # log đang PENDING. Dùng lại assert_period_open_for_job() dùng
             # chung (đã có sẵn cho Manager review/correct/void), không tự
@@ -117,6 +120,9 @@ class EmployeeEditLogWorkView(APIView):
 
             if log_work.review_status != LogWork.ReviewStatus.PENDING:
                 raise ValidationError("Only a PENDING log work can be edited.")
+
+            if log_work.task.job.status != "ACTIVE":
+                raise ValidationError(f"Cannot edit log work because its project is frozen or on hold ({log_work.task.job.status}).")
 
             assert_period_open_for_job(
                 job_id=log_work.task.job_id,

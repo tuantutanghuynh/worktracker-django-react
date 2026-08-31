@@ -69,6 +69,32 @@ def get_active_employee_or_error(user_id):
     return user
 
 
+def validate_assignee_for_job(job, assignee_id):
+    """
+    Kiem tra Assignee theo Quy trinh moi (Zero-Schema-Change):
+    1. Phai la Active Employee.
+    2. Khong duoc dang trong dien Phase-out o Job nay (co task danh dau [PHASE_OUT]).
+    3. Neu Job da co Project Team thi phai thuoc Project Team do.
+    """
+    assignee = get_active_employee_or_error(assignee_id)
+
+    # 1. Chot chan: Kiem tra Phase-out tai Job nay
+    is_phase_out = Task.objects.filter(
+        job=job,
+        assignee=assignee,
+        description__icontains="[PHASE_OUT]"
+    ).exists()
+    if is_phase_out:
+        raise BusinessRuleError("EMPLOYEE_IN_PHASE_OUT_CANNOT_RECEIVE_NEW_TASKS")
+
+    # 2. Chot chan: Kiem tra Project Team Scope neu Job da co Team
+    existing_team_ids = set(Task.objects.filter(job=job).values_list("assignee_id", flat=True).distinct())
+    if existing_team_ids and assignee.id not in existing_team_ids:
+        raise BusinessRuleError("ASSIGNEE_NOT_IN_JOB_PROJECT_TEAM")
+
+    return assignee
+
+
 def validate_task_deadline(job, deadline, is_create=False):
     if not deadline:
         return
@@ -175,9 +201,12 @@ def create_task(*, user, data, request=None):
         if job.status not in JOB_STATUS_ALLOW_CREATE:
             raise BusinessRuleError("JOB_STATUS_DOES_NOT_ALLOW_TASK_CREATE")
 
+        if not job.client or not job.client.is_active:
+            raise BusinessRuleError("CANNOT_CREATE_TASK_FOR_INACTIVE_CLIENT")
+
         validate_task_deadline(job, deadline, is_create=True)
 
-        assignee = get_active_employee_or_error(assignee_id)
+        assignee = validate_assignee_for_job(job, assignee_id)
 
         last_key = get_last_order_key(
             job_id=job.id,
@@ -308,7 +337,7 @@ def update_task(*, user, task, data, request=None):
             locked_task.deadline = data["deadline"]
 
         if "assignee_id" in data:
-            new_assignee = get_active_employee_or_error(data["assignee_id"])
+            new_assignee = validate_assignee_for_job(locked_task.job, data["assignee_id"])
 
             if locked_task.assignee_id != new_assignee.id:
                 locked_task.assignee = new_assignee

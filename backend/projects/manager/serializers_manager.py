@@ -42,6 +42,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
     task_counts = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     health = serializers.SerializerMethodField()
+    team_size = serializers.SerializerMethodField()
 
     class Meta:
         model = Job
@@ -54,10 +55,14 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             "status",
             "start_date",
             "deadline",
+            "team_size",
             "task_counts",
             "is_overdue",
             "health",
         ]
+
+    def get_team_size(self, obj):
+        return obj.tasks.values("assignee_id").distinct().count()
 
     def get_task_counts(self, obj):
         annotated_fields = [
@@ -105,13 +110,29 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
 
 class ManagerJobDetailSerializer(ManagerJobListSerializer):
     manager = ManagerUserMiniSerializer(read_only=True)
+    project_team = serializers.SerializerMethodField()
 
     class Meta(ManagerJobListSerializer.Meta):
         fields = ManagerJobListSerializer.Meta.fields + [
             "description",
             "manager",
+            "project_team",
             "created_at",
             "updated_at",
+        ]
+
+    def get_project_team(self, obj):
+        from accounts.models import CustomUser
+        assignee_ids = obj.tasks.values_list("assignee_id", flat=True).distinct()
+        users = CustomUser.objects.filter(id__in=assignee_ids, is_active=True).select_related("profile", "profile__department")
+        return [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": getattr(getattr(u, "profile", None), "full_name", "") or u.email,
+                "department_name": getattr(getattr(getattr(u, "profile", None), "department", None), "name", "No Department"),
+            }
+            for u in users
         ]
 
 

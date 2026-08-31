@@ -31,6 +31,7 @@ import { useRecentTasksStore } from '../../../stores/useRecentTasksStore';
 import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
 import { useManagerTasks } from '../../../hooks/queries/manager/useManagerTasks';
 import { useLogWorks } from '../../../hooks/queries/manager/useManagerTimesheets';
+import { useMyTasks } from '../../../hooks/queries/employee/useMyTasks';
 import { useProfile } from '../../../hooks/queries/common/useProfile';
 import UserAvatar from '../avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
@@ -68,7 +69,7 @@ const MENU_CONFIG = {
     portalLabel: 'Employee Portal',
     navItems: [
       { path: '/employee/dashboard', label: 'Dashboard', icon: LayoutGrid },
-      { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks, hasDividerTop: true },
+      { path: '/employee/my-tasks', label: 'My Tasks', icon: ListChecks, hasDividerTop: true, isEmployeeTaskBadge: true },
       { path: '/employee/team', label: 'My Team', icon: Users },
       { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
       { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp, hasDividerTop: true },
@@ -190,6 +191,14 @@ export default function Sidebar() {
     });
     return uniqueDays.size;
   }, [pendingLogWorksData]);
+
+  // 🚀 REACT QUERY: Lấy số lượng Task đang cần làm (TODO / IN_PROGRESS) của Employee
+  const isEmployee = userRole === 'EMPLOYEE';
+  const { tasks: employeeTasks } = useMyTasks({ enabled: isEmployee });
+  const employeePendingTaskCount = useMemo(() => {
+    if (!isEmployee || !Array.isArray(employeeTasks)) return 0;
+    return employeeTasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
+  }, [isEmployee, employeeTasks]);
 
   // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
   const displayRecentJobs = useMemo(() => {
@@ -321,6 +330,12 @@ export default function Sidebar() {
                   {item.hasBadge && unreadCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                       {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+
+                  {item.isEmployeeTaskBadge && employeePendingTaskCount > 0 && (
+                    <span className="bg-blue-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
+                      {employeePendingTaskCount > 99 ? '99+' : employeePendingTaskCount}
                     </span>
                   )}
 

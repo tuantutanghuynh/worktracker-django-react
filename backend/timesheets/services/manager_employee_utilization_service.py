@@ -3,6 +3,83 @@ from django.conf import settings
 from django.db.models import Sum
 
 
+def calculate_smart_workload_pressure(user):
+    """
+    Tinh toan Ap luc cong viec thoi gian thuc (Smart Workload Pressure - SWP):
+    1. Quet toan bo Task dang mo (TODO, IN_PROGRESS, REVIEWING).
+    2. Quy doi Priority thanh gio uoc tinh chuan:
+       - HIGH: 8.0 gio (1 ngay cong)
+       - MEDIUM: 4.0 gio (nua ngay cong)
+       - LOW: 1.5 gio (cong viec phu)
+    3. Tinh khung thoi gian lam viec thuc te:
+       - Tim Max Deadline cua cac task.
+       - Tinh so ngay lam viec tu Hom nay den Max Deadline (toi thieu 6 ngay lam viec de phan bo Backlog).
+    4. Tinh ap luc gio lam moi ngay: daily_required_hours = total_effort_hours / horizon_working_days
+    5. Phan loai trang thai:
+       - < 4.0h/ngay: AVAILABLE (Ranh / San sang nhan them viec)
+       - 4.0h - 8.0h/ngay: BALANCED (Vua tai / On dinh)
+       - > 8.0h/ngay: OVERLOADED (Qua tai thuc te)
+    """
+    from tasks.models import Task
+    from projects.models import Job
+    from django.utils import timezone
+
+    today = timezone.localdate()
+
+    active_tasks = Task.objects.filter(
+        assignee=user,
+        status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS, Task.Status.REVIEWING]
+    ).select_related("job")
+
+    if not active_tasks.exists():
+        return {
+            "active_tasks_count": 0,
+            "active_jobs_count": 0,
+            "daily_required_hours": 0.0,
+            "workload_status": "AVAILABLE",
+        }
+
+    PRIORITY_HOURS = {
+        Task.Priority.HIGH: 8.0,
+        Task.Priority.MEDIUM: 4.0,
+        Task.Priority.LOW: 1.5,
+    }
+
+    total_effort_hours = sum(PRIORITY_HOURS.get(task.priority, 4.0) for task in active_tasks)
+
+    # Tim deadline xa nhat cua cac task dang mo
+    max_deadline = max(task.deadline for task in active_tasks)
+
+    # Tinh so ngay lam viec tu Hom nay den Max Deadline (toi thieu 6 ngay)
+    end_horizon = max(max_deadline, today + timedelta(days=6))
+    horizon_working_days = calculate_working_days(today, end_horizon)
+    horizon_working_days = max(1, horizon_working_days)
+
+    daily_required_hours = round(total_effort_hours / float(horizon_working_days), 1)
+
+    active_jobs_count = Job.objects.filter(
+        tasks__assignee=user,
+        status=Job.Status.ACTIVE
+    ).distinct().count()
+
+    capacity_pct = round((daily_required_hours / 8.0) * 100.0, 1)
+
+    if daily_required_hours < 4.0:
+        workload_status = "AVAILABLE"
+    elif daily_required_hours <= 8.0:
+        workload_status = "BALANCED"
+    else:
+        workload_status = "OVERLOADED"
+
+    return {
+        "active_tasks_count": active_tasks.count(),
+        "active_jobs_count": active_jobs_count,
+        "daily_required_hours": daily_required_hours,
+        "capacity_pct": capacity_pct,
+        "workload_status": workload_status,
+    }
+
+
 def calculate_working_days(start_date, end_date, work_days_per_week=None):
     """
     Calculate the number of working days between two dates.

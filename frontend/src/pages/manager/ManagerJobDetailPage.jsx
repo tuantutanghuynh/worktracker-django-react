@@ -25,6 +25,8 @@ import {
   UserCheck,
   Sparkles,
   FileText,
+  PauseCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -88,10 +90,10 @@ export default function ManagerJobDetailPage() {
     deadline: '',
   });
 
-  // 🚀 TANSTACK REACT QUERY HOOKS: Nạp dữ liệu Job, Tasks và Employees
+  // 🚀 TANSTACK REACT QUERY HOOKS: Nạp dữ liệu Job, Tasks và Employees (Scoped to this Job's Project Team)
   const { data: job, isLoading: jobLoading } = useManagerJobDetail(id);
   const { data: taskResponse, isLoading: tasksLoading } = useManagerTasks({ job_id: id });
-  const { data: employeesResponse = [] } = useManagerEmployees();
+  const { data: employeesResponse = [] } = useManagerEmployees({ job_id: id });
 
   // Mutations
   const createTaskMutation = useCreateTask();
@@ -104,15 +106,22 @@ export default function ManagerJobDetailPage() {
     }
   }, [job, addRecentJob]);
 
-  // Chuẩn hóa danh sách Nhân viên cho Dropdown chọn Assignee
+  // Chuẩn hóa danh sách Nhân viên cho Dropdown chọn Assignee kèm Smart Workload
   const employeeOptions = useMemo(() => {
     const list = Array.isArray(employeesResponse)
       ? employeesResponse
       : employeesResponse.results || [];
-    return list.map((emp) => ({
-      value: String(emp.user_id || emp.id),
-      label: `${emp.full_name || emp.email} (${emp.department_name || 'Staff'})`,
-    }));
+    return list.map((emp) => {
+      const name = emp.full_name || emp.email;
+      const dept = emp.department?.name || emp.department_name || 'Staff';
+      const workloadInfo = emp.daily_required_hours !== undefined
+        ? ` · ~${emp.daily_required_hours}h/d [${emp.workload_status || 'AVAILABLE'}]`
+        : '';
+      return {
+        value: String(emp.user_id || emp.id),
+        label: `${name} (${dept})${workloadInfo}`,
+      };
+    });
   }, [employeesResponse]);
 
   // Chuẩn hóa dữ liệu Tasks
@@ -149,10 +158,24 @@ export default function ManagerJobDetailPage() {
     return { total, completed, inProgress, reviewing, todo, pct };
   }, [tasks]);
 
-  // Nhóm nhân sự phụ trách (Unique Team Members)
+  // Nhóm nhân sự phụ trách (Unique Team Members based on Project Team & Tasks)
   const groupedTeamMembers = useMemo(() => {
     const memberMap = {};
 
+    // 1. Khởi tạo từ Project Team chính thức của Job
+    const rawTeam = job?.project_team || (Array.isArray(employeesResponse) ? employeesResponse : employeesResponse?.results || []);
+    rawTeam.forEach((emp) => {
+      const key = String(emp.id);
+      memberMap[key] = {
+        id: emp.id,
+        name: emp.full_name || emp.email,
+        email: emp.email || '',
+        department_name: emp.department_name || emp.department?.name || 'General Staff',
+        tasks: [],
+      };
+    });
+
+    // 2. Gán các Task vào từng thành viên
     tasks.forEach((task) => {
       const assignee = task.assignee;
       const key = assignee?.id ? String(assignee.id) : 'unassigned';
@@ -161,6 +184,7 @@ export default function ManagerJobDetailPage() {
           id: assignee?.id || null,
           name: assignee?.full_name || assignee?.email || 'Unassigned Tasks',
           email: assignee?.email || '',
+          department_name: 'General Staff',
           tasks: [],
         };
       }
@@ -168,7 +192,7 @@ export default function ManagerJobDetailPage() {
     });
 
     return Object.values(memberMap);
-  }, [tasks]);
+  }, [tasks, job?.project_team, employeesResponse]);
 
   // Xử lý Tạo Task Mới
   const handleCreateTask = (e) => {
@@ -398,6 +422,32 @@ const ALLOWED_TRANSITIONS = {
   return (
     <div className="space-y-4 text-slate-800 pb-12">
       
+      {/* ⚠️ EXECUTIVE ALERT BANNER: CLIENT DEACTIVATED */}
+      {job.client && job.client.is_active === false && (
+        <div className="p-4 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-rose-500/10 border border-amber-300 rounded-2xl flex items-center justify-between gap-4 text-amber-950 shadow-xs">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-700 shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
+            <div className="text-xs space-y-0.5 min-w-0">
+              <p className="font-extrabold text-amber-950 text-sm flex items-center gap-2">
+                <span>PROJECT FROZEN — CLIENT INACTIVE</span>
+                <span className="px-2 py-0.2 rounded text-[10px] font-extrabold uppercase bg-rose-100 text-rose-700 border border-rose-200">
+                  Deactivated by Admin
+                </span>
+              </p>
+              <p className="text-amber-800 leading-relaxed">
+                Client <strong>"{job.client?.client_name}"</strong> is currently inactive. This project is placed in <strong>ON_HOLD</strong> state and all task workflow transitions & deliverables QA reviews are locked until the client is reactivated.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase bg-amber-100 text-amber-900 border border-amber-300 shrink-0 shadow-2xs">
+            <PauseCircle className="w-4 h-4 text-amber-700" />
+            <span>Frozen</span>
+          </span>
+        </div>
+      )}
+
       {/* 🌟 HERO MASTER INFO BANNER (THU GỌN ~45% CHIỀU CAO, CHỮ TO RÕ RÀNG) */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -417,6 +467,13 @@ const ALLOWED_TRANSITIONS = {
                 <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
                   {job.status}
                 </span>
+
+                {job.client && job.client.is_active === false && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                    <PauseCircle className="w-3 h-3 text-rose-500" />
+                    Client Inactive
+                  </span>
+                )}
 
                 <span
                   className={cn(
@@ -492,6 +549,12 @@ const ALLOWED_TRANSITIONS = {
             <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="font-semibold text-slate-500">Client:</span>
             <span className="font-bold text-slate-900">{job.client?.client_name || job.client_name || 'N/A'}</span>
+            {job.client && job.client.is_active === false && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
+                <PauseCircle className="w-2.5 h-2.5 text-rose-600" />
+                Inactive
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

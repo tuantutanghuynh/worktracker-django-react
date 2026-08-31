@@ -12,12 +12,13 @@ export const myTasksKeys = {
 // Errors from the status mutation surface as a toast (matches Manager's
 // mutation pattern), not a page-blocking error — a failed transition
 // shouldn't wipe out the whole task list the user is looking at.
-export function useMyTasks() {
+export function useMyTasks(options = {}) {
     const queryClient = useQueryClient()
 
     const { data, isLoading, error: queryError } = useQuery({
         queryKey: myTasksKeys.list(),
         queryFn: getMyTasks,
+        ...options,
     })
 
     const statusMutation = useMutation({

@@ -41,6 +41,11 @@ export const ERROR_DICTIONARY = {
   CANCELLATION_REASON_REQUIRED: 'A reason is required when cancelling a task.',
   TASK_DEADLINE_EXCEEDS_JOB: 'Task deadline must not exceed project deadline.',
   INVALID_ASSIGNEE: 'Assignee must be an active Employee within your department.',
+  JOB_NOT_ACTIVE_CANNOT_TRANSITION_TASK: 'Cannot transition task because its project is not in ACTIVE state (e.g. Planning, On Hold, or Completed). Please set the project to Active first.',
+  CLIENT_DEACTIVATED_CANNOT_TRANSITION_TASK: 'Cannot transition task because the client associated with this project is currently inactive/deactivated.',
+  TASK_LOCKED_FOR_REASSIGNMENT_EMPLOYEE_PHASE_OUT: 'This task is locked for reassignment because the assigned employee is currently in phase-out.',
+  ASSIGNEE_NOT_IN_JOB_PROJECT_TEAM: 'Assignee must belong to this project team roster.',
+  EMPLOYEE_IN_PHASE_OUT_CANNOT_RECEIVE_NEW_TASKS: 'Cannot assign new tasks to an employee undergoing project transfer (Phase-out).',
 
   // =================================================================
   // 4. TIMESHEETS & TIMELOCK MANAGEMENT (timesheets)

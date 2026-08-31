@@ -172,11 +172,25 @@ def assert_actor(user, task, allowed_actors):
 
 
 def validate_transition(task, to_status, reason=None):
+    # 0. Chặn thao tác khi Client bị vô hiệu hóa hoặc Job không ở trạng thái ACTIVE
+    if task.job.client and not task.job.client.is_active:
+        raise BusinessRuleError("CLIENT_DEACTIVATED_CANNOT_TRANSITION_TASK")
+
+    if task.job.status != "ACTIVE":
+        raise BusinessRuleError("JOB_NOT_ACTIVE_CANNOT_TRANSITION_TASK")
+
     transition_key = (task.status, to_status)
     allowed_actors = TASK_TRANSITIONS.get(transition_key)
 
     if allowed_actors is None:
         raise InvalidTaskTransition("INVALID_TASK_STATUS_TRANSITION")
+
+    if (
+        task.status == Task.Status.TODO
+        and to_status == Task.Status.IN_PROGRESS
+    ):
+        if task.description and "[LOCKED_FOR_REASSIGNMENT]" in task.description:
+            raise BusinessRuleError("TASK_LOCKED_FOR_REASSIGNMENT_EMPLOYEE_PHASE_OUT")
 
     if (
         task.status == Task.Status.IN_PROGRESS
@@ -313,6 +327,30 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
             },
             request=request,
         )
+
+        # 🚀 Auto-Release Check (Theo Quy trinh moi):
+        # Neu nhan vien nay khong con Task dang thuc hien (TODO, IN_PROGRESS, REVIEWING) nao o Job nay
+        if to_status == Task.Status.COMPLETED:
+            remaining_tasks_count = Task.objects.filter(
+                job_id=locked_task.job_id,
+                assignee_id=locked_task.assignee_id,
+                status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS, Task.Status.REVIEWING]
+            ).exclude(id=locked_task.id).count()
+
+            if remaining_tasks_count == 0:
+                log_action(
+                    user=user,
+                    action="AUTO_RELEASE_EMPLOYEE",
+                    table_name="jobs",
+                    record_id=locked_task.job_id,
+                    old_values=None,
+                    new_values={
+                        "released_user_id": locked_task.assignee_id,
+                        "job_id": locked_task.job_id,
+                        "note": "Employee completed all tasks in this job and is fully released."
+                    },
+                    request=request,
+                )
 
         recipients = resolve_task_recipients(
             locked_task,

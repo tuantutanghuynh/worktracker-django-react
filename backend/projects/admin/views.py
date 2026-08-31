@@ -108,6 +108,23 @@ class ClientViewSet(viewsets.ModelViewSet):
         old_values = ClientSerializer(instance).data
         instance.is_active = False
         instance.save()
+
+        # Tu dong chuyen cac Job dang chay cua Client nay sang ON_HOLD
+        active_jobs = Job.objects.filter(client=instance, status__in=[Job.Status.PLANNING, Job.Status.ACTIVE])
+        for job in active_jobs:
+            old_job_data = JobSerializer(job).data
+            job.status = Job.Status.ON_HOLD
+            job.save(update_fields=['status', 'updated_at'])
+            log_audit_event(
+                actor=self.request.user,
+                action='UPDATE',
+                table_name='jobs',
+                record_id=job.id,
+                old_values=old_job_data,
+                new_values=JobSerializer(job).data,
+                request=self.request,
+            )
+
         log_audit_event(
             actor=self.request.user,
             action='DELETE',

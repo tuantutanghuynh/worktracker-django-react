@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -21,6 +22,9 @@ class ManagerUserMiniSerializer(serializers.Serializer):
 
 
 class ManagerJobMiniSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source="client.client_name", read_only=True)
+    client_is_active = serializers.BooleanField(source="client.is_active", read_only=True)
+
     class Meta:
         model = Job
         fields = [
@@ -28,15 +32,20 @@ class ManagerJobMiniSerializer(serializers.ModelSerializer):
             "job_name",
             "status",
             "deadline",
+            "client_name",
+            "client_is_active",
         ]
 
 
 class ManagerTaskListSerializer(serializers.ModelSerializer):
+    job = ManagerJobMiniSerializer(read_only=True)
     assignee = ManagerUserMiniSerializer(read_only=True)
     is_overdue = serializers.SerializerMethodField()
     deadline_health = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
+    rejection_count = serializers.SerializerMethodField()
+    latest_rejection = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
@@ -46,12 +55,15 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
             "priority",
             "status",
             "deadline",
+            "job",
             "assignee",
             "order_index",
             "is_overdue",
             "deadline_health",
             "comment_count",
             "attachment_count",
+            "rejection_count",
+            "latest_rejection",
         ]
 
     def get_is_overdue(self, obj):
@@ -78,10 +90,47 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
 
         return obj.attachments.count()
 
+    def get_rejection_count(self, obj):
+        return obj.comments.filter(
+            Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
+            | Q(content__startswith="[Rejection Note]")
+            | Q(content__startswith="[Rework Requested]")
+        ).count()
+
+    def get_latest_rejection(self, obj):
+        comment = (
+            obj.comments.filter(
+                Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
+                | Q(content__startswith="[Rejection Note]")
+                | Q(content__startswith="[Rework Requested]")
+            )
+            .select_related("user", "user__profile")
+            .order_by("-created_at")
+            .first()
+        )
+        if comment:
+            reason = (
+                comment.content.replace("[Rejection Note]: ", "")
+                .replace("[Rework Requested]: ", "")
+                .strip()
+            )
+            user_name = (
+                getattr(getattr(comment.user, "profile", None), "full_name", "")
+                or comment.user.email
+            )
+            return {
+                "id": comment.id,
+                "reason": reason,
+                "rejected_by": user_name,
+                "rejected_at": comment.created_at,
+            }
+        return None
+
 
 class ManagerTaskDetailSerializer(ManagerTaskListSerializer):
     job = ManagerJobMiniSerializer(read_only=True)
     creator = ManagerUserMiniSerializer(read_only=True)
+    rejection_history = serializers.SerializerMethodField()
 
     class Meta(ManagerTaskListSerializer.Meta):
         fields = ManagerTaskListSerializer.Meta.fields + [
@@ -89,8 +138,35 @@ class ManagerTaskDetailSerializer(ManagerTaskListSerializer):
             "job",
             "creator",
             "completed_at",
+            "rejection_history",
             "created_at",
             "updated_at",
+        ]
+
+    def get_rejection_history(self, obj):
+        comments = (
+            obj.comments.filter(
+                Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
+                | Q(content__startswith="[Rejection Note]")
+                | Q(content__startswith="[Rework Requested]")
+            )
+            .select_related("user", "user__profile")
+            .order_by("-created_at")
+        )
+        return [
+            {
+                "id": c.id,
+                "reason": c.content.replace("[Rejection Note]: ", "")
+                .replace("[Rework Requested]: ", "")
+                .strip(),
+                "rejected_by": getattr(
+                    getattr(c.user, "profile", None), "full_name", ""
+                )
+                or c.user.email,
+                "rejected_at": c.created_at,
+                "comment_type": c.comment_type,
+            }
+            for c in comments
         ]
 
 

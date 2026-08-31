@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Ban } from 'lucide-react';
+import { Plus, Search, Pencil, Ban, Users } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
@@ -27,6 +27,7 @@ import {
 import { useAdminClients } from '../../hooks/queries/admin/useAdminClients';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
 import { getErrorMessage } from '../../utils/errorMessages';
+import { cn } from '../../utils/cn';
 
 const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
@@ -78,7 +79,7 @@ const jobSchema = z
   .object({
     client: z.string().min(1, 'Client is required'),
     manager: z.string().min(1, 'Manager is required'),
-    job_name: z.string().min(1, 'Job name is required'),
+    job_name: z.string().trim().min(1, 'Job name is required'),
     job_code: z.string().optional(),
     priority: z.string().min(1, 'Priority is required'),
     description: z.string().optional(),
@@ -102,7 +103,7 @@ const jobSchema = z
 const editJobSchema = z
   .object({
     manager: z.string().min(1, 'Manager is required'),
-    job_name: z.string().min(1, 'Job name is required'),
+    job_name: z.string().trim().min(1, 'Job name is required'),
     priority: z.string().min(1, 'Priority is required'),
     status: z.string().min(1, 'Status is required'),
     description: z.string().optional(),
@@ -172,6 +173,12 @@ export function JobsPage() {
   }));
   const managerEmailById = Object.fromEntries(managers.map((m) => [m.id, m.email]));
 
+  // Danh sách Employee để Admin phân bổ vào Project Team của Job (Giai đoạn 1)
+  const { data: employeesPage } = useAdminUsers({ role: 'EMPLOYEE', page_size: 500 });
+  const employees = employeesPage?.results || [];
+  const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState([]);
+  const [selectedEditTeamMemberIds, setSelectedEditTeamMemberIds] = useState([]);
+
   const {
     register,
     handleSubmit,
@@ -216,6 +223,7 @@ export function JobsPage() {
   }, []);
 
   function openCreate() {
+    setSelectedTeamMemberIds([]);
     reset({
       client: '',
       manager: '',
@@ -240,6 +248,7 @@ export function JobsPage() {
         description: data.description || null,
         start_date: data.start_date,
         deadline: data.deadline,
+        initial_team_member_ids: selectedTeamMemberIds.map(Number),
       },
       { onSuccess: () => setIsCreateOpen(false) }
     );
@@ -251,6 +260,8 @@ export function JobsPage() {
   function openEditJob(job) {
     acquireLockMutation.mutate(job.id, {
       onSuccess: () => {
+        const currentMemberIds = (job.project_team || []).map((m) => m.id);
+        setSelectedEditTeamMemberIds(currentMemberIds);
         resetEdit({
           manager: String(job.manager),
           job_name: job.job_name,
@@ -283,6 +294,7 @@ export function JobsPage() {
           description: data.description || null,
           start_date: data.start_date,
           deadline: data.deadline,
+          initial_team_member_ids: selectedEditTeamMemberIds.map(Number),
         },
       },
       { onSuccess: closeEditModal }
@@ -325,26 +337,27 @@ export function JobsPage() {
         <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Job" sortKey="job_name" ordering={ordering} onSort={toggleSort} className="w-[21%]" />
-              <SortableHeader label="Client" sortKey="client__client_name" ordering={ordering} onSort={toggleSort} className="w-[17%]" />
-              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} className="w-[19%]" />
-              <SortableHeader label="Priority" sortKey="priority" ordering={ordering} onSort={toggleSort} className="w-[11%]" />
-              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} className="w-[12%]" />
-              <SortableHeader label="Deadline" sortKey="deadline" ordering={ordering} onSort={toggleSort} className="w-[11%]" />
+              <SortableHeader label="Job" sortKey="job_name" ordering={ordering} onSort={toggleSort} className="w-[18%]" />
+              <SortableHeader label="Client" sortKey="client__client_name" ordering={ordering} onSort={toggleSort} className="w-[14%]" />
+              <SortableHeader label="Manager" sortKey="manager__email" ordering={ordering} onSort={toggleSort} className="w-[17%]" />
+              <th className="w-[11%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase text-slate-500">Team</th>
+              <SortableHeader label="Priority" sortKey="priority" ordering={ordering} onSort={toggleSort} className="w-[10%]" />
+              <SortableHeader label="Status" sortKey="status" ordering={ordering} onSort={toggleSort} className="w-[11%]" />
+              <SortableHeader label="Deadline" sortKey="deadline" ordering={ordering} onSort={toggleSort} className="w-[10%]" />
               <th className="w-[9%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && jobs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
                   {search ? 'No jobs match your search.' : 'No jobs yet.'}
                 </td>
               </tr>
@@ -380,6 +393,15 @@ export function JobsPage() {
                     />
                   )}
                   {managerEmailById[job.manager] || job.manager}
+                </td>
+                <td className="px-3 py-2 text-slate-600 truncate">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-semibold text-[11px] text-slate-700"
+                    title={job.project_team?.map((m) => m.full_name || m.email).join(', ') || 'No team members allocated'}
+                  >
+                    <Users className="w-3 h-3 text-slate-400" />
+                    {job.team_size || job.project_team?.length || 0}
+                  </span>
                 </td>
                 <td className="px-3 py-2 truncate">
                   <PriorityBadge priority={job.priority} className="text-[10px] px-2" />
@@ -422,9 +444,9 @@ export function JobsPage() {
         />
       </div>
 
-      <BaseModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="New Job" maxWidth="max-w-lg">
+      <BaseModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="New Job" maxWidth="max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <InputField label="Job Name" error={errors.job_name?.message} {...register('job_name')} />
+          <InputField label="Job Name" required error={errors.job_name?.message} {...register('job_name')} />
 
           <div className="grid grid-cols-2 gap-3">
             <Controller
@@ -433,6 +455,7 @@ export function JobsPage() {
               render={({ field }) => (
                 <SelectDropdown
                   label="Client"
+                  required
                   options={clientOptions}
                   value={field.value}
                   onChange={field.onChange}
@@ -446,6 +469,7 @@ export function JobsPage() {
               render={({ field }) => (
                 <SelectDropdown
                   label="Manager"
+                  required
                   options={managerOptions}
                   value={field.value}
                   onChange={field.onChange}
@@ -456,8 +480,8 @@ export function JobsPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <InputField label="Start Date" type="date" error={errors.start_date?.message} {...register('start_date')} />
-            <InputField label="Deadline" type="date" min={format(new Date(), 'yyyy-MM-dd')} error={errors.deadline?.message} {...register('deadline')} />
+            <InputField label="Start Date" required type="date" error={errors.start_date?.message} {...register('start_date')} />
+            <InputField label="Deadline" required type="date" min={format(new Date(), 'yyyy-MM-dd')} error={errors.deadline?.message} {...register('deadline')} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -467,6 +491,7 @@ export function JobsPage() {
               render={({ field }) => (
                 <SelectDropdown
                   label="Priority"
+                  required
                   options={PRIORITY_OPTIONS}
                   value={field.value}
                   onChange={field.onChange}
@@ -482,6 +507,89 @@ export function JobsPage() {
             error={errors.description?.message}
             {...register('description')}
           />
+
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Project Team Allocation (Initial Staffing)
+              </label>
+              <span className="text-[11px] text-slate-400">
+                {selectedTeamMemberIds.length} selected
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Select active employees across departments to form the initial project team.
+            </p>
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 space-y-1.5 text-xs">
+              {employees.length === 0 ? (
+                <div className="text-slate-400 py-2 text-center">No active employees available</div>
+              ) : (
+                employees.map((emp) => {
+                  const isSelected = selectedTeamMemberIds.includes(emp.id);
+                  const wl = emp.workload;
+                  return (
+                    <label
+                      key={emp.id}
+                      className={cn(
+                        'flex items-center justify-between gap-3 rounded-lg p-2.5 cursor-pointer transition-colors border',
+                        isSelected ? 'bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs' : 'bg-white border-slate-200/80 text-slate-700 hover:bg-slate-50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTeamMemberIds([...selectedTeamMemberIds, emp.id]);
+                            } else {
+                              setSelectedTeamMemberIds(selectedTeamMemberIds.filter((id) => id !== emp.id));
+                            }
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs truncate text-slate-900">{emp.profile?.full_name || emp.email}</p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {emp.email} · <span className="font-medium text-slate-600">{emp.profile?.department_name || emp.profile?.department?.name || 'No Department'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {wl ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-[10px] text-slate-600 bg-slate-100/90 px-2 py-1 rounded-md flex items-center gap-1.5">
+                            <span><strong className="text-slate-900">{wl.active_tasks_count}</strong> Tasks</span>
+                            <span className="text-slate-300">|</span>
+                            <span><strong className="text-slate-900">{wl.active_jobs_count}</strong> Jobs</span>
+                            <span className="text-slate-300">|</span>
+                            <span>
+                              Capacity: <strong className={cn(
+                                wl.capacity_pct < 50 ? 'text-emerald-700' : wl.capacity_pct <= 100 ? 'text-amber-700' : 'text-rose-700'
+                              )}>{wl.capacity_pct}%</strong>
+                            </span>
+                          </div>
+
+                          <span
+                            className={cn(
+                              'inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0',
+                              wl.workload_status === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                              wl.workload_status === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
+                              wl.workload_status === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200'
+                            )}
+                          >
+                            {wl.workload_status === 'AVAILABLE' ? '🟢 Available' : wl.workload_status === 'BALANCED' ? '🟡 Balanced' : '🔴 Overloaded'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Employee</span>
+                      )}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -507,10 +615,10 @@ export function JobsPage() {
         onClose={closeEditModal}
         title="Edit Job"
         description={editTarget?.job_name}
-        maxWidth="max-w-lg"
+        maxWidth="max-w-2xl"
       >
         <form onSubmit={handleEditSubmit(onSubmitEdit)} className="space-y-3">
-          <InputField label="Job Name" error={editErrors.job_name?.message} {...registerEdit('job_name')} />
+          <InputField label="Job Name" required error={editErrors.job_name?.message} {...registerEdit('job_name')} />
 
           <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
             Client: <span className="font-semibold text-slate-700">{clientNameById[editTarget?.client]}</span>{' '}
@@ -524,6 +632,7 @@ export function JobsPage() {
               render={({ field }) => (
                 <SelectDropdown
                   label="Manager"
+                  required
                   options={managerOptions}
                   value={field.value}
                   onChange={field.onChange}
@@ -537,6 +646,7 @@ export function JobsPage() {
               render={({ field }) => (
                 <SelectDropdown
                   label="Status"
+                  required
                   options={getStatusOptionsFor(editTarget?.status)}
                   value={field.value}
                   onChange={field.onChange}
@@ -559,12 +669,14 @@ export function JobsPage() {
           <div className="grid grid-cols-2 gap-3">
             <InputField
               label="Start Date"
+              required
               type="date"
               error={editErrors.start_date?.message}
               {...registerEdit('start_date')}
             />
             <InputField
               label="Deadline"
+              required
               type="date"
               error={editErrors.deadline?.message}
               {...registerEdit('deadline')}
@@ -577,6 +689,7 @@ export function JobsPage() {
             render={({ field }) => (
               <SelectDropdown
                 label="Priority"
+                required
                 options={PRIORITY_OPTIONS}
                 value={field.value}
                 onChange={field.onChange}
@@ -590,6 +703,89 @@ export function JobsPage() {
             error={editErrors.description?.message}
             {...registerEdit('description')}
           />
+
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Project Team Allocation
+              </label>
+              <span className="text-[11px] text-slate-400">
+                {selectedEditTeamMemberIds.length} allocated
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Manage employees participating in this project team.
+            </p>
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 space-y-1.5 text-xs">
+              {employees.length === 0 ? (
+                <div className="text-slate-400 py-2 text-center">No active employees available</div>
+              ) : (
+                employees.map((emp) => {
+                  const isSelected = selectedEditTeamMemberIds.includes(emp.id);
+                  const wl = emp.workload;
+                  return (
+                    <label
+                      key={emp.id}
+                      className={cn(
+                        'flex items-center justify-between gap-3 rounded-lg p-2.5 cursor-pointer transition-colors border',
+                        isSelected ? 'bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs' : 'bg-white border-slate-200/80 text-slate-700 hover:bg-slate-50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedEditTeamMemberIds([...selectedEditTeamMemberIds, emp.id]);
+                            } else {
+                              setSelectedEditTeamMemberIds(selectedEditTeamMemberIds.filter((id) => id !== emp.id));
+                            }
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs truncate text-slate-900">{emp.profile?.full_name || emp.email}</p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {emp.email} · <span className="font-medium text-slate-600">{emp.profile?.department_name || emp.profile?.department?.name || 'No Department'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {wl ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-[10px] text-slate-600 bg-slate-100/90 px-2 py-1 rounded-md flex items-center gap-1.5">
+                            <span><strong className="text-slate-900">{wl.active_tasks_count}</strong> Tasks</span>
+                            <span className="text-slate-300">|</span>
+                            <span><strong className="text-slate-900">{wl.active_jobs_count}</strong> Jobs</span>
+                            <span className="text-slate-300">|</span>
+                            <span>
+                              Capacity: <strong className={cn(
+                                wl.capacity_pct < 50 ? 'text-emerald-700' : wl.capacity_pct <= 100 ? 'text-amber-700' : 'text-rose-700'
+                              )}>{wl.capacity_pct}%</strong>
+                            </span>
+                          </div>
+
+                          <span
+                            className={cn(
+                              'inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0',
+                              wl.workload_status === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                              wl.workload_status === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
+                              wl.workload_status === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200'
+                            )}
+                          >
+                            {wl.workload_status === 'AVAILABLE' ? '🟢 Available' : wl.workload_status === 'BALANCED' ? '🟡 Balanced' : '🔴 Overloaded'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Employee</span>
+                      )}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
