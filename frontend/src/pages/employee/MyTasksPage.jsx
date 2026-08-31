@@ -66,9 +66,18 @@ function isTaskFrozen(task) {
 // Employee My Tasks (Ngày 7) — List view only for now (Kanban view
 // deferred). Filtering is client-side since the list endpoint doesn't
 // take query params yet, and 1 Employee's task count is small.
+// Task còn việc dang dở (TODO/IN_PROGRESS/REVIEWING) mà đang frozen — task
+// đã COMPLETED/CANCELLED thì dù job có frozen cũng không còn hành động nào
+// bị chặn, không cần xếp vào tab Frozen.
+const OPEN_STATUSES = ["TODO", "IN_PROGRESS", "REVIEWING"]
+function isFrozenOpenTask(task) {
+    return OPEN_STATUSES.includes(task.status) && isTaskFrozen(task)
+}
+
 export function MyTasksPage() {
     const { tasks, loading, error, changeStatus } = useMyTasks()
     const { addRecentTask } = useRecentTasksStore()
+    const [activeTab, setActiveTab] = useState("active") // "active" | "frozen"
     const [searchQuery, setSearchQuery] = useState("")
     const [statusValue, setStatusValue] = useState("")
     const [priorityValue, setPriorityValue] = useState("")
@@ -79,12 +88,18 @@ export function MyTasksPage() {
     const [recallingTask, setRecallingTask] = useState(null)
     const [isRecalling, setIsRecalling] = useState(false)
 
+    // Tách trước theo tab — Active/Frozen là 2 rổ độc lập, các filter/sort
+    // bên dưới chỉ áp dụng bên trong đúng rổ đang xem.
+    const frozenTasks = useMemo(() => tasks.filter(isFrozenOpenTask), [tasks])
+    const activeTasks = useMemo(() => tasks.filter((t) => !isFrozenOpenTask(t)), [tasks])
+    const tabTasks = activeTab === "frozen" ? frozenTasks : activeTasks
+
     const projectOptions = useMemo(() => {
         const seen = new Set()
-        return tasks
+        return tabTasks
             .filter((t) => t.job_name && !seen.has(t.job_name) && seen.add(t.job_name))
             .map((t) => ({ value: t.job_name, label: t.job_name }))
-    }, [tasks])
+    }, [tabTasks])
 
     function handleSortChange(key) {
         setSorting((prev) => {
@@ -95,7 +110,7 @@ export function MyTasksPage() {
     }
 
     const filteredTasks = useMemo(() => {
-        let result = tasks.filter((task) => {
+        let result = tabTasks.filter((task) => {
             if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
             if (statusValue && task.status !== statusValue) return false
             if (priorityValue && task.priority !== priorityValue) return false
@@ -117,7 +132,7 @@ export function MyTasksPage() {
         }
 
         return result
-    }, [tasks, searchQuery, statusValue, priorityValue, projectValue, sorting])
+    }, [tabTasks, searchQuery, statusValue, priorityValue, projectValue, sorting])
 
     function handleClearFilters() {
         setSearchQuery("")
@@ -279,11 +294,34 @@ export function MyTasksPage() {
         return <p className="text-xs text-rose-500">{error}</p>
     }
 
+    function handleTabChange(tab) {
+        setActiveTab(tab)
+        handleClearFilters() // filter cũ (vd. Project chỉ có ở tab kia) không nên carry sang
+    }
+
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">My Tasks</h1>
                 <p className="text-slate-500 text-xs">Tasks assigned to you across all projects.</p>
+            </div>
+
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+                <button
+                    type="button"
+                    onClick={() => handleTabChange("active")}
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-colors ${activeTab === "active" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    Active ({activeTasks.length})
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleTabChange("frozen")}
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${activeTab === "frozen" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+                    Frozen ({frozenTasks.length})
+                </button>
             </div>
 
             <FilterToolbar
@@ -316,7 +354,7 @@ export function MyTasksPage() {
                 columns={columns}
                 data={filteredTasks}
                 isLoading={loading}
-                emptyMessage="No tasks assigned yet."
+                emptyMessage={activeTab === "frozen" ? "No frozen tasks — nothing is currently blocked." : "No tasks assigned yet."}
                 onRowClick={(task) => { setSelectedTask(task); addRecentTask(task) }}
                 sorting={sorting}
                 onSortChange={handleSortChange}
