@@ -330,14 +330,14 @@ function TeamSection({ teammates, onMessage }) {
         ))}
       </div>
 
-      {hiddenRowsCount > 0 && (
+      {teammates.length > VISIBLE_ROWS && (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={() => setExpanded((v) => !v)}
           className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer"
         >
-          +{hiddenRowsCount} other member{hiddenRowsCount !== 1 ? 's' : ''}
-          <ChevronDown className="w-3 h-3" />
+          {expanded ? 'Show less' : `+${hiddenRowsCount} other member${hiddenRowsCount !== 1 ? 's' : ''}`}
+          <ChevronDown className={cn('w-3 h-3 transition-transform', expanded && 'rotate-180')} />
         </button>
       )}
     </div>
