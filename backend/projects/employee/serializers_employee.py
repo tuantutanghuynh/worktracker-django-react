@@ -15,7 +15,7 @@ class EmployeeMyTeamJobSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "id", "job_code", "job_name", "status", "priority",
-            "deadline", "client_name", "manager", "teammates",
+            "deadline", "updated_at", "client_name", "manager", "teammates",
         ]
 
     def get_manager(self, obj):
