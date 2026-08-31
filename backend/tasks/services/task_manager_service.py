@@ -37,16 +37,24 @@ def assert_task_in_manager_scope(user, task):
         raise PermissionDenied("TASK_OUT_OF_MANAGER_SCOPE")
 
 
-def get_active_employee_or_error(user_id):
+def get_active_employee_or_error(user_id, manager=None):
     """
     Lấy assignee hợp lệ.
 
     Theo FR-34, task được giao cho Employee.
+
+    Khi truyền `manager`, hàm còn kiểm tra Employee đó có thuộc tuyến báo cáo
+    của Manager này không (EmployeeProfile.manager). Đây là chốt chặn để một
+    Manager không giao được việc cho nhân viên của Manager khác — trước đây
+    chỉ kiểm role nên ai cũng giao cho ai cũng được.
+
+    Đặt luật ở đây chứ không ở serializer vì đây là điểm nghẽn duy nhất: cả
+    create_task lẫn update_task đều đi qua hàm này.
     """
     User = get_user_model()
 
     try:
-        user = User.objects.select_related("role").get(
+        user = User.objects.select_related("role", "profile").get(
             id=user_id,
             is_active=True,
         )
@@ -66,40 +74,19 @@ def get_active_employee_or_error(user_id):
             }
         )
 
+    if manager is not None:
+        assignee_manager_id = getattr(getattr(user, "profile", None), "manager_id", None)
+        if assignee_manager_id != manager.id:
+            raise ValidationError(
+                {
+                    "assignee_id": (
+                        "Nhân viên này không thuộc tuyến quản lý của bạn. "
+                        "Liên hệ Admin nếu cần điều chuyển."
+                    )
+                }
+            )
+
     return user
-
-
-def validate_assignee_for_job(job, assignee_id):
-    """
-    Kiem tra Assignee theo Quy trinh moi (Zero-Schema-Change):
-    1. Phai la Active Employee.
-    2. Khong duoc dang trong dien Phase-out o Job nay (co task danh dau [PHASE_OUT]).
-    3. Neu Job da co Project Team (ChatParticipant hoac da co task) thi phai thuoc Project Team do.
-    """
-    assignee = get_active_employee_or_error(assignee_id)
-
-    # 1. Chot chan: Kiem tra Phase-out tai Job nay
-    is_phase_out = Task.objects.filter(
-        job=job,
-        assignee=assignee,
-        description__icontains="[PHASE_OUT]"
-    ).exists()
-    if is_phase_out:
-        raise BusinessRuleError("EMPLOYEE_IN_PHASE_OUT_CANNOT_RECEIVE_NEW_TASKS")
-
-    # 2. Chot chan: Kiem tra Project Team Scope (ChatParticipant + Task Assignees)
-    from chat.models import ChatParticipant
-    task_assignee_ids = set(Task.objects.filter(job=job).values_list("assignee_id", flat=True).distinct())
-    team_participant_ids = set(
-        ChatParticipant.objects.filter(room__job=job, room__room_type='JOB')
-        .values_list('user_id', flat=True)
-        .distinct()
-    )
-    job_team_member_ids = task_assignee_ids | team_participant_ids
-    if job_team_member_ids and assignee.id not in job_team_member_ids:
-        raise BusinessRuleError("ASSIGNEE_NOT_IN_JOB_PROJECT_TEAM")
-
-    return assignee
 
 
 def validate_task_deadline(job, deadline, is_create=False):
@@ -185,6 +172,13 @@ def create_task(*, user, data, request=None):
             }
         )
 
+    if not assignee_id:
+        raise ValidationError(
+            {
+                "assignee_id": "assignee_id is required."
+            }
+        )
+
     if not title:
         raise ValidationError(
             {
@@ -201,16 +195,9 @@ def create_task(*, user, data, request=None):
         if job.status not in JOB_STATUS_ALLOW_CREATE:
             raise BusinessRuleError("JOB_STATUS_DOES_NOT_ALLOW_TASK_CREATE")
 
-        if not job.client or not job.client.is_active:
-            raise BusinessRuleError("CANNOT_CREATE_TASK_FOR_INACTIVE_CLIENT")
-
         validate_task_deadline(job, deadline, is_create=True)
 
-        if assignee_id:
-            assignee = validate_assignee_for_job(job, assignee_id)
-        else:
-            # Nếu chưa chọn nhân viên: Mặc định tạm gán cho chính Manager tạo task
-            assignee = user
+        assignee = get_active_employee_or_error(assignee_id, manager=user)
 
         last_key = get_last_order_key(
             job_id=job.id,
@@ -231,7 +218,10 @@ def create_task(*, user, data, request=None):
 
         add_default_followers(
             task=task,
-            users=list(set([assignee, user])),
+            users=[
+                assignee,
+                user,
+            ],
         )
 
         log_action(
@@ -257,15 +247,14 @@ def create_task(*, user, data, request=None):
             request=request,
         )
 
-        if assignee.id != user.id:
-            notify(
-                recipients=[assignee],
-                event_type=Notification.EventType.TASK_ASSIGNED,
-                title="New task assigned",
-                content=f"You have been assigned to task: {task.title}",
-                related_url="/employee/my-tasks",
-                channel=Notification.ChannelType.SYSTEM_ONLY,
-            )
+        notify(
+            recipients=[assignee],
+            event_type=Notification.EventType.TASK_ASSIGNED,
+            title="New task assigned",
+            content=f"You have been assigned to task: {task.title}",
+            related_url="/employee/my-tasks",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
+        )
 
     return task
 
@@ -339,7 +328,7 @@ def update_task(*, user, task, data, request=None):
             locked_task.deadline = data["deadline"]
 
         if "assignee_id" in data:
-            new_assignee = validate_assignee_for_job(locked_task.job, data["assignee_id"])
+            new_assignee = get_active_employee_or_error(data["assignee_id"], manager=user)
 
             if locked_task.assignee_id != new_assignee.id:
                 locked_task.assignee = new_assignee
@@ -368,7 +357,7 @@ def update_task(*, user, task, data, request=None):
             notify(
                 recipients=[new_assignee],
                 event_type=Notification.EventType.TASK_ASSIGNED,
-                title="Task re-assigned",
+                title="Task assigned",
                 content=f"You have been assigned to task: {locked_task.title}",
                 related_url="/employee/my-tasks",
                 channel=Notification.ChannelType.SYSTEM_ONLY,

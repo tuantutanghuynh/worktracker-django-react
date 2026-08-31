@@ -9,6 +9,7 @@ import {
   unlockUser,
   resetUserPassword,
   assignUserDepartment,
+  assignUserManager,
   listRoles,
 } from '../../../api/admin/users';
 import { getErrorMessage } from '../../../utils/errorMessages';
@@ -110,6 +111,18 @@ export function useAssignUserDepartment() {
       toast.success(departmentId ? 'Department assigned.' : 'Removed from department.');
     },
     onError: (err) => toast.error(getErrorMessage(err, 'Failed to update department.')),
+  });
+}
+
+export function useAssignUserManager() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, managerId }) => assignUserManager(id, managerId),
+    onSuccess: (_data, { managerId }) => {
+      queryClient.invalidateQueries({ queryKey: adminUserKeys.all });
+      toast.success(managerId ? 'Manager assigned.' : 'Removed from manager.');
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to update manager.')),
   });
 }
 

@@ -1,7 +1,8 @@
 import pytest
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta
 
+from django.utils import timezone
 from model_bakery import baker
 from rest_framework.test import APIClient
 from accounts.models import Permission
@@ -106,3 +107,44 @@ class TestEmployeeLogWorkDailyTotal:
             user=self.employee, work_date=self.work_date
         )
         assert timesheet.total_hours == Decimal("6")  # không bị cộng thêm 5h vượt cap
+
+
+@pytest.mark.django_db
+class TestKhongChamCongNgayTuongLai:
+    """
+    Chấm công là ghi nhận việc ĐÃ LÀM. Trước khi có validate_work_date(),
+    backend nhận mọi ngày — đã thử tạo được log cho ngày cách hôm nay 60 ngày
+    và nhận 201 Created. Dữ liệu đó làm sai lệch báo cáo tổng giờ.
+    """
+
+    def setup_method(self):
+        self.client = APIClient()
+        self.employee, self.task = make_employee_with_task()
+        self.client.force_authenticate(user=self.employee)
+
+    def _post(self, work_date):
+        return self.client.post("/api/timesheets/log-works/", {
+            "task": self.task.id,
+            "work_date": work_date,
+            "hours_spent": 4,
+            "description": "kiem tra ngay",
+        }, format="json")
+
+    def test_ngay_mai_bi_tu_choi(self):
+        response = self._post(timezone.localdate() + timedelta(days=1))
+        assert response.status_code == 400
+        assert "work_date" in response.data
+
+    def test_ngay_xa_trong_tuong_lai_bi_tu_choi(self):
+        response = self._post(timezone.localdate() + timedelta(days=60))
+        assert response.status_code == 400
+
+    def test_hom_nay_van_cham_cong_duoc(self):
+        """Ranh giới: hôm nay hợp lệ, chỉ chặn từ ngày mai trở đi."""
+        response = self._post(timezone.localdate())
+        assert response.status_code == 201
+
+    def test_ngay_trong_qua_khu_van_cham_cong_duoc(self):
+        """Chấm bù cho hôm qua là việc bình thường, không được cản."""
+        response = self._post(timezone.localdate() - timedelta(days=3))
+        assert response.status_code == 201

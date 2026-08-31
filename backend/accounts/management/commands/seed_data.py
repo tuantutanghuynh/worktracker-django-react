@@ -135,9 +135,40 @@ class Command(BaseCommand):
                 }
             )
 
+            # 👔 MANAGER THỨ HAI
+            # Cần ít nhất 2 Manager thì mới thấy được tác dụng của tuyến báo
+            # cáo cố định: mỗi người chỉ nhìn thấy và chỉ giao việc được cho
+            # nhân viên của mình. Một Manager duy nhất thì mọi bộ lọc phạm vi
+            # đều trông như không làm gì.
+            manager_two, _ = CustomUser.objects.get_or_create(
+                email="manager2@worktracker.vn",
+                defaults={
+                    "role": role_manager,
+                    "is_staff": True,
+                    "is_active": True,
+                    "must_change_password": False,
+                }
+            )
+            manager_two.set_password("Manager123!")
+            manager_two.must_change_password = False
+            manager_two.save()
+
+            EmployeeProfile.objects.get_or_create(
+                user=manager_two,
+                defaults={
+                    "full_name": "Grace Bennett",
+                    "department": dept_mkt,
+                    "phone_number": "+84 902 000 003",
+                }
+            )
+
             # Link department manager
             dept_it.manager = manager_user
             dept_it.save()
+            dept_mkt.manager = manager_two
+            dept_mkt.save()
+            dept_hr.manager = manager_two
+            dept_hr.save()
 
             # 👷 15 EMPLOYEE USERS
             employee_names = [
@@ -172,15 +203,36 @@ class Command(BaseCommand):
                 emp.must_change_password = False
                 emp.save()
 
-                EmployeeProfile.objects.get_or_create(
+                # Tuyến báo cáo cố định: nhân viên IT thuộc Manager 1, nhân
+                # viên Marketing/HR thuộc Manager 2. Phải gán tường minh chứ
+                # không dựa vào phòng ban — nếu để trống thì Manager mở danh
+                # sách nhân viên ra sẽ thấy rỗng và không giao được task.
+                reporting_manager = manager_user if dept == dept_it else manager_two
+                profile, created = EmployeeProfile.objects.get_or_create(
                     user=emp,
                     defaults={
                         "full_name": full_name,
                         "department": dept,
                         "phone_number": phone,
+                        "manager": reporting_manager,
                     }
                 )
+                if not created and profile.manager_id is None:
+                    profile.manager = reporting_manager
+                    profile.save(update_fields=["manager"])
                 employee_users.append(emp)
+
+            # Chia nhân viên theo Manager để bước tạo Task bên dưới giao việc
+            # đúng tuyến. Giao chéo tuyến sẽ tạo ra dữ liệu mà chính hệ thống
+            # từ chối nếu thao tác qua giao diện — demo sẽ trông sai.
+            employees_by_manager = {
+                manager_user.id: [
+                    e for e in employee_users if e.profile.manager_id == manager_user.id
+                ],
+                manager_two.id: [
+                    e for e in employee_users if e.profile.manager_id == manager_two.id
+                ],
+            }
 
             # -----------------------------------------------------------------
             # 3. CLIENTS & JOBS (5 CLIENTS & 10 JOBS)
@@ -207,13 +259,17 @@ class Command(BaseCommand):
             ]
 
             jobs = []
+            # Chia Job cho 2 Manager (7 cho Manager 1, 3 cho Manager 2) de
+            # moi nguoi deu co du an that su khi demo phan quyen.
+            jobs_of_manager_two = {"JOB-BI-07", "JOB-HRM-09", "JOB-MKT-10"}
             for code, name, client, status, priority, start, deadline in raw_jobs_list:
+                owning_manager = manager_two if code in jobs_of_manager_two else manager_user
                 j, _ = Job.objects.get_or_create(
                     job_code=code,
                     defaults={
                         "job_name": name,
                         "client": client,
-                        "manager": manager_user,
+                        "manager": owning_manager,
                         "status": status,
                         "priority": priority,
                         "start_date": start,
@@ -246,9 +302,15 @@ class Command(BaseCommand):
             for job_idx, target_job in enumerate(jobs):
                 last_keys = {}
 
+                # Chi giao viec cho nhan vien thuoc tuyen cua Manager so huu
+                # Job nay. Giao cheo tuyen se tao ra du lieu ma chinh he thong
+                # tu choi neu thao tac qua giao dien.
+                job_manager = target_job.manager
+                assignable = employees_by_manager.get(job_manager.id) or employee_users
+
                 for task_idx, (tmpl_title, default_status, default_priority) in enumerate(task_pool):
                     title = f"{tmpl_title} #{job_idx+1}.{task_idx+1}"
-                    assignee = employee_users[(job_idx * 10 + task_idx) % len(employee_users)]
+                    assignee = assignable[(job_idx * 10 + task_idx) % len(assignable)]
                     deadline = today + timedelta(days=random.randint(-5, 15))
 
                     prev_key = last_keys.get(default_status)
@@ -259,7 +321,7 @@ class Command(BaseCommand):
                         title=title,
                         job=target_job,
                         defaults={
-                            "creator": manager_user,
+                            "creator": job_manager,
                             "assignee": assignee,
                             "status": default_status,
                             "priority": default_priority,
@@ -270,7 +332,7 @@ class Command(BaseCommand):
                     )
                     created_tasks.append(t)
 
-                    TaskFollower.objects.get_or_create(task=t, user=manager_user)
+                    TaskFollower.objects.get_or_create(task=t, user=job_manager)
                     TaskFollower.objects.get_or_create(task=t, user=assignee)
                     TaskComment.objects.get_or_create(
                         task=t,

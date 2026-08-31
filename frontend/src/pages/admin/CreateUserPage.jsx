@@ -1,9 +1,9 @@
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
-import { useAdminRoles, useCreateUser } from '../../hooks/queries/admin/useAdminUsers';
+import { useAdminRoles, useAdminUsers, useCreateUser } from '../../hooks/queries/admin/useAdminUsers';
 import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
 
 // Same password-strength rules as ChangePasswordPage/ResetPasswordPage —
@@ -19,6 +19,7 @@ const createUserSchema = z.object({
     .regex(/[^A-Za-z0-9]/, 'Must contain a special symbol'),
   role: z.string().min(1, 'Role is required'),
   department: z.string().optional(),
+  manager: z.string().optional(),
 });
 
 // Admin page to create a new user with a default password. The backend
@@ -37,6 +38,15 @@ export function CreateUserPage() {
     ...departments.map((d) => ({ value: String(d.id), label: d.name })),
   ];
 
+  const { data: managersPage } = useAdminUsers({ role: 'MANAGER', page_size: 500 });
+  const managerOptions = [
+    { value: '', label: 'No Manager' },
+    ...(managersPage?.results || []).map((m) => ({
+      value: String(m.id),
+      label: m.profile?.full_name || m.email,
+    })),
+  ];
+
   const {
     register,
     handleSubmit,
@@ -44,6 +54,12 @@ export function CreateUserPage() {
     control,
     formState: { errors },
   } = useForm({ resolver: zodResolver(createUserSchema) });
+
+  // Chi EMPLOYEE moi co tuyen bao cao. So sanh theo id vi dropdown Role
+  // post id chu khong post code.
+  const selectedRoleId = useWatch({ control, name: 'role' });
+  const isCreatingEmployee =
+    roles.find((r) => String(r.id) === String(selectedRoleId))?.code === 'EMPLOYEE';
 
   const createMutation = useCreateUser();
 
@@ -54,8 +70,9 @@ export function CreateUserPage() {
         password: data.password,
         role: Number(data.role),
         department: data.department ? Number(data.department) : null,
+        manager: isCreatingEmployee && data.manager ? Number(data.manager) : null,
       },
-      { onSuccess: () => reset({ email: '', password: '', role: '', department: '' }) }
+      { onSuccess: () => reset({ email: '', password: '', role: '', department: '', manager: '' }) }
     );
   }
 
@@ -112,6 +129,28 @@ export function CreateUserPage() {
             />
           )}
         />
+
+        {isCreatingEmployee && (
+          <div className="space-y-1">
+            <Controller
+              name="manager"
+              control={control}
+              render={({ field }) => (
+                <SelectDropdown
+                  label="Manager"
+                  options={managerOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.manager?.message}
+                />
+              )}
+            />
+            <p className="text-[11px] text-amber-600">
+              Nên gán ngay. Nhân viên chưa có Manager sẽ không Manager nào nhìn thấy
+              và không ai giao việc được.
+            </p>
+          </div>
+        )}
 
         <button
           type="submit"

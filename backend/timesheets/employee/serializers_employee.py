@@ -1,16 +1,14 @@
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from system.services.audit_manager_service import log_action, snapshot
-from system.services.notification_manager_service import notify
-from system.models import Notification
 
 from timesheets.models import LogWork, DailyUserTimesheet, TimeLock
 from tasks.models import Task
-from projects.models import Job
 from timesheets.services.daily_total_manager_service import MAX_DAILY_HOURS
 
 # This file holds the EMPLOYEE-only serializers for the timesheets app:
@@ -35,7 +33,22 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("hours_spent must be greater than 0.")
         return value
 
-    # Data Isolation & State Locking: rejects a task that isn't assigned to the caller or is locked/frozen.
+    # Chấm công là ghi nhận việc ĐÃ LÀM — chưa tới ngày thì chưa có gì để
+    # ghi. Trước đây backend nhận mọi ngày, đã thử tạo được log cho ngày cách
+    # hôm nay 60 ngày và nhận 201 Created. Dữ liệu đó làm sai lệch mọi báo
+    # cáo tổng giờ, và từng khiến trung bình giờ/ngày vọt lên 10.4h.
+    #
+    # Cho phép log ngày hôm nay; chỉ chặn từ ngày mai trở đi.
+    def validate_work_date(self, value):
+        today = timezone.localdate()
+        if value > today:
+            raise serializers.ValidationError(
+                f"Không thể chấm công cho ngày trong tương lai ({value}). "
+                f"Hôm nay là {today}."
+            )
+        return value
+
+    # Data Isolation & State Locking: rejects a task that isn't assigned to the caller or is locked.
     def validate_task(self, task):
         request = self.context["request"]
         if task.assignee_id != request.user.id:
@@ -44,16 +57,6 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Cannot log work on task '{task.title}' because it is in '{task.status}' status. "
                 "Please recall submission or request manager reopen before logging hours."
-            )
-        
-        job = getattr(task, "job", None)
-        if job and job.status != Job.Status.ACTIVE:
-            raise serializers.ValidationError(
-                f"Cannot log work on task '{task.title}' because its project '{job.job_name}' is frozen or on hold ({job.status})."
-            )
-        if job and getattr(job, "client", None) and not job.client.is_active:
-            raise serializers.ValidationError(
-                f"Cannot log work on task '{task.title}' because its client '{job.client.client_name}' is inactive."
             )
         return task
 
@@ -132,20 +135,6 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                 ),
                 request=self.context["request"],
             )
-
-            # Thông báo real-time cho Manager phụ trách Job của Task
-            job_manager = getattr(getattr(log_work.task, "job", None), "manager", None)
-            if job_manager and job_manager.id != user.id:
-                raw_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-                employee_name = raw_name or getattr(user, "username", None) or getattr(user, "email", "Employee")
-                notify(
-                    recipients=[job_manager],
-                    event_type=Notification.EventType.LOG_WORK_SUBMITTED,
-                    title="New LogWork Submitted",
-                    content=f"{employee_name} logged {hours_spent}h on '{log_work.task.title}' ({work_date}).",
-                    related_url="/manager/timesheets/review",
-                    channel=Notification.ChannelType.SYSTEM_ONLY,
-                )
 
             return log_work
 

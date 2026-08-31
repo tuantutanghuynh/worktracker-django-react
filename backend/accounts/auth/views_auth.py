@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
@@ -57,6 +58,9 @@ class ReauthAwareTokenRefreshView(TokenRefreshView):
 # Public endpoint: verifies email/password and issues an access + refresh token pair.
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    # Gioi han 10 lan/phut moi IP — xem DEFAULT_THROTTLE_RATES.
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -92,6 +96,9 @@ class LogoutView(APIView):
 # the email exists, and only emails a reset token when it does.
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
+    # Endpoint cong khai, gui email that -> siet 5 lan/phut moi IP.
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
@@ -116,6 +123,9 @@ class ForgotPasswordView(APIView):
 # Public endpoint: exchanges a valid, unused, non-expired reset token for a new password.
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
+    # Endpoint cong khai, gui email that -> siet 5 lan/phut moi IP.
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)

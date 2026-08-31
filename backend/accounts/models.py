@@ -245,6 +245,24 @@ class EmployeeProfile(models.Model):
         blank=True,
         related_name="employees",
     )
+    # Tuyến báo cáo cố định: Employee này thuộc quyền Manager nào.
+    #
+    # Tách riêng khỏi `department` một cách có chủ đích. Department là đơn vị
+    # HÀNH CHÍNH (chấm công, lương thưởng); manager là tuyến QUẢN LÝ công
+    # việc. Gộp hai thứ vào một field thì mỗi lần đổi Manager cho một người
+    # lại buộc phải chuyển phòng ban của họ, kéo theo sai lệch chấm công.
+    #
+    # SET_NULL chứ không RESTRICT: khoá tài khoản một Manager là việc bình
+    # thường, không được để nó chặn đứng thao tác của Admin. Nhân viên rơi
+    # về NULL sẽ hiện trong bộ lọc "Chưa gán" để Admin gán lại.
+    manager = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_employees",
+        limit_choices_to={"role__code": "MANAGER"},
+    )
     avatar_url = models.CharField(
         max_length=500,
         blank=True,

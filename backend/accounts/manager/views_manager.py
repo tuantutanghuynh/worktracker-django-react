@@ -12,7 +12,6 @@ from accounts.manager.serializers_manager import (
     ManagerDepartmentMiniSerializer,
     ManagerEmployeeListSerializer,
 )
-from projects.models import Job
 from tasks.models import Task
 from system.security.permissions_manager import (
     IsActiveAuthenticated,
@@ -65,13 +64,19 @@ class ManagerTeamEmployeeListView(ListAPIView):
     serializer_class = ManagerEmployeeListSerializer
 
     def get_queryset(self):
-        user = self.request.user
-        role_code = getattr(getattr(user, "role", None), "code", None)
-
+        # Phạm vi quản lý: Manager CHỈ thấy nhân viên thuộc tuyến báo cáo của
+        # mình (EmployeeProfile.manager). Trước đây endpoint này trả về toàn
+        # bộ nhân viên công ty, nên bất kỳ Manager nào cũng giao việc được cho
+        # bất kỳ ai — không đúng quy trình nghiệp vụ.
+        #
+        # Nhân viên chưa được gán Manager sẽ không hiện với ai cả. Đó là hành
+        # vi mong muốn: Admin phải chủ động gán, không để rơi vào tay ngẫu
+        # nhiên. Trang User List có bộ lọc "Chưa gán" để Admin dọn số này.
         qs = (
             CustomUser.objects.filter(
                 role__code="EMPLOYEE",
                 is_active=True,
+                profile__manager=self.request.user,
             )
             .select_related("profile", "profile__department", "role")
             .annotate(
@@ -89,30 +94,6 @@ class ManagerTeamEmployeeListView(ListAPIView):
             )
             .order_by("profile__full_name")
         )
-
-        job_id = self.request.query_params.get("job_id")
-        if job_id:
-            from chat.models import ChatParticipant
-            task_assignee_ids = set(Task.objects.filter(job_id=job_id).values_list("assignee_id", flat=True).distinct())
-            team_participant_ids = set(
-                ChatParticipant.objects.filter(room__job_id=job_id, room__room_type='JOB')
-                .values_list('user_id', flat=True)
-                .distinct()
-            )
-            team_user_ids = task_assignee_ids | team_participant_ids
-            qs = qs.filter(id__in=team_user_ids)
-        elif role_code != "ADMIN":
-            # Scoping chuẩn: Manager chỉ thấy các nhân viên thuộc các Job do mình quản lý
-            from chat.models import ChatParticipant
-            managed_job_ids = Job.objects.filter(manager_id=user.id).values_list("id", flat=True)
-            task_assignee_ids = set(Task.objects.filter(job_id__in=managed_job_ids).values_list("assignee_id", flat=True).distinct())
-            team_participant_ids = set(
-                ChatParticipant.objects.filter(room__job_id__in=managed_job_ids, room__room_type='JOB')
-                .values_list('user_id', flat=True)
-                .distinct()
-            )
-            team_user_ids = task_assignee_ids | team_participant_ids
-            qs = qs.filter(id__in=team_user_ids)
 
         department_id = self.request.query_params.get("department_id")
         if department_id:

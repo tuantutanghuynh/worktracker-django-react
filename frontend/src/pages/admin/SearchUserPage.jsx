@@ -21,6 +21,7 @@ import {
   useLockUser,
   useUnlockUser,
   useAssignUserDepartment,
+  useAssignUserManager,
   useResetUserPassword,
 } from '../../hooks/queries/admin/useAdminUsers';
 import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
@@ -54,6 +55,7 @@ export function SearchUserPage() {
   const [roleFilter, setRoleFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [managerFilter, setManagerFilter] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [ordering, toggleSort] = useOrdering();
   const [page, setPage] = useState(1);
@@ -77,6 +79,7 @@ export function SearchUserPage() {
     role: roleFilter || undefined,
     department: departmentFilter || undefined,
     is_active: statusFilter || undefined,
+    manager: managerFilter || undefined,
     ordering: ordering || undefined,
   };
 
@@ -108,13 +111,33 @@ export function SearchUserPage() {
   // đã mang nghĩa "tất cả phòng ban".
   const departmentFilterOptions = departments.map((d) => ({ value: String(d.id), label: d.name }));
 
-  const hasActiveFilters = Boolean(search || roleFilter || departmentFilter || statusFilter);
+  // Danh sach Manager de do 2 dropdown ben duoi. Tai qua chinh endpoint
+  // users voi role=MANAGER; page_size=500 de lay het, khong bi cat o trang
+  // dau nhu pagination mac dinh 10 dong.
+  const { data: managersPage } = useAdminUsers({ role: 'MANAGER', page_size: 500 });
+  const managers = managersPage?.results || [];
+  const managerLabel = (m) => m.profile?.full_name || m.email;
+  const managerOptions = [
+    { value: '', label: 'No Manager' },
+    ...managers.map((m) => ({ value: String(m.id), label: managerLabel(m) })),
+  ];
+  // Ban dung cho filter: them muc "Chua gan" de Admin tim ra nhung nhan vien
+  // khong thuoc tuyen nao — ho vo hinh voi moi Manager nen phai gan lai.
+  const managerFilterOptions = [
+    { value: 'none', label: 'Chưa gán Manager' },
+    ...managers.map((m) => ({ value: String(m.id), label: managerLabel(m) })),
+  ];
+
+  const hasActiveFilters = Boolean(
+    search || roleFilter || departmentFilter || statusFilter || managerFilter
+  );
 
   function clearFilters() {
     setSearch('');
     setRoleFilter('');
     setDepartmentFilter('');
     setStatusFilter('');
+    setManagerFilter('');
   }
 
   const {
@@ -160,6 +183,7 @@ export function SearchUserPage() {
   const lockMutation = useLockUser();
   const unlockMutation = useUnlockUser();
   const departmentMutation = useAssignUserDepartment();
+  const managerMutation = useAssignUserManager();
   const resetPasswordMutation = useResetUserPassword();
 
   function onSubmitEdit(data) {
@@ -186,6 +210,17 @@ export function SearchUserPage() {
       {
         onSuccess: () =>
           setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, department: departmentId } })),
+      }
+    );
+  }
+
+  function onChangeManager(val) {
+    const managerId = val ? Number(val) : null;
+    managerMutation.mutate(
+      { id: selectedUser.id, managerId },
+      {
+        onSuccess: () =>
+          setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, manager: managerId } })),
       }
     );
   }
@@ -245,6 +280,13 @@ export function SearchUserPage() {
             onChange={setDepartmentFilter}
           />
           <SelectDropdown
+            label="Manager"
+            placeholder="All managers"
+            options={managerFilterOptions}
+            value={managerFilter}
+            onChange={setManagerFilter}
+          />
+          <SelectDropdown
             label="Status"
             placeholder="All status"
             options={STATUS_FILTER_OPTIONS}
@@ -269,29 +311,36 @@ export function SearchUserPage() {
         <table className="w-full table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
-              <SortableHeader label="Email" sortKey="email" ordering={ordering} onSort={toggleSort} className="w-[36%]" />
-              <SortableHeader label="Role" sortKey="role__code" ordering={ordering} onSort={toggleSort} className="w-[18%]" />
+              <SortableHeader label="Email" sortKey="email" ordering={ordering} onSort={toggleSort} className="w-[28%]" />
+              <SortableHeader label="Role" sortKey="role__code" ordering={ordering} onSort={toggleSort} className="w-[14%]" />
               <SortableHeader
                 label="Department"
                 sortKey="profile__department__name"
                 ordering={ordering}
                 onSort={toggleSort}
-                className="w-[30%]"
+                className="w-[22%]"
               />
-              <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} className="w-[16%]" />
+              <SortableHeader
+                label="Manager"
+                sortKey="profile__manager__email"
+                ordering={ordering}
+                onSort={toggleSort}
+                className="w-[24%]"
+              />
+              <SortableHeader label="Status" sortKey="is_active" ordering={ordering} onSort={toggleSort} className="w-[12%]" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
                   {hasActiveFilters ? 'No users match these filters.' : 'No users yet.'}
                 </td>
               </tr>
@@ -304,6 +353,26 @@ export function SearchUserPage() {
                 </td>
                 <td className="px-3 py-2 text-slate-500 truncate">
                   {u.profile?.department ? departmentNameById[u.profile.department] || `#${u.profile.department}` : '—'}
+                </td>
+                <td className="px-3 py-2 truncate" title={u.profile?.manager_email || ''}>
+                  {u.role_detail?.code !== 'EMPLOYEE' ? (
+                    <span className="text-slate-300">—</span>
+                  ) : u.profile?.manager_email ? (
+                    <span
+                      className={
+                        u.profile.manager_is_active === false
+                          ? 'text-rose-500'
+                          : 'text-slate-500'
+                      }
+                    >
+                      {u.profile.manager_email}
+                      {u.profile.manager_is_active === false && ' (đã khoá)'}
+                    </span>
+                  ) : (
+                    // Chua gan Manager = khong Manager nao nhin thay nguoi nay,
+                    // cung khong ai giao viec duoc. To do de Admin thay ngay.
+                    <span className="text-[11px] font-semibold text-amber-600">Chưa gán</span>
+                  )}
                 </td>
                 <td className="px-3 py-2 truncate">
                   <span
@@ -374,6 +443,22 @@ export function SearchUserPage() {
                 Select &quot;No Department&quot; to remove this user from their current department.
               </p>
             </div>
+
+            {selectedUser.role_detail?.code === 'EMPLOYEE' && (
+              <div className="space-y-1.5 border-t border-slate-100 pt-3">
+                <SelectDropdown
+                  label="Manager"
+                  options={managerOptions}
+                  value={selectedUser.profile?.manager ? String(selectedUser.profile.manager) : ''}
+                  onChange={onChangeManager}
+                  disabled={managerMutation.isPending}
+                />
+                <p className="text-[11px] text-slate-400">
+                  Manager phụ trách quyết định ai nhìn thấy và giao việc được cho nhân
+                  viên này. Bỏ trống thì không Manager nào thấy họ.
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between border-t border-slate-100 pt-3">
               <span className="text-xs text-slate-500">

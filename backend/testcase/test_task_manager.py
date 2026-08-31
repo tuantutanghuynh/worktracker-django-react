@@ -108,6 +108,12 @@ class TestManagerTaskCreate:
         self.employee = baker.make(
             "accounts.CustomUser", role=self.role_employee, is_active=True
         )
+        # Tuyen bao cao co dinh: Manager chi giao viec duoc cho nhan vien
+        # thuoc quyen minh (EmployeeProfile.manager). Khong gan thi
+        # get_active_employee_or_error() tu choi voi loi assignee_id.
+        baker.make(
+            "accounts.EmployeeProfile", user=self.employee, manager=self.manager
+        )
 
         self.client_db = baker.make("projects.Client")
 
@@ -199,6 +205,15 @@ class TestManagerTaskUpdate:
         )
         self.employee_2 = baker.make(
             "accounts.CustomUser", role=self.role_employee, is_active=True
+        )
+        # Tuyen bao cao co dinh: Manager chi giao viec duoc cho nhan vien
+        # thuoc quyen minh (EmployeeProfile.manager). Khong gan thi
+        # get_active_employee_or_error() tu choi voi loi assignee_id.
+        baker.make(
+            "accounts.EmployeeProfile", user=self.employee_1, manager=self.manager
+        )
+        baker.make(
+            "accounts.EmployeeProfile", user=self.employee_2, manager=self.manager
         )
 
         self.client_db = baker.make("projects.Client")
