@@ -197,11 +197,7 @@ def create_task(*, user, data, request=None):
 
         validate_task_deadline(job, deadline, is_create=True)
 
-        if assignee_id:
-            assignee = get_active_employee_or_error(assignee_id, manager=user)
-        else:
-            # Nếu chưa chọn nhân viên: Mặc định tạm gán cho chính Manager tạo task
-            assignee = user
+        assignee = get_active_employee_or_error(assignee_id, manager=user)
 
         last_key = get_last_order_key(
             job_id=job.id,
@@ -222,7 +218,10 @@ def create_task(*, user, data, request=None):
 
         add_default_followers(
             task=task,
-            users=list(set([assignee, user])),
+            users=[
+                assignee,
+                user,
+            ],
         )
 
         log_action(
@@ -248,15 +247,14 @@ def create_task(*, user, data, request=None):
             request=request,
         )
 
-        if assignee.id != user.id:
-            notify(
-                recipients=[assignee],
-                event_type=Notification.EventType.TASK_ASSIGNED,
-                title="New task assigned",
-                content=f"You have been assigned to task: {task.title}",
-                related_url="/employee/my-tasks",
-                channel=Notification.ChannelType.SYSTEM_ONLY,
-            )
+        notify(
+            recipients=[assignee],
+            event_type=Notification.EventType.TASK_ASSIGNED,
+            title="New task assigned",
+            content=f"You have been assigned to task: {task.title}",
+            related_url="/employee/my-tasks",
+            channel=Notification.ChannelType.SYSTEM_ONLY,
+        )
 
     return task
 
