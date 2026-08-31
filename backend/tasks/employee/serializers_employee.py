@@ -32,7 +32,7 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'status', 'priority',
             'deadline', 'order_index', 'job_id', 'job_code', 'job_name',
-            'manager_name', 'created_at', 'completed_at'
+            'manager_name', 'created_at', 'updated_at', 'completed_at'
         ]
 
         

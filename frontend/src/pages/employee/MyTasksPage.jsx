@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from "react"
 import { Send, Paperclip, RotateCcw, Lock, AlertTriangle } from "lucide-react"
+import { differenceInCalendarDays, format, parseISO, formatDistanceToNowStrict } from "date-fns"
 import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { useTaskDetail } from "../../hooks/queries/employee/useTaskDetail"
 import { FilterToolbar } from "../../components/common/table/FilterToolbar"
@@ -24,6 +25,8 @@ const PRIORITY_OPTIONS = [
     { value: "HIGH", label: "High" },
 ]
 
+const PRIORITY_RANK = { HIGH: 3, MEDIUM: 2, LOW: 1 }
+
 // Cùng bảng màu Pending/Approved/Rejected/Voided với TimesheetPage.jsx —
 // đồng bộ ngôn ngữ hình ảnh cho review_status ở mọi nơi hiển thị.
 const LOG_STATUS_STYLES = {
@@ -31,6 +34,23 @@ const LOG_STATUS_STYLES = {
     APPROVED: "bg-emerald-50 text-emerald-600 border-emerald-200",
     REJECTED: "bg-rose-50 text-rose-600 border-rose-200",
     VOIDED: "bg-slate-100 text-slate-500 border-slate-200",
+}
+
+// "Aug 22, 2026" + "9 days overdue" / "Due in 3 days" / "Due today" — thuần
+// client-side từ deadline đã có sẵn, không cần API mới.
+function describeDeadline(deadline) {
+    if (!deadline) return null
+    const days = differenceInCalendarDays(parseISO(deadline), new Date())
+    const label = format(parseISO(deadline), "MMM d, yyyy")
+    if (days < 0) return { label, relative: `${Math.abs(days)} day${days !== -1 ? "s" : ""} overdue`, tone: "overdue" }
+    if (days === 0) return { label, relative: "Due today", tone: "today" }
+    return { label, relative: `Due in ${days} day${days !== 1 ? "s" : ""}`, tone: "upcoming" }
+}
+
+const DEADLINE_TONE_STYLES = {
+    overdue: "text-rose-600",
+    today: "text-amber-600",
+    upcoming: "text-slate-400",
 }
 
 // Employee My Tasks (Ngày 7) — List view only for now (Kanban view
@@ -42,24 +62,58 @@ export function MyTasksPage() {
     const [searchQuery, setSearchQuery] = useState("")
     const [statusValue, setStatusValue] = useState("")
     const [priorityValue, setPriorityValue] = useState("")
+    const [projectValue, setProjectValue] = useState("")
+    const [sorting, setSorting] = useState({ key: null, direction: null })
     const [selectedTask, setSelectedTask] = useState(null)
     const [submittingTask, setSubmittingTask] = useState(null)
     const [recallingTask, setRecallingTask] = useState(null)
     const [isRecalling, setIsRecalling] = useState(false)
 
+    const projectOptions = useMemo(() => {
+        const seen = new Set()
+        return tasks
+            .filter((t) => t.job_name && !seen.has(t.job_name) && seen.add(t.job_name))
+            .map((t) => ({ value: t.job_name, label: t.job_name }))
+    }, [tasks])
+
+    function handleSortChange(key) {
+        setSorting((prev) => {
+            if (prev.key !== key) return { key, direction: "asc" }
+            if (prev.direction === "asc") return { key, direction: "desc" }
+            return { key: null, direction: null } // 3rd click: clear sort
+        })
+    }
+
     const filteredTasks = useMemo(() => {
-        return tasks.filter((task) => {
+        let result = tasks.filter((task) => {
             if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
             if (statusValue && task.status !== statusValue) return false
             if (priorityValue && task.priority !== priorityValue) return false
+            if (projectValue && task.job_name !== projectValue) return false
             return true
         })
-    }, [tasks, searchQuery, statusValue, priorityValue])
+
+        if (sorting.key) {
+            const dir = sorting.direction === "asc" ? 1 : -1
+            result = [...result].sort((a, b) => {
+                if (sorting.key === "deadline") {
+                    return dir * (new Date(a.deadline) - new Date(b.deadline))
+                }
+                if (sorting.key === "priority") {
+                    return dir * (PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])
+                }
+                return 0
+            })
+        }
+
+        return result
+    }, [tasks, searchQuery, statusValue, priorityValue, projectValue, sorting])
 
     function handleClearFilters() {
         setSearchQuery("")
         setStatusValue("")
         setPriorityValue("")
+        setProjectValue("")
     }
 
     async function handleStartTask(task) {
@@ -75,11 +129,22 @@ export function MyTasksPage() {
     }
 
     const columns = [
-        { accessorKey: "title", header: "Task" },
-        { accessorKey: "job_name", header: "Job / Project" },
+        {
+            accessorKey: "title",
+            header: "Task",
+            className: "max-w-[220px] truncate",
+            cell: (info) => <span title={info.row.original.title}>{info.row.original.title}</span>,
+        },
+        {
+            accessorKey: "job_name",
+            header: "Job / Project",
+            className: "max-w-[160px] truncate",
+            cell: (info) => <span title={info.row.original.job_name}>{info.row.original.job_name}</span>,
+        },
         {
             accessorKey: "priority",
             header: "Priority",
+            sortable: true,
             cell: (info) => <PriorityBadge priority={info.row.original.priority} />,
         },
         {
@@ -87,7 +152,21 @@ export function MyTasksPage() {
             header: "Status",
             cell: (info) => <StatusBadge status={info.row.original.status} />,
         },
-        { accessorKey: "deadline", header: "Deadline" },
+        {
+            accessorKey: "deadline",
+            header: "Deadline",
+            sortable: true,
+            cell: (info) => {
+                const d = describeDeadline(info.row.original.deadline)
+                if (!d) return <span className="text-slate-300">—</span>
+                return (
+                    <div className="leading-tight">
+                        <p className="text-slate-700">{d.label}</p>
+                        <p className={`text-[10px] font-semibold ${DEADLINE_TONE_STYLES[d.tone]}`}>{d.relative}</p>
+                    </div>
+                )
+            },
+        },
         {
             accessorKey: "action",
             header: "Action",
@@ -155,7 +234,20 @@ export function MyTasksPage() {
                 onPriorityChange={setPriorityValue}
                 priorityOptions={PRIORITY_OPTIONS}
                 onClearFilters={handleClearFilters}
-            />
+            >
+                {projectOptions.length > 0 && (
+                    <select
+                        value={projectValue}
+                        onChange={(e) => setProjectValue(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
+                    >
+                        <option value="">All Projects</option>
+                        {projectOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                )}
+            </FilterToolbar>
 
             <DataTable
                 columns={columns}
@@ -163,9 +255,18 @@ export function MyTasksPage() {
                 isLoading={loading}
                 emptyMessage="No tasks assigned yet."
                 onRowClick={(task) => { setSelectedTask(task); addRecentTask(task) }}
+                sorting={sorting}
+                onSortChange={handleSortChange}
             />
 
-            <TaskDrawerContent key={selectedTask?.id ?? "none"} task={selectedTask} onClose={() => setSelectedTask(null)} />
+            <TaskDrawerContent
+                key={selectedTask?.id ?? "none"}
+                task={selectedTask}
+                onClose={() => setSelectedTask(null)}
+                onStartTask={handleStartTask}
+                onRequestSubmit={setSubmittingTask}
+                onRequestRecall={setRecallingTask}
+            />
 
             <TaskSubmitReviewModal
                 key={submittingTask?.id ?? "none-submit"}
@@ -192,7 +293,7 @@ export function MyTasksPage() {
 // Tách riêng vì cần gọi useTaskDetail(task?.id) — hook phải gọi vô điều
 // kiện ở top-level, không thể gọi bên trong JSX của component cha khi
 // selectedTask có thể null.
-function TaskDrawerContent({ task, onClose }) {
+function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit, onRequestRecall }) {
     const {
         comments, workLogs, loadingDetail, submitting, error,
         submitComment, submitLogWork, submitVoidLogWork, submitEditLogWork,
@@ -206,6 +307,10 @@ function TaskDrawerContent({ task, onClose }) {
     const [editingLog, setEditingLog] = useState(null)
 
     const isLocked = task?.status === "REVIEWING" || task?.status === "COMPLETED" || task?.status === "CANCELLED"
+    const totalLoggedHours = workLogs
+        .filter((log) => log.review_status !== "VOIDED")
+        .reduce((sum, log) => sum + Number(log.hours_spent), 0)
+    const deadlineInfo = task ? describeDeadline(task.deadline) : null
 
     async function handleAddComment() {
         if (!commentText.trim() || isLocked) return
@@ -236,11 +341,32 @@ function TaskDrawerContent({ task, onClose }) {
         if (ok) setEditingLog(null)
     }
 
+    // null khi task không có action nào (COMPLETED/CANCELLED) — SideDrawer
+    // chỉ vẽ khung footer khi prop này truthy, nên phải tính trước thay vì
+    // luôn truyền 1 element rồi để nó tự render null bên trong.
+    const footerAction = task ? getFooterAction(task, { onStartTask, onRequestSubmit, onRequestRecall }) : null
+
     return (
         <>
-            <SideDrawer isOpen={Boolean(task)} onClose={onClose} title={task?.title} subtitle={task?.job_name}>
+            <SideDrawer
+                isOpen={Boolean(task)}
+                onClose={onClose}
+                title={task?.title}
+                subtitle={task?.job_name}
+                footer={footerAction}
+            >
                 {task && (
                     <div className="space-y-6">
+                        <div>
+                            <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                                Task &middot; TASK-{task.id}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <StatusBadge status={task.status} />
+                                <PriorityBadge priority={task.priority} />
+                            </div>
+                        </div>
+
                         {isLocked && (
                             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
                                 <Lock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
@@ -260,36 +386,50 @@ function TaskDrawerContent({ task, onClose }) {
                             <p className="text-sm text-slate-800">{task.description}</p>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <StatusBadge status={task.status} />
-                            <PriorityBadge priority={task.priority} />
-                        </div>
-
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Deadline</p>
-                            <p className="text-sm font-medium text-slate-800">{task.deadline}</p>
+                            {deadlineInfo ? (
+                                <div>
+                                    <p className="text-sm font-medium text-slate-800">{deadlineInfo.label}</p>
+                                    <p className={`text-xs font-semibold ${DEADLINE_TONE_STYLES[deadlineInfo.tone]}`}>{deadlineInfo.relative}</p>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400">No deadline set</p>
+                            )}
                         </div>
+
+                        {task.updated_at && (
+                            <p className="text-[11px] text-slate-400">
+                                Updated {formatDistanceToNowStrict(parseISO(task.updated_at), { addSuffix: true })}
+                            </p>
+                        )}
 
                         {/* Log Work — Chỉ hiển thị khi Task chưa bị khóa (TODO hoặc IN_PROGRESS) */}
                         {!isLocked && (
                             <div className="border-t border-slate-100 pt-4 space-y-2">
                                 <p className="text-xs font-semibold text-slate-400 uppercase">Log Work</p>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <input
-                                        type="date"
-                                        value={workDate}
-                                        onChange={(e) => setWorkDate(e.target.value)}
-                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
-                                    />
-                                    <input
-                                        type="number"
-                                        step="0.5"
-                                        min="0"
-                                        placeholder="Hours"
-                                        value={hoursSpent}
-                                        onChange={(e) => setHoursSpent(e.target.value)}
-                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
-                                    />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-semibold text-slate-500">Date</label>
+                                        <input
+                                            type="date"
+                                            value={workDate}
+                                            onChange={(e) => setWorkDate(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-semibold text-slate-500">Hours</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            min="0"
+                                            placeholder="e.g. 1.5"
+                                            value={hoursSpent}
+                                            onChange={(e) => setHoursSpent(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
+                                        />
+                                    </div>
                                 </div>
                                 <textarea
                                     placeholder="What did you work on?"
@@ -298,6 +438,9 @@ function TaskDrawerContent({ task, onClose }) {
                                     className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
                                     rows={2}
                                 />
+                                <p className="text-[10px] text-slate-400">
+                                    Capped at 8 hours total per day, across all your tasks.
+                                </p>
                                 <button
                                     type="button"
                                     onClick={handleLogWork}
@@ -311,7 +454,12 @@ function TaskDrawerContent({ task, onClose }) {
 
                         {/* Logged Hours — list các entry đã tạo, Void & Edit chỉ hiện khi chưa bị Lock và còn PENDING */}
                         <div className="border-t border-slate-100 pt-4 space-y-2">
-                            <p className="text-xs font-semibold text-slate-400 uppercase">Logged Hours</p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-semibold text-slate-400 uppercase">Logged Hours</p>
+                                {totalLoggedHours > 0 && (
+                                    <p className="text-xs font-bold text-slate-700">{totalLoggedHours}h total</p>
+                                )}
+                            </div>
                             {loadingDetail ? (
                                 <p className="text-xs text-slate-500">Loading...</p>
                             ) : workLogs.length === 0 ? (
@@ -321,7 +469,9 @@ function TaskDrawerContent({ task, onClose }) {
                                     {workLogs.map((log) => (
                                         <div key={log.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 flex items-start justify-between gap-2">
                                             <div>
-                                                <p className="text-xs font-bold text-slate-900">{log.work_date} — {log.hours_spent}h</p>
+                                                <p className="text-xs font-bold text-slate-900">
+                                                    {format(parseISO(log.work_date), "MMM d")} — {log.hours_spent}h
+                                                </p>
                                                 <p className="text-[11px] text-slate-500">{log.description}</p>
                                                 {log.review_status === "VOIDED" && (
                                                     <p className="text-[11px] text-rose-600 mt-1">Voided: {log.adjustment_reason}</p>
@@ -360,12 +510,21 @@ function TaskDrawerContent({ task, onClose }) {
                             <p className="text-xs font-semibold text-slate-400 uppercase">Comments</p>
                             {loadingDetail ? (
                                 <p className="text-xs text-slate-500">Loading...</p>
+                            ) : comments.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic py-2">No comments yet.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {comments.map((c) => (
                                         <div key={c.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
-                                            <p className="text-[11px] font-bold text-slate-800">{c.author_name}</p>
-                                            <p className="text-xs text-slate-600">{c.content}</p>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-[11px] font-bold text-slate-800">{c.author_name}</p>
+                                                {c.created_at && (
+                                                    <p className="text-[10px] text-slate-400 shrink-0">
+                                                        {formatDistanceToNowStrict(parseISO(c.created_at), { addSuffix: true })}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-600 mt-0.5">{c.content}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -418,6 +577,56 @@ function TaskDrawerContent({ task, onClose }) {
             />
         </>
     )
+}
+
+// Nội dung cho slot `footer` có sẵn của SideDrawer — 1 chỗ duy nhất
+// tổng hợp thao tác chính theo status, thay vì bắt người dùng đóng
+// drawer rồi tìm nút ở table. Trả về null (không phải component rỗng)
+// khi task không còn action nào — SideDrawer chỉ vẽ khung footer khi
+// giá trị truyền vào truthy.
+function getFooterAction(task, { onStartTask, onRequestSubmit, onRequestRecall }) {
+    if (task.status === "TODO") {
+        return (
+            <button
+                type="button"
+                onClick={() => onStartTask(task)}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+            >
+                Start Task
+            </button>
+        )
+    }
+    if (task.status === "IN_PROGRESS") {
+        return (
+            <button
+                type="button"
+                onClick={() => onRequestSubmit(task)}
+                className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+            >
+                Submit for Review
+            </button>
+        )
+    }
+    if (task.status === "REVIEWING") {
+        return (
+            <button
+                type="button"
+                onClick={() => onRequestRecall(task)}
+                className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold rounded-lg cursor-pointer flex items-center justify-center gap-1.5"
+            >
+                <RotateCcw size={13} />
+                Recall Submission
+            </button>
+        )
+    }
+    if (task.status === "COMPLETED") {
+        return (
+            <p className="w-full py-2 text-center text-xs font-bold text-emerald-600 bg-emerald-50 rounded-lg">
+                &#10003; Completed
+            </p>
+        )
+    }
+    return null
 }
 
 // Popup xem lại công việc trước khi Submit for Review — tách biệt hoàn
