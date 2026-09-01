@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { ProtectedRoute } from "./ProtectedRoute"
+import { PublicOnlyRoute } from "./PublicOnlyRoute"
 import { useAuth } from "../hooks/useAuth"
 
 // Pages thuộc Auth (dùng chung mọi role)
@@ -77,9 +78,11 @@ export function AppRouter() {
         <BrowserRouter>
             <Suspense fallback={<PageLoadingSpinner />}>
                 <Routes>
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route element={<PublicOnlyRoute />}>
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    </Route>
 
                     <Route element={<ProtectedRoute />}>
                         <Route path="/change-password" element={<ChangePasswordPage />} />
