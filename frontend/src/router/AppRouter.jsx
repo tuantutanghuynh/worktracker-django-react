@@ -89,20 +89,32 @@ export function AppRouter() {
 
                         {/* Phân hệ EMPLOYEE */}
                         <Route element={<EmployeeLayout />}>
+                            {/* "/" ở NGOÀI chốt allowedRoles bên dưới — RoleHome tự
+                                điều hướng Admin/Manager sang đúng dashboard của họ,
+                                không thể để "/" bị chặn vì chính nó là đích redirect. */}
                             <Route path="/" element={<RoleHome />} />
-                            <Route path="/profile" element={<ProfilePage />} />
-                            <Route path="/employee/dashboard" element={<DashboardPage />} />
-                            <Route path="/employee/profile" element={<ProfilePage />} />
-                            <Route path="/my-performance" element={<MyPerformancePage />} />
-                            <Route path="/employee/my-performance" element={<MyPerformancePage />} />
-                            <Route path="/notifications" element={<NotificationsPage />} />
-                            <Route path="/employee/notifications" element={<NotificationsPage />} />
-                            <Route path="/my-tasks" element={<MyTasksPage />} />
-                            <Route path="/employee/my-tasks" element={<MyTasksPage />} />
-                            <Route path="/employee/team" element={<MyTeamPage />} />
-                            <Route path="/employee/timesheet" element={<TimesheetPage />} />
-                            <Route path="/employee/chat" element={<EmployeeChatPage />} />
-                            <Route path="/employee/audit-logs" element={<EmployeeAuditLogsPage />} />
+
+                            {/* Mọi route Employee còn lại: BẮT BUỘC allowedRoles,
+                                giống hệt nhóm Manager/Admin bên dưới — thiếu dòng
+                                này là bug thật đã xảy ra: Admin/Manager gõ thẳng URL
+                                /employee/... vẫn vào được (chỉ khác sidebar vì
+                                Sidebar.jsx tự chọn menu theo role thật, không theo
+                                route đang render). */}
+                            <Route element={<ProtectedRoute allowedRoles={["EMPLOYEE"]} />}>
+                                <Route path="/profile" element={<ProfilePage />} />
+                                <Route path="/employee/dashboard" element={<DashboardPage />} />
+                                <Route path="/employee/profile" element={<ProfilePage />} />
+                                <Route path="/my-performance" element={<MyPerformancePage />} />
+                                <Route path="/employee/my-performance" element={<MyPerformancePage />} />
+                                <Route path="/notifications" element={<NotificationsPage />} />
+                                <Route path="/employee/notifications" element={<NotificationsPage />} />
+                                <Route path="/my-tasks" element={<MyTasksPage />} />
+                                <Route path="/employee/my-tasks" element={<MyTasksPage />} />
+                                <Route path="/employee/team" element={<MyTeamPage />} />
+                                <Route path="/employee/timesheet" element={<TimesheetPage />} />
+                                <Route path="/employee/chat" element={<EmployeeChatPage />} />
+                                <Route path="/employee/audit-logs" element={<EmployeeAuditLogsPage />} />
+                            </Route>
                         </Route>
 
                         {/* Phân hệ MANAGER */}
