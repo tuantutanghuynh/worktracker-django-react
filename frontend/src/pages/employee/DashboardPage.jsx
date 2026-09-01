@@ -84,10 +84,13 @@ export function DashboardPage() {
                 </Link>
             </div>
 
+            {/* Cùng màu với đúng 3 chỉ số này ở My Performance (Overdue/Hours
+                This Week/Completion Rate) — nhất quán xuyên trang, không
+                phải 3 màu mới. */}
             <div className="grid grid-cols-3 gap-4">
-                <StatCard icon={AlertTriangle} color="rose" label="Overdue Tasks" value={kpi?.overdue_tasks_count ?? 0} />
-                <StatCard icon={Clock} color="blue" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
-                <StatCard icon={TrendingUp} color="emerald" label="Completion Rate" value={ratePercent} />
+                <StatCard icon={AlertTriangle} hex="#6F9576" label="Overdue Tasks" value={kpi?.overdue_tasks_count ?? 0} />
+                <StatCard icon={Clock} hex="#D2D2D1" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
+                <StatCard icon={TrendingUp} hex="#99C0CD" label="Completion Rate" value={ratePercent} />
             </div>
 
             <DonutChartCard
