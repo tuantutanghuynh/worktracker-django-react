@@ -219,6 +219,7 @@ export function EmployeeAuditLogsPage() {
                         severity={selectedLog.severity}
                         ipAddress={selectedLog.ip_address}
                         summary={summarizeLog(selectedLog)}
+                        theme="light"
                     />
                 )}
             </SideDrawer>
