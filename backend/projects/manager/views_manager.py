@@ -161,14 +161,37 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         - Không được truyền manager_id.
         - Hệ thống tự gán manager = request.user.
         - Status dùng default của model: PLANNING.
+        - Khởi tạo Kênh Chat dự án và gán Team Members do Manager chọn.
         """
-        serializer = ManagerJobCreateSerializer(data=request.data)
+        serializer = ManagerJobCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
+            initial_team_ids = serializer.validated_data.pop("initial_team_member_ids", None)
             job = serializer.save(
                 manager=request.user,
             )
+
+            # Tự động khởi tạo Kênh Chat Dự án và gán Project Team
+            from chat.models import ChatRoom, ChatParticipant
+            room_name = f"#{job.job_code or f'JOB-{job.id}'}: {job.job_name}"
+            room, _ = ChatRoom.objects.get_or_create(
+                room_type=ChatRoom.RoomType.JOB,
+                job=job,
+                defaults={"name": room_name},
+            )
+            ChatParticipant.objects.get_or_create(room=room, user=request.user)
+
+            if initial_team_ids:
+                from accounts.models import CustomUser
+                employees = CustomUser.objects.filter(
+                    id__in=initial_team_ids,
+                    role__code="EMPLOYEE",
+                    is_active=True,
+                    profile__manager=request.user,
+                )
+                for emp in employees:
+                    ChatParticipant.objects.get_or_create(room=room, user=emp)
 
             log_action(
                 user=request.user,

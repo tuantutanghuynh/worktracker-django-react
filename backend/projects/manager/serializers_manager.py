@@ -158,6 +158,11 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
         queryset=Client.objects.filter(is_active=True),
         write_only=True,
     )
+    initial_team_member_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        write_only=True,
+    )
 
     class Meta:
         model = Job
@@ -169,6 +174,7 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
             "description",
             "start_date",
             "deadline",
+            "initial_team_member_ids",
         ]
 
     def validate(self, attrs):
@@ -201,6 +207,30 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"deadline": "Job deadline must not be earlier than start date."}
             )
+
+        initial_team_ids = attrs.get("initial_team_member_ids")
+        if initial_team_ids:
+            request = self.context.get("request")
+            manager_user = getattr(request, "user", None)
+            if manager_user:
+                from accounts.models import CustomUser
+                invalid_emps = list(
+                    CustomUser.objects.filter(id__in=initial_team_ids)
+                    .exclude(
+                        role__code="EMPLOYEE",
+                        is_active=True,
+                        profile__manager=manager_user,
+                    )
+                    .values_list("id", flat=True)
+                )
+                if invalid_emps:
+                    raise serializers.ValidationError(
+                        {
+                            "initial_team_member_ids": (
+                                f"Nhân viên có ID {invalid_emps} không thuộc quyền quản lý của bạn."
+                            )
+                        }
+                    )
 
         return attrs
 

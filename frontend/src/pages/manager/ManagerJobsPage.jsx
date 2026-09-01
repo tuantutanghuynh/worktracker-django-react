@@ -41,6 +41,7 @@ import {
   useChangeJobStatus,
   useManagerClients,
 } from '../../hooks/queries/manager/useManagerJobs';
+import { useManagerEmployees } from '../../hooks/queries/manager/useManagerTeam';
 import { useRecentJobsStore } from '../../stores/useRecentJobsStore';
 
 // Định nghĩa danh sách Trạng thái Job
@@ -201,9 +202,17 @@ export default function ManagerJobsPage() {
   );
 
   const { data: response, isLoading } = useManagerJobs(queryParams);
+  const { data: teamResponse } = useManagerEmployees();
   const createJobMutation = useCreateJob();
   const updateJobMutation = useUpdateJob();
   const changeJobStatusMutation = useChangeJobStatus();
+
+  // Danh sách nhân viên trong Team do Manager quản lý
+  const myTeamEmployees = useMemo(() => {
+    if (Array.isArray(teamResponse)) return teamResponse;
+    if (teamResponse?.results && Array.isArray(teamResponse.results)) return teamResponse.results;
+    return [];
+  }, [teamResponse]);
 
   // Chuẩn hóa dữ liệu Jobs
   const jobs = useMemo(() => {
@@ -258,6 +267,7 @@ export default function ManagerJobsPage() {
       deadline: '',
       priority: 'MEDIUM',
       description: '',
+      initial_team_member_ids: myTeamEmployees.map((e) => e.id),
     });
     setIsDrawerOpen(true);
   };
@@ -314,6 +324,7 @@ export default function ManagerJobsPage() {
         start_date: formData.start_date || new Date().toISOString().split('T')[0],
         deadline: formData.deadline,
         description: formData.description.trim() || undefined,
+        initial_team_member_ids: formData.initial_team_member_ids || [],
       };
 
       createJobMutation.mutate(payload, {
@@ -943,13 +954,74 @@ const ALLOWED_TRANSITIONS = {
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Project Description</label>
             <textarea
-              rows={4}
+              rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Enter deliverables, scope, and objectives..."
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {drawerMode === 'create' && myTeamEmployees.length > 0 && (
+            <div className="pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block font-semibold text-slate-700 text-xs">
+                  Assign Team Members ({formData.initial_team_member_ids?.length || 0}/{myTeamEmployees.length})
+                </label>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, initial_team_member_ids: myTeamEmployees.map((e) => e.id) })}
+                    className="text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, initial_team_member_ids: [] })}
+                    className="text-slate-500 hover:underline cursor-pointer"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                {myTeamEmployees.map((emp) => {
+                  const isChecked = formData.initial_team_member_ids?.includes(emp.id);
+                  return (
+                    <label
+                      key={emp.id}
+                      className="flex items-center justify-between p-1.5 rounded hover:bg-white transition cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const current = formData.initial_team_member_ids || [];
+                            if (e.target.checked) {
+                              setFormData({ ...formData, initial_team_member_ids: [...current, emp.id] });
+                            } else {
+                              setFormData({ ...formData, initial_team_member_ids: current.filter((id) => id !== emp.id) });
+                            }
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                        />
+                        <span className="font-medium text-slate-800">
+                          {emp.full_name || emp.profile?.full_name || emp.email}
+                        </span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
+                        {emp.department_name || emp.profile?.department_name || 'Member'}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
             <button
