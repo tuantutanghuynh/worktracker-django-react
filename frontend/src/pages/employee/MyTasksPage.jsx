@@ -335,10 +335,10 @@ export function MyTasksPage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatCard icon={ListChecks} color="purple" label="Total Tasks" value={summary.total} size="sm" />
-                <StatCard icon={PlayCircle} color="blue" label="In Progress" value={summary.inProgress} size="sm" />
-                <StatCard icon={Eye} color="amber" label="Reviewing" value={summary.reviewing} size="sm" />
-                <StatCard icon={CalendarClock} color="rose" label="Due Soon" value={summary.dueSoon} size="sm" />
+                <StatCard icon={ListChecks} hex="#FFB6A6" label="Total Tasks" value={summary.total} size="sm" />
+                <StatCard icon={PlayCircle} hex="#FFEBD3" label="In Progress" value={summary.inProgress} size="sm" />
+                <StatCard icon={Eye} hex="#9BCEC1" label="Reviewing" value={summary.reviewing} size="sm" />
+                <StatCard icon={CalendarClock} hex="#67A2C5" label="Due Soon" value={summary.dueSoon} size="sm" />
             </div>
 
             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">

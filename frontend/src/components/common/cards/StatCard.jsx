@@ -30,6 +30,10 @@ const SIZE_STYLES = {
 export default function StatCard({
   icon: Icon,
   color = 'blue',
+  // hex (vd. '#FFB6A6'): tint riêng cho 1 bảng màu tùy trang, đè lên
+  // `color` — nền card + icon chip nhạt (~12%/18% alpha), không đổi
+  // hành vi của bất kỳ consumer nào khác chỉ dùng `color` (mặc định).
+  hex,
   label,
   value,
   subtext,
@@ -45,10 +49,12 @@ export default function StatCard({
   return (
     <div
       className={clsx(
-        'rounded-xl border border-slate-200/80 bg-white shadow-sm',
+        'rounded-xl border shadow-sm',
+        !hex && 'border-slate-200/80 bg-white',
         sizeStyle.container,
         className
       )}
+      style={hex ? { backgroundColor: `${hex}1F`, borderColor: `${hex}66` } : undefined}
     >
       <div className="flex items-center justify-between">
         {Icon && (
@@ -56,8 +62,9 @@ export default function StatCard({
             className={clsx(
               'flex items-center justify-center rounded-lg text-xs',
               sizeStyle.icon,
-              colorStyle
+              !hex && colorStyle
             )}
+            style={hex ? { backgroundColor: `${hex}33`, color: hex } : undefined}
           >
             <Icon className={sizeStyle.iconGlyph} />
           </div>
