@@ -4,7 +4,10 @@ import { getPersonalKPI } from '../../../api/dashboardApi'
 // Query Key Factory for Employee Dashboard
 export const dashboardKeys = {
     all: ['employee-dashboard'],
-    kpi: () => [...dashboardKeys.all, 'kpi'],
+    // params (vd. { start_date, end_date }) vào key — My Performance's
+    // date-ranged query và Dashboard's không-tham-số query cache riêng,
+    // không đè lên nhau.
+    kpi: (params = {}) => [...dashboardKeys.all, 'kpi', params],
 }
 
 // Employee dashboard summary — Personal KPI, cached 1 minute (matches
@@ -12,7 +15,7 @@ export const dashboardKeys = {
 export function useDashboard() {
     return useQuery({
         queryKey: dashboardKeys.kpi(),
-        queryFn: getPersonalKPI,
+        queryFn: () => getPersonalKPI(),
         staleTime: 60 * 1000,
     })
 }

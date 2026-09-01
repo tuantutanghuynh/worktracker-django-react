@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
+import { format, subDays, startOfMonth } from "date-fns"
 import { useMyPerformance } from "../../hooks/queries/employee/useMyPerformance"
 import StatCard from "../../components/common/cards/StatCard"
 import LineChartCard from "../../components/common/charts/LineChartCard"
@@ -44,6 +45,27 @@ const RESULT_OPTIONS = [
     { value: "Pending", label: "Pending" },
 ]
 
+// Chỉ ảnh hưởng Completion Rate + On-time Rate (backend filter theo
+// deadline của completion_tasks) — KHÔNG áp dụng cho Overdue/Hours This
+// Week/chart nào cả, vì backend chưa hỗ trợ lọc những field đó theo
+// khoảng ngày. Cố tình không đặt tên "toàn dashboard" để tránh hiểu nhầm.
+const PERIOD_PRESETS = [
+    { value: "all", label: "All time" },
+    { value: "this_month", label: "This month" },
+    { value: "last_30", label: "Last 30 days" },
+]
+
+function resolvePeriodRange(preset) {
+    const today = new Date()
+    if (preset === "this_month") {
+        return { start_date: format(startOfMonth(today), "yyyy-MM-dd"), end_date: format(today, "yyyy-MM-dd") }
+    }
+    if (preset === "last_30") {
+        return { start_date: format(subDays(today, 29), "yyyy-MM-dd"), end_date: format(today, "yyyy-MM-dd") }
+    }
+    return {} // "all" — không gửi start_date/end_date, backend mặc định all-time
+}
+
 function ResultBadge({ result }) {
     return (
         <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${RESULT_STYLES[result]}`}>
@@ -66,7 +88,10 @@ function computeResult(task, today) {
 }
 
 export function MyPerformancePage() {
-    const { kpi, dailyTrendData, hoursByProjectData, statusBreakdownData, loading, error } = useMyPerformance()
+    const [periodPreset, setPeriodPreset] = useState("all")
+    const dateRange = useMemo(() => resolvePeriodRange(periodPreset), [periodPreset])
+
+    const { kpi, dailyTrendData, hoursByProjectData, statusBreakdownData, loading, error } = useMyPerformance(dateRange)
     const { tasks } = useMyTasks()
     const { entries } = useTimesheet()
 
@@ -75,6 +100,8 @@ export function MyPerformancePage() {
     const [priorityValue, setPriorityValue] = useState("")
     const [resultValue, setResultValue] = useState("")
     const [projectValue, setProjectValue] = useState("")
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
 
     if (loading) {
         return <p className="text-xs text-slate-400">Loading performance data...</p>
@@ -130,12 +157,23 @@ export function MyPerformancePage() {
         return true
     })
 
+    // Trang hiện tại clamp về tổng số trang thật (thay vì reset qua effect
+    // riêng mỗi lần filter đổi) — tránh lại dính đúng anti-pattern
+    // "setState trong effect" vừa sửa ở QuickLogWorkFormCard.
+    const totalPages = Math.max(Math.ceil(filteredTaskRows.length / pageSize), 1)
+    const effectivePage = Math.min(currentPage, totalPages)
+    const paginatedTaskRows = filteredTaskRows.slice(
+        (effectivePage - 1) * pageSize,
+        effectivePage * pageSize
+    )
+
     function handleClearFilters() {
         setSearchQuery("")
         setStatusValue("")
         setPriorityValue("")
         setResultValue("")
         setProjectValue("")
+        setCurrentPage(1)
     }
 
     // Summary phản ánh đúng tập đã lọc — lọc xuống "Completed" thì summary
@@ -167,13 +205,54 @@ export function MyPerformancePage() {
                 <p className="text-slate-500 text-xs">Track your personal KPIs and work trends over time.</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-                <StatCard icon={AlertTriangle} color="rose" label="Overdue Tasks" value={kpi?.overdue_tasks_count ?? 0} />
-                <StatCard icon={ListChecks} color="purple" label="Total Tasks" value={kpi?.completion_rate?.total ?? 0} />
-                <StatCard icon={TrendingUp} color="emerald" label="Completion Rate" value={ratePercent} />
-                <StatCard icon={Clock} color="blue" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
-                <StatCard icon={CheckCircle2} color="emerald" label="On-time Rate" value={onTimeRatePercent} />
-                <StatCard icon={Zap} color="amber" label="Avg Time / Task" value={productivityLabel} />
+            <div className="space-y-2">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workload</p>
+                <div className="grid grid-cols-3 gap-4">
+                    <StatCard
+                        icon={AlertTriangle} color="rose" label="Overdue Tasks"
+                        value={kpi?.overdue_tasks_count ?? 0}
+                        subtext={kpi?.completion_rate?.total ? `of ${kpi.completion_rate.total} tasks` : undefined}
+                    />
+                    <StatCard icon={ListChecks} color="purple" label="Total Tasks" value={kpi?.completion_rate?.total ?? 0} />
+                    <StatCard icon={Clock} color="blue" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        Performance <span className="font-normal normal-case text-slate-400">— Completion &amp; On-time only</span>
+                    </p>
+                    <div className="flex items-center p-0.5 bg-slate-100 rounded-lg text-[11px] font-semibold text-slate-600">
+                        {PERIOD_PRESETS.map((p) => (
+                            <button
+                                key={p.value}
+                                type="button"
+                                onClick={() => setPeriodPreset(p.value)}
+                                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${periodPreset === p.value ? "bg-white text-blue-700 shadow-xs" : "hover:text-slate-800"}`}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <StatCard
+                        icon={TrendingUp} color="emerald" label="Completion Rate"
+                        value={ratePercent}
+                        subtext={kpi?.completion_rate ? `${kpi.completion_rate.completed} of ${kpi.completion_rate.total} completed` : undefined}
+                    />
+                    <StatCard
+                        icon={CheckCircle2} color="emerald" label="On-time Rate"
+                        value={onTimeRatePercent}
+                        subtext={kpi?.on_time_rate ? `${kpi.on_time_rate.on_time} of ${kpi.on_time_rate.completed_with_date} completed tasks` : "Only counts tasks you've completed"}
+                    />
+                    <StatCard
+                        icon={Zap} color="amber" label="Avg Time / Task"
+                        value={productivityLabel}
+                        subtext="Hours per completed task, all-time"
+                    />
+                </div>
             </div>
 
             <LineChartCard title="Logged Hours Trend (Daily)" data={dailyTrendData} />
@@ -229,28 +308,48 @@ export function MyPerformancePage() {
                     </FilterToolbar>
                 </div>
 
-                <DataTable columns={taskColumns} data={filteredTaskRows} emptyMessage="No tasks match these filters." />
+                <DataTable
+                    columns={taskColumns}
+                    data={paginatedTaskRows}
+                    emptyMessage="No tasks match these filters."
+                    pagination={{
+                        currentPage: effectivePage,
+                        totalPages,
+                        totalItems: filteredTaskRows.length,
+                        pageSize,
+                        onPageChange: setCurrentPage,
+                        onPageSizeChange: (size) => { setPageSize(size); setCurrentPage(1) },
+                    }}
+                />
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50/60 grid grid-cols-4 gap-4 text-center">
-                    <div>
-                        <p className="text-lg font-bold text-slate-900">{summaryTotal}</p>
-                        <p className="text-xs text-slate-500">Total Tasks</p>
-                    </div>
-                    <div>
-                        <p className="text-lg font-bold text-slate-900">
-                            {summaryTotal ? Math.round((summaryCompleted / summaryTotal) * 100) : 0}%
-                        </p>
-                        <p className="text-xs text-slate-500">Completion Rate</p>
-                    </div>
-                    <div>
-                        <p className="text-lg font-bold text-slate-900">
-                            {summaryOnTimeEligible ? Math.round((summaryOnTime / summaryOnTimeEligible) * 100) : 0}%
-                        </p>
-                        <p className="text-xs text-slate-500">On-time Rate</p>
-                    </div>
-                    <div>
-                        <p className="text-lg font-bold text-slate-900">{summaryTotalHours.toFixed(1)}h</p>
-                        <p className="text-xs text-slate-500">Total Logged ({summaryOverdueHours.toFixed(1)}h overdue)</p>
+                <div className="p-4 border-t border-slate-100 bg-slate-50/60 space-y-2">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                        For the {summaryTotal} task{summaryTotal !== 1 ? "s" : ""} matching current filters
+                    </p>
+                    <div className="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                            <p className="text-lg font-bold text-slate-900">{summaryTotal}</p>
+                            <p className="text-xs text-slate-500">Total Tasks</p>
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold text-slate-900">
+                                {summaryTotal ? Math.round((summaryCompleted / summaryTotal) * 100) : 0}%
+                            </p>
+                            <p className="text-xs text-slate-500">Completion Rate</p>
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold text-slate-900">
+                                {summaryOnTimeEligible ? Math.round((summaryOnTime / summaryOnTimeEligible) * 100) : 0}%
+                            </p>
+                            <p className="text-xs text-slate-500">On-time Rate</p>
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold text-slate-900">{summaryTotalHours.toFixed(1)}h</p>
+                            <p className="text-xs text-slate-500">Total Logged</p>
+                            {summaryOverdueHours > 0 && (
+                                <p className="text-[10px] text-rose-500 mt-0.5">{summaryOverdueHours.toFixed(1)}h logged on overdue tasks</p>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
