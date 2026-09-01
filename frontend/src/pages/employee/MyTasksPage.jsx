@@ -194,6 +194,16 @@ export function MyTasksPage() {
             },
         },
         {
+            accessorKey: "manager_name",
+            header: "Manager",
+            className: "max-w-[140px] truncate",
+            cell: (info) => (
+                <span className="truncate" title={info.row.original.manager_name}>
+                    {info.row.original.manager_name || "—"}
+                </span>
+            ),
+        },
+        {
             accessorKey: "priority",
             header: "Priority",
             sortable: true,
