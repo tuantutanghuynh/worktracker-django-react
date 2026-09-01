@@ -1034,6 +1034,11 @@ const ALLOWED_TRANSITIONS = {
                 </option>
               ))}
             </select>
+            {employeeOptions.length === 0 && (
+              <p className="text-[11px] text-amber-600 mt-1">
+                ⚠️ No members in this project team yet. Task will be saved as draft (Unassigned) unless you add members first.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

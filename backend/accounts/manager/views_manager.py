@@ -99,6 +99,28 @@ class ManagerTeamEmployeeListView(ListAPIView):
         if department_id:
             qs = qs.filter(profile__department_id=department_id)
 
+        job_id = self.request.query_params.get("job_id")
+        if job_id:
+            from chat.models import ChatParticipant
+            from projects.models import Job
+
+            job = Job.objects.filter(id=job_id, manager=self.request.user).first()
+            if job:
+                team_member_ids = (
+                    set(
+                        ChatParticipant.objects.filter(
+                            room__job=job,
+                            room__room_type=ChatParticipant._meta.get_field('room').remote_field.model.RoomType.JOB
+                            if hasattr(ChatParticipant._meta.get_field('room').remote_field.model, 'RoomType')
+                            else 'JOB',
+                        )
+                        .exclude(user=self.request.user)
+                        .values_list("user_id", flat=True)
+                    )
+                    | set(job.tasks.values_list("assignee_id", flat=True))
+                ) - {self.request.user.id, None}
+                qs = qs.filter(id__in=team_member_ids)
+
         search = self.request.query_params.get("search")
         if search:
             qs = qs.filter(
