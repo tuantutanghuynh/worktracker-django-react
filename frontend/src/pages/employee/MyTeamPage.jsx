@@ -116,10 +116,10 @@ export default function MyTeamPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={FolderKanban} label="Projects" value={stats.total} accent="text-slate-700" />
-        <StatCard icon={PlayCircle} label="Active" value={stats.ACTIVE} accent="text-emerald-600" />
-        <StatCard icon={CalendarClock} label="Planning" value={stats.PLANNING} accent="text-amber-600" />
-        <StatCard icon={CheckCircle2} label="Completed" value={stats.COMPLETED} accent="text-blue-600" />
+        <StatCard icon={FolderKanban} label="Projects" value={stats.total} hex="#FFB6A6" />
+        <StatCard icon={PlayCircle} label="Active" value={stats.ACTIVE} hex="#FFEBD3" />
+        <StatCard icon={CalendarClock} label="Planning" value={stats.PLANNING} hex="#9BCEC1" />
+        <StatCard icon={CheckCircle2} label="Completed" value={stats.COMPLETED} hex="#67A2C5" />
       </div>
 
       <div className="flex flex-col md:flex-row gap-3 md:items-end">
@@ -192,12 +192,20 @@ export default function MyTeamPage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, accent }) {
+// hex: nền nhạt (~12% alpha) + border tint + icon theo đúng màu — cùng
+// pattern đã dùng ở My Tasks' summary cards (StatCard dùng chung,
+// components/common/cards/StatCard.jsx), viết riêng ở đây vì component
+// này có layout khác (label+icon rồi mới tới value, không phải icon chip
+// tròn phía trên).
+function StatCard({ icon: Icon, label, value, hex }) {
   return (
-    <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+    <div
+      className="p-4 rounded-2xl border shadow-2xs space-y-2"
+      style={{ backgroundColor: `${hex}1F`, borderColor: `${hex}66` }}
+    >
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-        <Icon className={cn('w-4 h-4', accent)} />
+        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+        <Icon className="w-4 h-4" style={{ color: hex }} />
       </div>
       <span className="text-2xl font-extrabold text-slate-900">{value}</span>
     </div>
