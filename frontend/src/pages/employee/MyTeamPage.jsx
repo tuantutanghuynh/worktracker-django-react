@@ -219,7 +219,7 @@ function StatCard({ icon: Icon, label, value, hex }) {
 
 function JobCard({ job, onMessage }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-blue-200 transition-all space-y-4">
+    <div className="bg-gradient-to-br from-slate-100 via-slate-50 to-white p-5 rounded-2xl border border-slate-300/80 shadow-sm hover:shadow-md hover:border-blue-300 transition-all space-y-4">
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-xs font-bold text-blue-700 truncate">
