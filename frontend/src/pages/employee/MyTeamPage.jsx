@@ -192,7 +192,7 @@ export default function MyTeamPage() {
   );
 }
 
-// hex: nền nhạt (~12% alpha) + border tint + icon theo đúng màu — cùng
+// hex: nền gradient chéo theo đúng màu + icon chip đậm gần solid — cùng
 // pattern đã dùng ở My Tasks' summary cards (StatCard dùng chung,
 // components/common/cards/StatCard.jsx), viết riêng ở đây vì component
 // này có layout khác (label+icon rồi mới tới value, không phải icon chip
@@ -201,11 +201,16 @@ function StatCard({ icon: Icon, label, value, hex }) {
   return (
     <div
       className="p-4 rounded-2xl border shadow-2xs space-y-2"
-      style={{ backgroundColor: `${hex}1F`, borderColor: `${hex}66` }}
+      style={{ backgroundImage: `linear-gradient(135deg, ${hex}66 0%, ${hex}26 100%)`, borderColor: `${hex}99` }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-        <Icon className="w-4 h-4" style={{ color: hex }} />
+        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{label}</span>
+        <div
+          className="w-6 h-6 rounded-lg flex items-center justify-center shadow-sm"
+          style={{ backgroundImage: `linear-gradient(135deg, ${hex} 0%, ${hex}CC 100%)` }}
+        >
+          <Icon className="w-3.5 h-3.5 text-white" />
+        </div>
       </div>
       <span className="text-2xl font-extrabold text-slate-900">{value}</span>
     </div>

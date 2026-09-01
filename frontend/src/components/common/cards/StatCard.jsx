@@ -31,8 +31,9 @@ export default function StatCard({
   icon: Icon,
   color = 'blue',
   // hex (vd. '#FFB6A6'): tint riêng cho 1 bảng màu tùy trang, đè lên
-  // `color` — nền card + icon chip nhạt (~12%/18% alpha), không đổi
-  // hành vi của bất kỳ consumer nào khác chỉ dùng `color` (mặc định).
+  // `color` — nền card gradient chéo theo đúng màu + icon chip đậm gần
+  // như solid, không đổi hành vi của bất kỳ consumer nào khác chỉ dùng
+  // `color` (mặc định).
   hex,
   label,
   value,
@@ -54,17 +55,17 @@ export default function StatCard({
         sizeStyle.container,
         className
       )}
-      style={hex ? { backgroundColor: `${hex}1F`, borderColor: `${hex}66` } : undefined}
+      style={hex ? { backgroundImage: `linear-gradient(135deg, ${hex}66 0%, ${hex}26 100%)`, borderColor: `${hex}99` } : undefined}
     >
       <div className="flex items-center justify-between">
         {Icon && (
           <div
             className={clsx(
-              'flex items-center justify-center rounded-lg text-xs',
+              'flex items-center justify-center rounded-lg text-xs shadow-sm',
               sizeStyle.icon,
               !hex && colorStyle
             )}
-            style={hex ? { backgroundColor: `${hex}33`, color: hex } : undefined}
+            style={hex ? { backgroundImage: `linear-gradient(135deg, ${hex} 0%, ${hex}CC 100%)`, color: '#fff' } : undefined}
           >
             <Icon className={sizeStyle.iconGlyph} />
           </div>
