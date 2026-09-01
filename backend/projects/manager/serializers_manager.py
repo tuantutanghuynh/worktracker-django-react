@@ -43,6 +43,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
     is_overdue = serializers.SerializerMethodField()
     health = serializers.SerializerMethodField()
     team_size = serializers.SerializerMethodField()
+    project_team = serializers.SerializerMethodField()
 
     class Meta:
         model = Job
@@ -56,6 +57,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             "start_date",
             "deadline",
             "team_size",
+            "project_team",
             "task_counts",
             "is_overdue",
             "health",
@@ -71,6 +73,42 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             .distinct()
         )
         return len(task_assignee_ids | team_participant_ids)
+
+    def get_project_team(self, obj):
+        from accounts.models import CustomUser
+        from chat.models import ChatParticipant
+        from django.db.models import Count, Q
+
+        task_assignee_ids = set(obj.tasks.values_list("assignee_id", flat=True).distinct())
+        team_participant_ids = set(
+            ChatParticipant.objects.filter(room__job=obj, room__room_type='JOB')
+            .exclude(user=obj.manager)
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        all_member_ids = (task_assignee_ids | team_participant_ids) - {obj.manager_id}
+        users = CustomUser.objects.filter(id__in=all_member_ids, is_active=True).select_related("profile", "profile__department")
+
+        # Đếm số task đang hoạt động (chưa hoàn thành) của từng nhân viên trong Job này
+        active_counts_query = (
+            obj.tasks.filter(
+                status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS, Task.Status.REVIEWING]
+            )
+            .values("assignee_id")
+            .annotate(cnt=Count("id"))
+        )
+        active_map = {row["assignee_id"]: row["cnt"] for row in active_counts_query}
+
+        return [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": getattr(getattr(u, "profile", None), "full_name", "") or u.email,
+                "department_name": getattr(getattr(getattr(u, "profile", None), "department", None), "name", "No Department"),
+                "active_tasks_count": active_map.get(u.id, 0),
+            }
+            for u in users
+        ]
 
     def get_task_counts(self, obj):
         annotated_fields = [
@@ -118,37 +156,13 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
 
 class ManagerJobDetailSerializer(ManagerJobListSerializer):
     manager = ManagerUserMiniSerializer(read_only=True)
-    project_team = serializers.SerializerMethodField()
 
     class Meta(ManagerJobListSerializer.Meta):
         fields = ManagerJobListSerializer.Meta.fields + [
             "description",
             "manager",
-            "project_team",
             "created_at",
             "updated_at",
-        ]
-
-    def get_project_team(self, obj):
-        from accounts.models import CustomUser
-        from chat.models import ChatParticipant
-        task_assignee_ids = set(obj.tasks.values_list("assignee_id", flat=True).distinct())
-        team_participant_ids = set(
-            ChatParticipant.objects.filter(room__job=obj, room__room_type='JOB')
-            .exclude(user=obj.manager)
-            .values_list('user_id', flat=True)
-            .distinct()
-        )
-        all_member_ids = task_assignee_ids | team_participant_ids
-        users = CustomUser.objects.filter(id__in=all_member_ids, is_active=True).select_related("profile", "profile__department")
-        return [
-            {
-                "id": u.id,
-                "email": u.email,
-                "full_name": getattr(getattr(u, "profile", None), "full_name", "") or u.email,
-                "department_name": getattr(getattr(getattr(u, "profile", None), "department", None), "name", "No Department"),
-            }
-            for u in users
         ]
 
 
@@ -320,6 +334,49 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                             )
                         }
                     )
+
+            # CHỐT CHẶN NGHIÊM NGẶT (STRICT GUARD):
+            # Không cho phép bỏ nhân viên ra khỏi Job nếu nhân viên đó đang có Task dang dở (TODO, IN_PROGRESS, REVIEWING)
+            if job:
+                from chat.models import ChatParticipant
+                from accounts.models import CustomUser
+
+                current_job_emp_ids = (
+                    set(
+                        ChatParticipant.objects.filter(room__job=job, room__room_type='JOB')
+                        .exclude(user=job.manager)
+                        .values_list('user_id', flat=True)
+                    )
+                    | set(job.tasks.values_list('assignee_id', flat=True))
+                ) - {job.manager_id}
+
+                removed_emp_ids = current_job_emp_ids - set(team_member_ids)
+                if removed_emp_ids:
+                    for rem_id in removed_emp_ids:
+                        active_tasks = job.tasks.filter(
+                            assignee_id=rem_id,
+                            status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS, Task.Status.REVIEWING]
+                        )
+                        if active_tasks.exists():
+                            emp_obj = CustomUser.objects.filter(id=rem_id).first()
+                            emp_name = (
+                                getattr(getattr(emp_obj, "profile", None), "full_name", "")
+                                or getattr(emp_obj, "email", f"ID {rem_id}")
+                            )
+                            task_titles = list(active_tasks.values_list("title", flat=True)[:3])
+                            task_list_str = ", ".join(f"'{t}'" for t in task_titles)
+                            if active_tasks.count() > 3:
+                                task_list_str += f" and {active_tasks.count() - 3} more"
+
+                            raise serializers.ValidationError(
+                                {
+                                    "team_member_ids": (
+                                        f"Cannot remove '{emp_name}' from the project because they still have "
+                                        f"{active_tasks.count()} active task(s) ({task_list_str}). "
+                                        "Please reassign or cancel their tasks before removing them."
+                                    )
+                                }
+                            )
 
         return attrs
 

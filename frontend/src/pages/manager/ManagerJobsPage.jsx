@@ -279,9 +279,8 @@ export default function ManagerJobsPage() {
     setEditingJobId(job.id);
 
     // Lấy danh sách ID thành viên đang tham gia dự án
-    const existingMemberIds = Array.isArray(job.project_team)
-      ? job.project_team.map((m) => m.id)
-      : [];
+    const existingTeam = Array.isArray(job.project_team) ? job.project_team : [];
+    const existingMemberIds = existingTeam.map((m) => m.id);
 
     setFormData({
       job_name: job.job_name || '',
@@ -293,6 +292,7 @@ export default function ManagerJobsPage() {
       priority: job.priority || 'MEDIUM',
       description: job.description || '',
       initial_team_member_ids: existingMemberIds,
+      project_team: existingTeam,
     });
     setIsDrawerOpen(true);
   };
@@ -1007,7 +1007,13 @@ const ALLOWED_TRANSITIONS = {
                   <span className="text-slate-300">•</span>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, initial_team_member_ids: [] })}
+                    onClick={() => {
+                      // Chỉ giữ lại những nhân viên đang bị khóa do có task dang dở
+                      const lockedIds = (formData.project_team || [])
+                        .filter((m) => (m.active_tasks_count || 0) > 0)
+                        .map((m) => m.id);
+                      setFormData({ ...formData, initial_team_member_ids: lockedIds });
+                    }}
                     className="text-slate-500 hover:underline cursor-pointer font-medium"
                   >
                     Deselect All
@@ -1015,19 +1021,30 @@ const ALLOWED_TRANSITIONS = {
                 </div>
               </div>
 
-              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200">
                 {myTeamEmployees.map((emp) => {
-                  const isChecked = formData.initial_team_member_ids?.includes(emp.id);
+                  const memberInfo = formData.project_team?.find((m) => m.id === emp.id);
+                  const activeTasksCount = memberInfo?.active_tasks_count || 0;
+                  const isLocked = drawerMode === 'edit' && activeTasksCount > 0;
+                  const isChecked = isLocked || formData.initial_team_member_ids?.includes(emp.id);
+
                   return (
                     <label
                       key={emp.id}
-                      className="flex items-center justify-between p-1.5 rounded hover:bg-white transition cursor-pointer text-xs"
+                      className={cn(
+                        "flex items-center justify-between p-2 rounded-lg transition text-xs",
+                        isLocked
+                          ? "bg-slate-100/90 border border-slate-200/80 cursor-not-allowed select-none"
+                          : "hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer"
+                      )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
                         <input
                           type="checkbox"
                           checked={isChecked}
+                          disabled={isLocked}
                           onChange={(e) => {
+                            if (isLocked) return;
                             const current = formData.initial_team_member_ids || [];
                             if (e.target.checked) {
                               setFormData({ ...formData, initial_team_member_ids: [...current, emp.id] });
@@ -1035,15 +1052,30 @@ const ALLOWED_TRANSITIONS = {
                               setFormData({ ...formData, initial_team_member_ids: current.filter((id) => id !== emp.id) });
                             }
                           }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                          className={cn(
+                            "rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5",
+                            isLocked && "opacity-60 cursor-not-allowed"
+                          )}
                         />
-                        <span className="font-medium text-slate-800">
+                        <span className={cn("font-medium truncate", isLocked ? "text-slate-700" : "text-slate-800")}>
                           {emp.full_name || emp.profile?.full_name || emp.email}
                         </span>
                       </div>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
-                        {emp.department_name || emp.profile?.department_name || 'Member'}
-                      </span>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isLocked ? (
+                          <span
+                            title="Reassign or cancel open tasks before removing this employee from the project"
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1"
+                          >
+                            🔒 {activeTasksCount} active task{activeTasksCount > 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-600 font-medium">
+                            {emp.department_name || emp.profile?.department_name || 'Member'}
+                          </span>
+                        )}
+                      </div>
                     </label>
                   );
                 })}
