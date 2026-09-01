@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { queryClient } from "../lib/queryClient";
 
 // Global auth state store (Zustand + persist middleware). Holds the
 // access/refresh tokens and the logged-in user. Where they're persisted
@@ -47,6 +48,11 @@ export const useAuthStore = create(
                 localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? "true" : "false")
                 const otherStorage = rememberMe ? sessionStorage : localStorage
                 otherStorage.removeItem("auth-storage")
+                // Phòng trường hợp React Query vẫn còn cache của phiên trước
+                // (vd. tab cũ bị đóng đột ngột, không qua logout()) — đảm bảo
+                // user mới đăng nhập không bao giờ thấy dữ liệu của người khác
+                // dù chỉ trong khoảnh khắc trước lần fetch đầu tiên.
+                queryClient.clear()
                 set({
                     accessToken: tokens.access,
                     refreshToken: tokens.refresh,
@@ -60,10 +66,21 @@ export const useAuthStore = create(
 
             // Clears all auth state and wipes both possible storage
             // locations, so no stale session survives in either engine.
+            //
+            // queryClient.clear() is the critical line: without it, every
+            // cached query (dashboard KPI, profile, my tasks...) stays in
+            // memory after logout. The next person to log in on this same
+            // tab — a different Employee, on a shared machine — would see
+            // and briefly be able to act on the PREVIOUS user's data,
+            // since React Query paints cached data immediately on mount
+            // and (per query's staleTime) may not refetch right away.
+            // Previously this only got cleared by a full page reload,
+            // which wipes the in-memory QueryClient as a side effect.
             logout: () => {
                 localStorage.removeItem(REMEMBER_ME_KEY)
                 localStorage.removeItem("auth-storage")
                 sessionStorage.removeItem("auth-storage")
+                queryClient.clear()
                 set({ accessToken: null, refreshToken: null, user: null})
             },
         }),
