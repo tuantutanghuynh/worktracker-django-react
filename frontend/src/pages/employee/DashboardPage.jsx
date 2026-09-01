@@ -4,7 +4,7 @@ import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { useProfile } from "../../hooks/queries/employee/useProfile"
 import { getErrorMessage } from "../../utils/errorMessages"
 import { describeDeadline, DEADLINE_TONE_STYLES } from "../../utils/deadline"
-import StatCard from "../../components/common/cards/StatCard"
+import EmployeeStatCard from "../../components/employee/EmployeeStatCard"
 import { DataTable } from "../../components/common/table/DataTable"
 import StatusBadge from "../../components/common/badges/StatusBadge"
 import PriorityBadge from "../../components/common/badges/PriorityBadge"
@@ -131,22 +131,22 @@ export function DashboardPage() {
             {/* Cùng màu với đúng các chỉ số này ở My Performance — nhất
                 quán xuyên trang, không phải màu mới. */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <StatCard
+                <EmployeeStatCard
                     icon={ListChecks} hex="#CBA37E" label="Total Tasks"
                     value={total}
                     subtext={`${completed} completed`}
                 />
-                <StatCard
+                <EmployeeStatCard
                     icon={AlertTriangle} hex="#6F9576" label="Overdue Tasks"
                     value={overdue}
                     subtext={total ? `of ${total} tasks` : undefined}
                 />
-                <StatCard
+                <EmployeeStatCard
                     icon={TrendingUp} hex="#99C0CD" label="Completion Rate"
                     value={ratePercent}
                     subtext={total ? `${completed} of ${total} tasks` : undefined}
                 />
-                <StatCard
+                <EmployeeStatCard
                     icon={Clock} hex="#D2D2D1" label="Hours This Week"
                     value={`${hoursThisWeek}h`}
                     subtext={`${weeklyHoursPct}% of ${EXPECTED_WEEKLY_HOURS}h`}
