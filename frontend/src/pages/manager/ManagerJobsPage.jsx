@@ -280,6 +280,7 @@ export default function ManagerJobsPage() {
     setFormData({
       job_name: job.job_name || '',
       job_code: job.job_code || '',
+      client_name: job.client?.client_name || 'No Client',
       client_id: job.client?.id ? String(job.client.id) : '',
       start_date: job.start_date || '',
       deadline: job.deadline || '',
@@ -885,12 +886,25 @@ const ALLOWED_TRANSITIONS = {
       >
         <form onSubmit={handleDrawerFormSubmit} className="space-y-4 text-xs">
           <InputField
-            label="Project Name *"
+            label="Project Name"
             value={formData.job_name}
             onChange={(e) => setFormData({ ...formData, job_name: e.target.value })}
             placeholder="e.g. ERP Implementation Phase 1"
             required
           />
+
+          {drawerMode === 'edit' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Client</label>
+              <div className="flex items-center gap-2.5 p-2.5 bg-slate-100/90 rounded-xl border border-slate-200 text-xs font-medium text-slate-800">
+                <Building2 className="w-4 h-4 text-slate-500 shrink-0" />
+                <span className="font-semibold text-slate-900">{formData.client_name || 'Associated Client'}</span>
+                <span className="ml-auto text-[10px] font-normal px-2 py-0.5 bg-slate-200 text-slate-600 rounded-md">
+                  Read-only
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <InputField
@@ -899,10 +913,13 @@ const ALLOWED_TRANSITIONS = {
               onChange={(e) => setFormData({ ...formData, job_code: e.target.value })}
               placeholder="e.g. JOB-ERP-01"
               disabled={drawerMode === 'edit'}
+              helperText={drawerMode === 'edit' ? 'Unique project identifier.' : undefined}
             />
 
             <SelectDropdown
-              label="Priority Level *"
+              label="Priority Level"
+              required
+              theme="light"
               value={formData.priority}
               onChange={(val) => setFormData({ ...formData, priority: val })}
               options={[
@@ -915,12 +932,14 @@ const ALLOWED_TRANSITIONS = {
 
           {drawerMode === 'create' && (
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Select Client *</label>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">
+                Select Client <span className="text-rose-500">*</span>
+              </label>
               <select
                 value={formData.client_id}
                 onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Choose Client --</option>
                 {clientOptions.map((c) => (
@@ -939,10 +958,11 @@ const ALLOWED_TRANSITIONS = {
               value={formData.start_date}
               onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
               disabled={drawerMode === 'edit'}
+              helperText={drawerMode === 'edit' ? 'Start date is fixed.' : undefined}
             />
 
             <InputField
-              label="Deadline Date *"
+              label="Deadline Date"
               type="date"
               min={drawerMode === 'create' ? format(new Date(), 'yyyy-MM-dd') : undefined}
               value={formData.deadline}
@@ -952,13 +972,13 @@ const ALLOWED_TRANSITIONS = {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Project Description</label>
+            <label className="block font-bold text-slate-700 mb-1 text-xs">Project Description</label>
             <textarea
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Enter deliverables, scope, and objectives..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400"
             />
           </div>
 
