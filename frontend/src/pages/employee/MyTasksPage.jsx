@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react"
-import { Send, Paperclip, RotateCcw, Lock, AlertTriangle, PauseCircle } from "lucide-react"
+import { Send, Paperclip, RotateCcw, Lock, AlertTriangle, PauseCircle, ListChecks, PlayCircle, Eye, CalendarClock } from "lucide-react"
 import { differenceInCalendarDays, format, parseISO, formatDistanceToNowStrict } from "date-fns"
 import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { useTaskDetail } from "../../hooks/queries/employee/useTaskDetail"
@@ -10,7 +10,13 @@ import StatusBadge from "../../components/common/badges/StatusBadge"
 import PriorityBadge from "../../components/common/badges/PriorityBadge"
 import PromptReasonModal from "../../components/common/modal/PromptReasonModal"
 import EditLogWorkModal from "../../components/employee/EditLogWorkModal"
+import StatCard from "../../components/common/cards/StatCard"
 import { useRecentTasksStore } from "../../stores/useRecentTasksStore"
+
+// "Due Soon" = còn mở (chưa Completed/Cancelled), có deadline, còn 0-3
+// ngày nữa tới hạn — CHƯA quá hạn (đã quá hạn thì đây là "overdue",
+// khái niệm khác, đã hiện riêng ở cột Deadline mỗi dòng).
+const DUE_SOON_DAYS = 3
 
 const STATUS_OPTIONS = [
     { value: "TODO", label: "To Do" },
@@ -93,6 +99,24 @@ export function MyTasksPage() {
     const frozenTasks = useMemo(() => tasks.filter(isFrozenOpenTask), [tasks])
     const activeTasks = useMemo(() => tasks.filter((t) => !isFrozenOpenTask(t)), [tasks])
     const tabTasks = activeTab === "frozen" ? frozenTasks : activeTasks
+
+    // Summary luôn tính trên TOÀN BỘ task (không đổi theo tab Active/Frozen
+    // đang xem) — giống cách KPI ở My Team/My Performance không đổi theo
+    // filter bảng bên dưới, chỉ là "tổng quan nhanh" cố định.
+    const summary = useMemo(() => {
+        const openTasks = tasks.filter((t) => t.status !== "CANCELLED")
+        const dueSoon = openTasks.filter((t) => {
+            if (!t.deadline || t.status === "COMPLETED") return false
+            const days = differenceInCalendarDays(parseISO(t.deadline), new Date())
+            return days >= 0 && days <= DUE_SOON_DAYS
+        })
+        return {
+            total: openTasks.length,
+            inProgress: openTasks.filter((t) => t.status === "IN_PROGRESS").length,
+            reviewing: openTasks.filter((t) => t.status === "REVIEWING").length,
+            dueSoon: dueSoon.length,
+        }
+    }, [tasks])
 
     const projectOptions = useMemo(() => {
         const seen = new Set()
@@ -308,6 +332,13 @@ export function MyTasksPage() {
             <div>
                 <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">My Tasks</h1>
                 <p className="text-slate-500 text-xs">Tasks assigned to you across all projects.</p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatCard icon={ListChecks} color="purple" label="Total Tasks" value={summary.total} size="sm" />
+                <StatCard icon={PlayCircle} color="blue" label="In Progress" value={summary.inProgress} size="sm" />
+                <StatCard icon={Eye} color="amber" label="Reviewing" value={summary.reviewing} size="sm" />
+                <StatCard icon={CalendarClock} color="rose" label="Due Soon" value={summary.dueSoon} size="sm" />
             </div>
 
             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
