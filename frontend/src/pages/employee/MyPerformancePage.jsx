@@ -209,12 +209,12 @@ export function MyPerformancePage() {
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workload</p>
                 <div className="grid grid-cols-3 gap-4">
                     <StatCard
-                        icon={AlertTriangle} color="rose" label="Overdue Tasks"
+                        icon={AlertTriangle} hex="#6F9576" label="Overdue Tasks"
                         value={kpi?.overdue_tasks_count ?? 0}
                         subtext={kpi?.completion_rate?.total ? `of ${kpi.completion_rate.total} tasks` : undefined}
                     />
-                    <StatCard icon={ListChecks} color="purple" label="Total Tasks" value={kpi?.completion_rate?.total ?? 0} />
-                    <StatCard icon={Clock} color="blue" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
+                    <StatCard icon={ListChecks} hex="#CBA37E" label="Total Tasks" value={kpi?.completion_rate?.total ?? 0} />
+                    <StatCard icon={Clock} hex="#D2D2D1" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
                 </div>
             </div>
 
@@ -238,17 +238,17 @@ export function MyPerformancePage() {
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                     <StatCard
-                        icon={TrendingUp} color="emerald" label="Completion Rate"
+                        icon={TrendingUp} hex="#99C0CD" label="Completion Rate"
                         value={ratePercent}
                         subtext={kpi?.completion_rate ? `${kpi.completion_rate.completed} of ${kpi.completion_rate.total} completed` : undefined}
                     />
                     <StatCard
-                        icon={CheckCircle2} color="emerald" label="On-time Rate"
+                        icon={CheckCircle2} hex="#A085B4" label="On-time Rate"
                         value={onTimeRatePercent}
                         subtext={kpi?.on_time_rate ? `${kpi.on_time_rate.on_time} of ${kpi.on_time_rate.completed_with_date} completed tasks` : "Only counts tasks you've completed"}
                     />
                     <StatCard
-                        icon={Zap} color="amber" label="Avg Time / Task"
+                        icon={Zap} hex="#E2A4C0" label="Avg Time / Task"
                         value={productivityLabel}
                         subtext="Hours per completed task, all-time"
                     />
