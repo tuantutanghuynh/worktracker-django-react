@@ -236,6 +236,12 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
 
 
 class ManagerJobUpdateSerializer(serializers.ModelSerializer):
+    team_member_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = Job
         fields = [
@@ -243,6 +249,7 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
             "priority",  # ➕ BỔ SUNG: Cho phép sửa độ ưu tiên khi Edit Job
             "description",
             "deadline",
+            "team_member_ids",
         ]
 
     def validate(self, attrs):
@@ -289,6 +296,30 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                         )
                     }
                 )
+
+        team_member_ids = attrs.get("team_member_ids")
+        if team_member_ids is not None:
+            request = self.context.get("request")
+            manager_user = getattr(request, "user", None)
+            if manager_user:
+                from accounts.models import CustomUser
+                invalid_emps = list(
+                    CustomUser.objects.filter(id__in=team_member_ids)
+                    .exclude(
+                        role__code="EMPLOYEE",
+                        is_active=True,
+                        profile__manager=manager_user,
+                    )
+                    .values_list("id", flat=True)
+                )
+                if invalid_emps:
+                    raise serializers.ValidationError(
+                        {
+                            "team_member_ids": (
+                                f"Nhân viên có ID {invalid_emps} không thuộc quyền quản lý của bạn."
+                            )
+                        }
+                    )
 
         return attrs
 

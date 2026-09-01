@@ -277,6 +277,12 @@ export default function ManagerJobsPage() {
     if (e) e.stopPropagation();
     setDrawerMode('edit');
     setEditingJobId(job.id);
+
+    // Lấy danh sách ID thành viên đang tham gia dự án
+    const existingMemberIds = Array.isArray(job.project_team)
+      ? job.project_team.map((m) => m.id)
+      : [];
+
     setFormData({
       job_name: job.job_name || '',
       job_code: job.job_code || '',
@@ -286,6 +292,7 @@ export default function ManagerJobsPage() {
       deadline: job.deadline || '',
       priority: job.priority || 'MEDIUM',
       description: job.description || '',
+      initial_team_member_ids: existingMemberIds,
     });
     setIsDrawerOpen(true);
   };
@@ -345,6 +352,7 @@ export default function ManagerJobsPage() {
         priority: formData.priority,
         deadline: formData.deadline || undefined,
         description: formData.description.trim() || '',
+        team_member_ids: formData.initial_team_member_ids || [],
       };
 
       updateJobMutation.mutate(
@@ -982,25 +990,25 @@ const ALLOWED_TRANSITIONS = {
             />
           </div>
 
-          {drawerMode === 'create' && myTeamEmployees.length > 0 && (
+          {myTeamEmployees.length > 0 && (
             <div className="pt-2 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2">
-                <label className="block font-semibold text-slate-700 text-xs">
-                  Assign Team Members ({formData.initial_team_member_ids?.length || 0}/{myTeamEmployees.length})
+                <label className="block font-bold text-slate-700 text-xs">
+                  {drawerMode === 'create' ? 'Assign Team Members' : 'Manage Project Team'} ({formData.initial_team_member_ids?.length || 0}/{myTeamEmployees.length})
                 </label>
                 <div className="flex items-center gap-2 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, initial_team_member_ids: myTeamEmployees.map((e) => e.id) })}
-                    className="text-blue-600 hover:underline cursor-pointer"
+                    className="text-blue-600 hover:underline cursor-pointer font-medium"
                   >
                     Select All
                   </button>
-                  <span>•</span>
+                  <span className="text-slate-300">•</span>
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, initial_team_member_ids: [] })}
-                    className="text-slate-500 hover:underline cursor-pointer"
+                    className="text-slate-500 hover:underline cursor-pointer font-medium"
                   >
                     Deselect All
                   </button>

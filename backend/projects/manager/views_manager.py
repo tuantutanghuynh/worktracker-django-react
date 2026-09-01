@@ -239,11 +239,46 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
             instance=job,
             data=request.data,
             partial=True,
+            context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
+            team_member_ids = serializer.validated_data.pop("team_member_ids", None)
             updated_job = serializer.save()
+
+            if team_member_ids is not None:
+                from chat.models import ChatRoom, ChatParticipant
+                from accounts.models import CustomUser
+
+                room_name = f"#{updated_job.job_code or f'JOB-{updated_job.id}'}: {updated_job.job_name}"
+                room, _ = ChatRoom.objects.get_or_create(
+                    room_type=ChatRoom.RoomType.JOB,
+                    job=updated_job,
+                    defaults={"name": room_name},
+                )
+                ChatParticipant.objects.get_or_create(room=room, user=request.user)
+
+                # Cập nhật danh sách thành viên dự án
+                current_participants = ChatParticipant.objects.filter(
+                    room=room
+                ).exclude(user=request.user)
+
+                # Thêm thành viên mới
+                target_emps = CustomUser.objects.filter(
+                    id__in=team_member_ids,
+                    role__code="EMPLOYEE",
+                    is_active=True,
+                    profile__manager=request.user,
+                )
+                target_emp_ids = set(target_emps.values_list("id", flat=True))
+
+                # Xóa những thành viên bị bỏ chọn
+                current_participants.exclude(user_id__in=target_emp_ids).delete()
+
+                # Thêm mới những thành viên chưa có
+                for emp in target_emps:
+                    ChatParticipant.objects.get_or_create(room=room, user=emp)
 
             log_action(
                 user=request.user,
