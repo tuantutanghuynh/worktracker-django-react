@@ -4,6 +4,7 @@ import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { useProfile } from "../../hooks/queries/employee/useProfile"
 import { getErrorMessage } from "../../utils/errorMessages"
 import { describeDeadline, DEADLINE_TONE_STYLES } from "../../utils/deadline"
+import { isTaskFrozen } from "../../utils/taskFrozen"
 import EmployeeStatCard from "../../components/employee/EmployeeStatCard"
 import { DataTable } from "../../components/common/table/DataTable"
 import StatusBadge from "../../components/common/badges/StatusBadge"
@@ -79,7 +80,7 @@ export function DashboardPage() {
             header: "Job / Project",
             cell: (info) => {
                 const task = info.row.original
-                const isFrozen = (task.job_status && task.job_status !== "ACTIVE") || task.job_client_is_active === false
+                const isFrozen = isTaskFrozen(task)
                 return (
                     <div className="flex flex-col gap-0.5">
                         <span className="font-semibold text-slate-800 text-xs">{task.job_name || "—"}</span>
