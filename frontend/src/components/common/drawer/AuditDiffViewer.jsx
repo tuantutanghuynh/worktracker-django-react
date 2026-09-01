@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { 
-  FileDiff, 
-  ArrowRight, 
-  User, 
-  Globe, 
-  AlertTriangle, 
-  CheckCircle2, 
+import {
+  FileDiff,
+  ArrowRight,
+  User,
+  Globe,
+  AlertTriangle,
+  CheckCircle2,
   Info,
   Clock
 } from 'lucide-react';
@@ -21,6 +21,10 @@ import {
 /**
  * AuditDiffViewer - Audit Log Snapshot Comparison Component
  * Perfectly aligned 12-column grid layout with automatic date-fns ISO string formatting
+ *
+ * theme ('dark' | 'light'): visual theme, default 'dark' (original look,
+ * unchanged for every existing caller — Admin's AuditLogsPage). Pass
+ * 'light' to render on a white/light-card drawer (Employee's My Activity).
  */
 export default function AuditDiffViewer({
   oldValues = {},
@@ -31,9 +35,11 @@ export default function AuditDiffViewer({
   severity = 'NORMAL',
   ipAddress,
   summary,
+  theme = 'dark',
   className
 }) {
   const [showUnchanged, setShowUnchanged] = useState(false);
+  const isLight = theme === 'light';
 
   // Parse JSON string if necessary
   const parseData = (val) => {
@@ -71,11 +77,17 @@ export default function AuditDiffViewer({
 
   const filteredItems = diffItems.filter(item => showUnchanged || item.status !== 'unchanged');
 
-  const severityConfigs = {
-    CRITICAL: { label: 'Critical', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', icon: AlertTriangle },
-    WARNING: { label: 'Warning', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30', icon: Info },
-    NORMAL: { label: 'Normal', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', icon: CheckCircle2 },
-  };
+  const severityConfigs = isLight
+    ? {
+        CRITICAL: { label: 'Critical', bg: 'bg-rose-50 text-rose-600 border-rose-200', icon: AlertTriangle },
+        WARNING: { label: 'Warning', bg: 'bg-amber-50 text-amber-600 border-amber-200', icon: Info },
+        NORMAL: { label: 'Normal', bg: 'bg-emerald-50 text-emerald-600 border-emerald-200', icon: CheckCircle2 },
+      }
+    : {
+        CRITICAL: { label: 'Critical', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', icon: AlertTriangle },
+        WARNING: { label: 'Warning', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30', icon: Info },
+        NORMAL: { label: 'Normal', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', icon: CheckCircle2 },
+      };
 
   const currentSeverity = severityConfigs[severity] || severityConfigs.NORMAL;
   const SeverityIcon = currentSeverity.icon;
@@ -84,35 +96,41 @@ export default function AuditDiffViewer({
   // chữ thường hoa đầu, ISO datetime -> giờ + ngày, object -> liệt kê gọn.
   const renderValue = (key, val) => {
     const formatted = formatAuditValue(key, val);
-    if (formatted === null) return <span className="text-slate-500 italic">Not set</span>;
+    if (formatted === null) return <span className={cn('italic', isLight ? 'text-slate-400' : 'text-slate-500')}>Not set</span>;
     return formatted;
   };
 
-  const formattedDate = timestamp 
+  const formattedDate = timestamp
     ? format(new Date(timestamp), 'HH:mm - yyyy-MM-dd')
     : 'Recently';
 
   return (
-    <div className={cn("bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5 text-slate-100", className)}>
+    <div
+      className={cn(
+        'border rounded-xl p-5 space-y-5',
+        isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100',
+        className
+      )}
+    >
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className={cn('flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b', isLight ? 'border-slate-100' : 'border-slate-800')}>
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-400">
+            <div className={cn('p-2 rounded-lg border', isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400')}>
               <FileDiff className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-100 tracking-tight">
+                <h3 className={cn('text-base font-bold tracking-tight', isLight ? 'text-slate-900' : 'text-slate-100')}>
                   {getActionLabel(action)}
                 </h3>
-                <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full border", currentSeverity.bg)}>
+                <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full border', currentSeverity.bg)}>
                   <SeverityIcon className="w-3.5 h-3.5" />
                   {currentSeverity.label}
                 </span>
               </div>
               {summary && (
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className={cn('text-xs mt-0.5', isLight ? 'text-slate-500' : 'text-slate-400')}>
                   {summary}
                 </p>
               )}
@@ -125,7 +143,12 @@ export default function AuditDiffViewer({
           <button
             type="button"
             onClick={() => setShowUnchanged(!showUnchanged)}
-            className="text-xs px-3.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-semibold transition-colors cursor-pointer"
+            className={cn(
+              'text-xs px-3.5 py-1.5 rounded-lg border font-semibold transition-colors cursor-pointer',
+              isLight
+                ? 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600'
+                : 'border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300'
+            )}
           >
             {showUnchanged ? 'Hide Unchanged Fields' : 'Show All Fields'}
           </button>
@@ -133,80 +156,106 @@ export default function AuditDiffViewer({
       </div>
 
       {/* 3 Metadata Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80 text-xs">
+      <div className={cn(
+        'grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl border text-xs',
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/70 border-slate-800/80'
+      )}>
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-            <User className="w-3.5 h-3.5 text-indigo-400" /> Changed By
+          <span className={cn('font-medium flex items-center gap-1.5 text-[11px]', isLight ? 'text-slate-500' : 'text-slate-400')}>
+            <User className={cn('w-3.5 h-3.5', isLight ? 'text-indigo-500' : 'text-indigo-400')} /> Changed By
           </span>
-          <p className="font-bold text-slate-100 truncate">
+          <p className={cn('font-bold truncate', isLight ? 'text-slate-900' : 'text-slate-100')}>
             {user?.full_name || user?.email || 'System User'}
           </p>
         </div>
 
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-            <Clock className="w-3.5 h-3.5 text-emerald-400" /> Date &amp; Time
+          <span className={cn('font-medium flex items-center gap-1.5 text-[11px]', isLight ? 'text-slate-500' : 'text-slate-400')}>
+            <Clock className={cn('w-3.5 h-3.5', isLight ? 'text-emerald-500' : 'text-emerald-400')} /> Date &amp; Time
           </span>
-          <p className="font-semibold text-slate-200">
+          <p className={cn('font-semibold', isLight ? 'text-slate-800' : 'text-slate-200')}>
             {formattedDate}
           </p>
         </div>
 
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-            <Globe className="w-3.5 h-3.5 text-purple-400" /> Access IP
+          <span className={cn('font-medium flex items-center gap-1.5 text-[11px]', isLight ? 'text-slate-500' : 'text-slate-400')}>
+            <Globe className={cn('w-3.5 h-3.5', isLight ? 'text-purple-500' : 'text-purple-400')} /> Access IP
           </span>
-          <p className="font-mono text-slate-300 truncate">
+          <p className={cn('font-mono truncate', isLight ? 'text-slate-600' : 'text-slate-300')}>
             {ipAddress || 'Internal / Celery'}
           </p>
         </div>
       </div>
 
       {/* Comparison Diff Table (Synchronized 12-Column Grid Header & Body) */}
-      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40">
+      <div className={cn('border rounded-xl overflow-hidden', isLight ? 'border-slate-200 bg-white' : 'border-slate-800 bg-slate-950/40')}>
         {/* Table Header: Exactly matching 12-column grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-800/90 px-3.5 py-3 border-b border-slate-800 text-xs font-bold items-center">
-          <div className="md:col-span-4 text-slate-200">Field Changed</div>
-          <div className="md:col-span-4 text-rose-400">Before Change (Old)</div>
-          <div className="hidden md:block md:col-span-1 text-center text-slate-500">➔</div>
-          <div className="md:col-span-3 text-emerald-400">After Change (New)</div>
+        <div className={cn(
+          'grid grid-cols-1 md:grid-cols-12 gap-3 px-3.5 py-3 border-b text-xs font-bold items-center',
+          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/90 border-slate-800'
+        )}>
+          <div className={cn('md:col-span-4', isLight ? 'text-slate-700' : 'text-slate-200')}>Field Changed</div>
+          <div className={isLight ? 'md:col-span-4 text-rose-600' : 'md:col-span-4 text-rose-400'}>Before Change (Old)</div>
+          <div className={cn('hidden md:block md:col-span-1 text-center', isLight ? 'text-slate-400' : 'text-slate-500')}>➔</div>
+          <div className={isLight ? 'md:col-span-3 text-emerald-600' : 'md:col-span-3 text-emerald-400'}>After Change (New)</div>
         </div>
 
         {/* Table Body: Exactly matching 12-column grid */}
         {filteredItems.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500">
+          <div className={cn('p-8 text-center text-xs', isLight ? 'text-slate-400' : 'text-slate-500')}>
             No data changes recorded or all fields are identical.
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60 text-xs">
+          <div className={cn('divide-y text-xs', isLight ? 'divide-slate-100' : 'divide-slate-800/60')}>
             {filteredItems.map(({ key, oldVal, newVal, status }) => {
-              const statusBg = {
-                modified: 'bg-amber-500/5 hover:bg-amber-500/10',
-                added: 'bg-emerald-500/5 hover:bg-emerald-500/10',
-                removed: 'bg-rose-500/5 hover:bg-rose-500/10',
-                unchanged: 'hover:bg-slate-800/40',
-              }[status];
+              const statusBg = isLight
+                ? {
+                    modified: 'bg-amber-50/60 hover:bg-amber-50',
+                    added: 'bg-emerald-50/60 hover:bg-emerald-50',
+                    removed: 'bg-rose-50/60 hover:bg-rose-50',
+                    unchanged: 'hover:bg-slate-50',
+                  }[status]
+                : {
+                    modified: 'bg-amber-500/5 hover:bg-amber-500/10',
+                    added: 'bg-emerald-500/5 hover:bg-emerald-500/10',
+                    removed: 'bg-rose-500/5 hover:bg-rose-500/10',
+                    unchanged: 'hover:bg-slate-800/40',
+                  }[status];
 
               // Field không đổi thì 2 ô hiện trung tính (không đỏ/gạch
               // ngang, không xanh) — tô màu "đã xóa / đã thêm" cho giá trị
               // y hệt nhau khiến người đọc tưởng có thay đổi.
               const isUnchanged = status === 'unchanged';
-              const oldCellClass = isUnchanged
-                ? 'bg-slate-800/30 border-slate-700/40 text-slate-400'
-                : 'bg-rose-950/30 border-rose-900/40 text-rose-300/90 line-through';
-              const newCellClass = isUnchanged
-                ? 'bg-slate-800/30 border-slate-700/40 text-slate-300'
-                : 'bg-emerald-950/30 border-emerald-900/40 text-emerald-300';
+              const oldCellClass = isLight
+                ? (isUnchanged ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-rose-50 border-rose-200 text-rose-500 line-through')
+                : (isUnchanged ? 'bg-slate-800/30 border-slate-700/40 text-slate-400' : 'bg-rose-950/30 border-rose-900/40 text-rose-300/90 line-through');
+              const newCellClass = isLight
+                ? (isUnchanged ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700')
+                : (isUnchanged ? 'bg-slate-800/30 border-slate-700/40 text-slate-300' : 'bg-emerald-950/30 border-emerald-900/40 text-emerald-300');
+              const badgeClass = isLight
+                ? {
+                    modified: 'bg-amber-100 text-amber-700',
+                    added: 'bg-emerald-100 text-emerald-700',
+                    removed: 'bg-rose-100 text-rose-700',
+                    unchanged: 'bg-slate-100 text-slate-500',
+                  }
+                : {
+                    modified: 'bg-amber-500/20 text-amber-300',
+                    added: 'bg-emerald-500/20 text-emerald-300',
+                    removed: 'bg-rose-500/20 text-rose-300',
+                    unchanged: 'bg-slate-700/50 text-slate-400',
+                  };
 
               return (
                 <div key={key} className={cn("grid grid-cols-1 md:grid-cols-12 gap-3 p-3.5 items-center transition-colors", statusBg)}>
                   {/* Key Name Column (col-span-4) */}
                   <div className="md:col-span-4 flex items-center gap-2 font-sans">
-                    <span className="font-bold text-slate-200">{getFieldLabel(key)}</span>
-                    {status === 'modified' && <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 font-bold rounded">Modified</span>}
-                    {status === 'added' && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 font-bold rounded">Added</span>}
-                    {status === 'removed' && <span className="px-1.5 py-0.5 text-[10px] bg-rose-500/20 text-rose-300 font-bold rounded">Removed</span>}
-                    {isUnchanged && <span className="px-1.5 py-0.5 text-[10px] bg-slate-700/50 text-slate-400 font-bold rounded">Unchanged</span>}
+                    <span className={cn('font-bold', isLight ? 'text-slate-800' : 'text-slate-200')}>{getFieldLabel(key)}</span>
+                    {status === 'modified' && <span className={cn('px-1.5 py-0.5 text-[10px] font-bold rounded', badgeClass.modified)}>Modified</span>}
+                    {status === 'added' && <span className={cn('px-1.5 py-0.5 text-[10px] font-bold rounded', badgeClass.added)}>Added</span>}
+                    {status === 'removed' && <span className={cn('px-1.5 py-0.5 text-[10px] font-bold rounded', badgeClass.removed)}>Removed</span>}
+                    {isUnchanged && <span className={cn('px-1.5 py-0.5 text-[10px] font-bold rounded', badgeClass.unchanged)}>Unchanged</span>}
                   </div>
 
                   {/* Old Value Column (col-span-4) */}
@@ -216,7 +265,7 @@ export default function AuditDiffViewer({
 
                   {/* Arrow Column (col-span-1) */}
                   <div className="hidden md:flex md:col-span-1 justify-center">
-                    <ArrowRight className={cn('w-4 h-4', isUnchanged ? 'text-slate-700' : 'text-slate-400')} />
+                    <ArrowRight className={cn('w-4 h-4', isUnchanged ? (isLight ? 'text-slate-300' : 'text-slate-700') : (isLight ? 'text-slate-500' : 'text-slate-400'))} />
                   </div>
 
                   {/* New Value Column (col-span-3) */}

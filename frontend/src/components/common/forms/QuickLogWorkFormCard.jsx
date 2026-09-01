@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Clock,
   Send,
@@ -46,16 +46,19 @@ export default function QuickLogWorkFormCard({
     return true;
   });
 
-  // Tự động chọn task hợp lệ đầu tiên nếu task đang chọn bị đóng băng/vô hiệu hóa
-  useEffect(() => {
-    if (defaultTaskId && eligibleTasks.some(t => String(t.id) === String(defaultTaskId))) {
-      setTaskId(String(defaultTaskId));
-    } else if (eligibleTasks.length > 0 && (!taskId || !eligibleTasks.some(t => String(t.id) === String(taskId)))) {
-      setTaskId(String(eligibleTasks[0].id));
-    } else if (eligibleTasks.length === 0) {
-      setTaskId('');
-    }
-  }, [defaultTaskId, eligibleTasks]);
+  // Task thật sự dùng để submit/hiển thị — tính trực tiếp lúc render thay vì
+  // "sửa lại" state qua useEffect (dễ dính cascading render, và ESLint
+  // react-hooks/set-state-in-effect đã cảnh báo đúng chỗ này). Ưu tiên lựa
+  // chọn tường minh của user (taskId) nếu còn hợp lệ; nếu không thì fallback
+  // về defaultTaskId, rồi tới task hợp lệ đầu tiên — tự động chọn lại nếu
+  // task đang chọn vừa bị đóng băng/vô hiệu hóa.
+  const resolvedTaskId = (taskId && eligibleTasks.some(t => String(t.id) === String(taskId)))
+    ? String(taskId)
+    : (defaultTaskId && eligibleTasks.some(t => String(t.id) === String(defaultTaskId)))
+      ? String(defaultTaskId)
+      : eligibleTasks[0]
+        ? String(eligibleTasks[0].id)
+        : '';
 
   const taskOptions = eligibleTasks.map(t => ({
     value: String(t.id),
@@ -71,7 +74,7 @@ export default function QuickLogWorkFormCard({
 
   const validate = () => {
     const newErrors = {};
-    if (!taskId) newErrors.taskId = 'Please select a task';
+    if (!resolvedTaskId) newErrors.taskId = 'Please select a task';
     if (!workDate) newErrors.workDate = 'Please select a work date';
     
     const h = Number(hoursSpent);
@@ -93,7 +96,7 @@ export default function QuickLogWorkFormCard({
 
     if (onSubmit) {
       await onSubmit({
-        task_id: taskId,
+        task_id: resolvedTaskId,
         work_date: workDate,
         hours_spent: parseFloat(hoursSpent),
         description: description.trim(),
@@ -103,41 +106,40 @@ export default function QuickLogWorkFormCard({
     }
   };
 
+  const todayPct = Math.min(Math.round((Number(dailyHoursLogged) / MAX_DAILY_LIMIT) * 100), 100);
+
   return (
-    <div className={cn("bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm space-y-5 text-slate-800", className)}>
+    <div className={cn("bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm space-y-4 text-slate-800", className)}>
       {/* Form Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-blue-50 border border-blue-100 rounded-lg text-blue-600">
             <Clock className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Quick Log Work Entry</h3>
-            <p className="text-xs text-slate-500">Record daily work log entries</p>
-          </div>
+          <h3 className="text-sm font-bold text-slate-900">Log Work</h3>
         </div>
 
-        {/* Daily Total Progress Pill */}
-        <div className={cn(
-          "px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5",
-          isOverLimit
-            ? "bg-rose-50 text-rose-600 border-rose-200"
-            : "bg-slate-50 text-slate-600 border-slate-200"
-        )}>
-          <span>Logged Today:</span>
-          <strong className={isOverLimit ? "text-rose-600" : "text-emerald-600"}>
-            {dailyHoursLogged}h / 8.0h
-          </strong>
+        {/* Today progress — số + thanh %, thay cho pill chữ thuần trước đây */}
+        <div className="text-right w-32">
+          <p className={cn("text-xs font-bold", isOverLimit ? "text-rose-600" : "text-slate-700")}>
+            Today: {dailyHoursLogged}h / {MAX_DAILY_LIMIT}h
+          </p>
+          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+            <div
+              className={cn("h-full rounded-full transition-all", isOverLimit ? "bg-rose-500" : "bg-blue-500")}
+              style={{ width: `${todayPct}%` }}
+            />
+          </div>
         </div>
       </div>
 
       {/* Form Body */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* Task Selection Dropdown */}
         <SelectDropdown
           label="Select Task"
           options={taskOptions}
-          value={taskId}
+          value={resolvedTaskId}
           onChange={(val) => {
             setTaskId(val);
             setErrors(prev => ({ ...prev, taskId: null }));
@@ -151,7 +153,7 @@ export default function QuickLogWorkFormCard({
         />
 
         {/* Date and Hours Input Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <InputField
             label="Work Date"
             type="date"
@@ -182,7 +184,7 @@ export default function QuickLogWorkFormCard({
             {/* Quick Add Presets Buttons */}
             <div className="flex items-center gap-1.5 pt-1">
               <span className="text-[11px] text-slate-500 mr-1">Quick Add:</span>
-              {[1, 2, 4, 8].map((h) => (
+              {[0.5, 1, 2, 4, 8].map((h) => (
                 <button
                   key={h}
                   type="button"
@@ -199,14 +201,14 @@ export default function QuickLogWorkFormCard({
         {/* Work Description Textarea */}
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-slate-600">
-            Work Log Description
+            Description
           </label>
           <textarea
-            rows={3}
+            rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe work completed during this period..."
-            className="w-full bg-white border border-slate-200 rounded-lg p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+            placeholder="What did you work on?"
+            className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
           />
         </div>
 
@@ -240,7 +242,7 @@ export default function QuickLogWorkFormCard({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Submit Work Log
+                Log Work
               </>
             )}
           </button>

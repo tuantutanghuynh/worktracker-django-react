@@ -36,7 +36,7 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'status', 'priority',
             'deadline', 'order_index', 'job_id', 'job_code', 'job_name',
             'job_status', 'job_client_is_active', 'job_client_name',
-            'manager_name', 'created_at', 'completed_at'
+            'manager_name', 'created_at', 'updated_at', 'completed_at'
         ]
 
         

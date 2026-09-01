@@ -17,7 +17,14 @@ from timesheets.models import DailyUserTimesheet
 
 
 def make_employee_with_task():
-    """Tạo 1 Employee có quyền timesheet:create và 1 Task được giao cho họ."""
+    """Tạo 1 Employee có quyền timesheet:create và 1 Task được giao cho họ,
+    thuộc 1 Job đang ACTIVE. Job.status mặc định là PLANNING (không phải
+    ACTIVE) — từ khi nhánh LongNguyen thêm guard "chặn log work nếu
+    job.status != ACTIVE" (EmployeeLogWorkSerializer.validate_task()),
+    phải set rõ status="ACTIVE" ở đây, nếu không mọi log work test đều bị
+    400 dù không liên quan gì tới hành vi đang test."""
+    from projects.models import Job
+
     role = baker.make("accounts.Role", code="EMPLOYEE")
     perm, _ = Permission.objects.get_or_create(
         code="timesheet:create", defaults={"name": "timesheet:create"}
@@ -30,7 +37,8 @@ def make_employee_with_task():
         is_active=True,
         must_change_password=False,  # tránh bug fixture must_change_password đã báo team
     )
-    task = baker.make("tasks.Task", assignee=employee)
+    job = baker.make("projects.Job", status=Job.Status.ACTIVE)
+    task = baker.make("tasks.Task", assignee=employee, job=job)
     return employee, task
 
 

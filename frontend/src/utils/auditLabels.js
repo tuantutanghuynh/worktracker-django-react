@@ -35,10 +35,35 @@ export const ACTION_LABELS = {
   UNLOCK_ACCOUNT: 'Unlocked account',
   ROLE_CHANGED: 'Changed role',
   RESET_PASSWORD: 'Reset password',
+  CHANGE_PASSWORD: 'Changed password',
   ASSIGN_ROLE: 'Updated permissions',
   EXPORT: 'Exported report',
+  REPORT_EXPORTED: 'Exported report',
   LOCK_TIMESHEET: 'Locked timesheet period',
   UNLOCK_TIMESHEET: 'Unlocked timesheet period',
+  CREATE_JOB: 'Created project',
+  UPDATE_JOB: 'Updated project',
+  UPDATE_JOB_STATUS: 'Changed project status',
+  // Task lifecycle (tasks/services/task_manager_service.py,
+  // task_transition_manager_service.py) — trước đây leak thẳng action code
+  // lên UI Employee vì trang đó chưa dùng auditLabels.js.
+  CREATE_TASK: 'Created task',
+  UPDATE_TASK: 'Updated task',
+  UPDATE_TASK_STATUS: 'Changed task status',
+  REORDER_TASK: 'Reordered task',
+  UPLOAD_TASK_ATTACHMENT: 'Uploaded attachment',
+  APPROVE_TASK: 'Approved task',
+  REJECT_TASK: 'Rejected task',
+  CANCEL_TASK: 'Cancelled task',
+  RESTORE_TASK: 'Restored task',
+  AUTO_RELEASE_EMPLOYEE: 'Released from project',
+  // Log work lifecycle (timesheets/employee/, timesheets/services/logwork_review_manager_service.py)
+  CREATE_LOG_WORK: 'Created work log',
+  EDIT_LOG_WORK: 'Edited work log',
+  VOID_LOG_WORK: 'Voided work log',
+  APPROVE_LOG_WORK: 'Approved work log',
+  REJECT_LOG_WORK: 'Rejected work log',
+  CORRECT_LOG_WORK: 'Corrected work log',
 };
 
 // Tên cột trong DB -> nhãn hiển thị
@@ -203,6 +228,43 @@ export function summarizeLog(log) {
       return `Locked timesheet period${ref}`;
     case 'UNLOCK_TIMESHEET':
       return `Unlocked timesheet period${ref}`;
+    // Task status transitions — cùng 1 hình dạng old.status -> new.status
+    // cho mọi action đổi trạng thái Task (apply_transition() luôn ghi
+    // {status: locked_task.status} vào new_values, và snapshot() cũ vào
+    // old_values trước khi đổi).
+    case 'UPDATE_TASK_STATUS':
+    case 'APPROVE_TASK':
+    case 'REJECT_TASK':
+    case 'CANCEL_TASK':
+    case 'RESTORE_TASK': {
+      const from = log.old_values?.status;
+      const to = log.new_values?.status;
+      if (from && to) return `${formatAuditValue('status', from)} → ${formatAuditValue('status', to)}`;
+      return `${getActionLabel(log.action)}${ref}`;
+    }
+    case 'CREATE_LOG_WORK': {
+      const hours = log.new_values?.hours_spent;
+      return hours ? `Logged ${hours}h` : `Created work log${ref}`;
+    }
+    case 'EDIT_LOG_WORK': {
+      const fromHours = log.old_values?.hours_spent;
+      const toHours = log.new_values?.hours_spent;
+      // Backend serialize không nhất quán kiểu dữ liệu (cũ ra string
+      // '0.50', mới ra number 0.75) — so bằng Number() để không báo nhầm
+      // "đã đổi" khi giá trị thật giống nhau, chỉ khác kiểu.
+      if (fromHours != null && toHours != null && Number(fromHours) !== Number(toHours)) {
+        return `${fromHours}h → ${toHours}h`;
+      }
+      return `Edited work log${ref}`;
+    }
+    case 'VOID_LOG_WORK': {
+      const reason = log.new_values?.adjustment_reason;
+      return reason ? `Voided · "${reason}"` : `Voided work log${ref}`;
+    }
+    case 'REJECT_LOG_WORK': {
+      const reason = log.new_values?.review_note;
+      return reason ? `Rejected · "${reason}"` : `Rejected work log${ref}`;
+    }
     default:
       return `${getActionLabel(log.action)} · ${moduleLabel}${ref}`;
   }

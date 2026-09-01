@@ -1,19 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "sonner"
 import { AppRouter } from "./router/AppRouter"
-
-// Shared React Query client — required by hooks/queries/** (e.g.
-// useManagerJobs, used inside Sidebar). refetchOnWindowFocus off so
-// switching tabs doesn't re-trigger every query; retry: 1 keeps failed
-// requests from hammering the API.
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            refetchOnWindowFocus: false,
-            retry: 1,
-        },
-    },
-})
+import { queryClient } from "./lib/queryClient"
 
 // App entry component — intentionally just renders the router. All real
 // logic lives in router/, hooks/, stores/, and api/, not here.
