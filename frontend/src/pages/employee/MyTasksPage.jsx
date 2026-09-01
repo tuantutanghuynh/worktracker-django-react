@@ -12,6 +12,7 @@ import PromptReasonModal from "../../components/common/modal/PromptReasonModal"
 import EditLogWorkModal from "../../components/employee/EditLogWorkModal"
 import StatCard from "../../components/common/cards/StatCard"
 import { useRecentTasksStore } from "../../stores/useRecentTasksStore"
+import { describeDeadline, DEADLINE_TONE_STYLES } from "../../utils/deadline"
 
 // "Due Soon" = còn mở (chưa Completed/Cancelled), có deadline, còn 0-3
 // ngày nữa tới hạn — CHƯA quá hạn (đã quá hạn thì đây là "overdue",
@@ -42,22 +43,6 @@ const LOG_STATUS_STYLES = {
     VOIDED: "bg-slate-100 text-slate-500 border-slate-200",
 }
 
-// "Aug 22, 2026" + "9 days overdue" / "Due in 3 days" / "Due today" — thuần
-// client-side từ deadline đã có sẵn, không cần API mới.
-function describeDeadline(deadline) {
-    if (!deadline) return null
-    const days = differenceInCalendarDays(parseISO(deadline), new Date())
-    const label = format(parseISO(deadline), "MMM d, yyyy")
-    if (days < 0) return { label, relative: `${Math.abs(days)} day${days !== -1 ? "s" : ""} overdue`, tone: "overdue" }
-    if (days === 0) return { label, relative: "Due today", tone: "today" }
-    return { label, relative: `Due in ${days} day${days !== 1 ? "s" : ""}`, tone: "upcoming" }
-}
-
-const DEADLINE_TONE_STYLES = {
-    overdue: "text-rose-600",
-    today: "text-amber-600",
-    upcoming: "text-slate-400",
-}
 
 // 1 task được coi là "frozen" (đông cứng) khi dự án của nó không còn ACTIVE
 // (vd. ON_HOLD, CANCELLED...) hoặc Client của dự án đã bị Admin vô hiệu hóa —
