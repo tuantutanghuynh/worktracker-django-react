@@ -52,6 +52,8 @@ export function MyTasksPage() {
     const [priorityValue, setPriorityValue] = useState("")
     const [projectValue, setProjectValue] = useState("")
     const [sorting, setSorting] = useState({ key: null, direction: null })
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
     const [selectedTask, setSelectedTask] = useState(null)
     const [submittingTask, setSubmittingTask] = useState(null)
     const [recallingTask, setRecallingTask] = useState(null)
@@ -121,11 +123,19 @@ export function MyTasksPage() {
         return result
     }, [tabTasks, searchQuery, statusValue, priorityValue, projectValue, sorting])
 
+    const totalItems = filteredTasks.length
+    const totalPages = Math.ceil(totalItems / pageSize) || 1
+    const paginatedTasks = useMemo(() => {
+        const start = (currentPage - 1) * pageSize
+        return filteredTasks.slice(start, start + pageSize)
+    }, [filteredTasks, currentPage, pageSize])
+
     function handleClearFilters() {
         setSearchQuery("")
         setStatusValue("")
         setPriorityValue("")
         setProjectValue("")
+        setCurrentPage(1)
     }
 
     async function handleStartTask(task) {
@@ -360,12 +370,24 @@ export function MyTasksPage() {
 
             <DataTable
                 columns={columns}
-                data={filteredTasks}
+                data={paginatedTasks}
                 isLoading={loading}
                 emptyMessage={activeTab === "frozen" ? "No frozen tasks — nothing is currently blocked." : "No tasks assigned yet."}
                 onRowClick={(task) => { setSelectedTask(task); addRecentTask(task) }}
                 sorting={sorting}
                 onSortChange={handleSortChange}
+                pagination={{
+                    currentPage,
+                    totalPages,
+                    totalItems,
+                    pageSize,
+                    pageSizeOptions: [10, 25, 50],
+                    onPageChange: setCurrentPage,
+                    onPageSizeChange: (size) => {
+                        setPageSize(size)
+                        setCurrentPage(1)
+                    },
+                }}
             />
 
             <TaskDrawerContent

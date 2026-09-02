@@ -191,7 +191,13 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
                     profile__manager=request.user,
                 )
                 for emp in employees:
-                    ChatParticipant.objects.get_or_create(room=room, user=emp)
+                    _, created = ChatParticipant.objects.get_or_create(room=room, user=emp)
+                    if created:
+                        try:
+                            from tasks.services.task_email_service import send_project_team_added_email
+                            send_project_team_added_email(job, emp, request=request)
+                        except Exception:
+                            pass
 
             log_action(
                 user=request.user,
@@ -278,7 +284,13 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
 
                 # Thêm mới những thành viên chưa có
                 for emp in target_emps:
-                    ChatParticipant.objects.get_or_create(room=room, user=emp)
+                    _, created = ChatParticipant.objects.get_or_create(room=room, user=emp)
+                    if created:
+                        try:
+                            from tasks.services.task_email_service import send_project_team_added_email
+                            send_project_team_added_email(updated_job, emp, request=request)
+                        except Exception:
+                            pass
 
             log_action(
                 user=request.user,

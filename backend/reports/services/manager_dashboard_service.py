@@ -79,25 +79,56 @@ def build_task_metrics_summary(user):
     return status_summary, overdue_summary
 
 
-def build_team_total_hours(user, month, year):
+def build_team_hours_summary(user, month, year):
     """
-    Tổng giờ log work trong tháng/năm.
-
-    VOIDED không tính vào dashboard.
+    Thống kê tổng hợp giờ làm việc của team: Tổng giờ, Giờ đã duyệt (Approved),
+    Giờ chờ duyệt (Pending), Giờ bị từ chối (Rejected).
     """
     start_date, end_date = get_month_range(month, year)
 
-    total = (
+    qs = (
         scoped_logworks(user)
         .exclude(review_status=LogWork.ReviewStatus.VOIDED)
         .filter(
             work_date__gte=start_date,
             work_date__lte=end_date,
         )
-        .aggregate(total_hours=Sum("hours_spent"))
-    )["total_hours"]
+    )
 
-    return decimal_to_float(total)
+    result = qs.aggregate(
+        total_hours=Sum("hours_spent"),
+        approved_hours=Sum("hours_spent", filter=Q(review_status=LogWork.ReviewStatus.APPROVED)),
+        pending_hours=Sum("hours_spent", filter=Q(review_status=LogWork.ReviewStatus.PENDING)),
+        rejected_hours=Sum("hours_spent", filter=Q(review_status=LogWork.ReviewStatus.REJECTED)),
+    )
+
+    return {
+        "team_total_hours": decimal_to_float(result["total_hours"]),
+        "team_approved_hours": decimal_to_float(result["approved_hours"]),
+        "team_pending_hours": decimal_to_float(result["pending_hours"]),
+        "team_rejected_hours": decimal_to_float(result["rejected_hours"]),
+    }
+
+
+def build_team_total_hours(user, month, year):
+    """
+    Tổng giờ log work trong tháng/năm.
+    VOIDED không tính vào dashboard.
+    """
+    return build_team_hours_summary(user, month, year)["team_total_hours"]
+
+
+def build_pending_timesheets_count(user):
+    """
+    Đếm số ngày công (user_id, work_date) đang chờ duyệt của Manager.
+    """
+    return (
+        scoped_logworks(user)
+        .filter(review_status=LogWork.ReviewStatus.PENDING)
+        .values("user_id", "work_date")
+        .distinct()
+        .count()
+    )
 
 
 def build_workload_per_employee(user, month, year):
@@ -258,6 +289,8 @@ def build_dashboard(user, month, year):
     """
     managed_jobs_count = scoped_jobs(user).count()
     status_summary, overdue_task_rate = build_task_metrics_summary(user)
+    hours_summary = build_team_hours_summary(user, month, year)
+    pending_timesheets_count = build_pending_timesheets_count(user)
 
     return {
         "month": month,
@@ -265,7 +298,11 @@ def build_dashboard(user, month, year):
         "managed_jobs_count": managed_jobs_count,
         "task_status_summary": status_summary,
         "overdue_task_rate": overdue_task_rate,
-        "team_total_hours": build_team_total_hours(user, month, year),
+        "team_total_hours": hours_summary["team_total_hours"],
+        "team_approved_hours": hours_summary["team_approved_hours"],
+        "team_pending_hours": hours_summary["team_pending_hours"],
+        "team_rejected_hours": hours_summary["team_rejected_hours"],
+        "pending_timesheets_count": pending_timesheets_count,
         "workload_per_employee": build_workload_per_employee(
             user,
             month,

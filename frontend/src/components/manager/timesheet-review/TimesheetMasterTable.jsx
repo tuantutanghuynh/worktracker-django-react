@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search as SearchIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import UserAvatar from '../../common/avatar/UserAvatar';
+import PaginationBar from '../../common/table/PaginationBar';
 import { cn } from '../../../utils/cn';
 
 function formatDateSafe(dateStr, pattern = 'dd MMM yyyy') {
@@ -26,10 +27,23 @@ export default function TimesheetMasterTable({
   selectedStatus = 'PENDING',
   onStatusChange,
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedJobId, selectedStatus]);
+
+  const totalItems = filteredDays.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedDays = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredDays.slice(start, start + pageSize);
+  }, [filteredDays, currentPage, pageSize]);
   return (
     <section className="w-[48%] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden min-h-0">
       {/* Filter Toolbar */}
-      <div className="p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
+      <div className="p-2.5 border-b border-slate-200 bg-white space-y-2 shrink-0">
         <div className="flex items-center gap-2 text-xs">
           <div className="relative flex-1 min-w-0">
             <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
@@ -68,7 +82,7 @@ export default function TimesheetMasterTable({
       </div>
 
       {/* MASTER TABLE: 4 CLEAN COLUMNS (EMPLOYEE, WORK DATE, TOTAL HOURS, STATUS) */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0 flex flex-col">
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -78,17 +92,22 @@ export default function TimesheetMasterTable({
             No timesheet logs found for this filter.
           </div>
         ) : (
-          <table className="w-full text-left text-sm table-fixed">
+          <table
+            className={cn(
+              "w-full text-left text-sm table-fixed",
+              paginatedDays.length >= 8 && "h-full"
+            )}
+          >
             <thead className="bg-slate-50/90 text-slate-600 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xs">
               <tr>
-                <th className="py-2.5 px-3.5 w-[36%]">EMPLOYEE</th>
-                <th className="py-2.5 px-3 w-[28%]">WORK DATE</th>
-                <th className="py-2.5 px-2 w-[18%] text-center">TOTAL HOURS</th>
-                <th className="py-2.5 px-3 w-[18%] text-center">STATUS</th>
+                <th className="py-2 px-3.5 w-[36%]">EMPLOYEE</th>
+                <th className="py-2 px-3 w-[28%]">WORK DATE</th>
+                <th className="py-2 px-2 w-[18%] text-center">TOTAL HOURS</th>
+                <th className="py-2 px-3 w-[18%] text-center">STATUS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredDays.map((dayGroup) => {
+              {paginatedDays.map((dayGroup) => {
                 const isSelected = dayGroup.key === selectedDayKey;
                 const overallStatus = dayGroup.hasPending
                   ? 'PENDING'
@@ -107,7 +126,7 @@ export default function TimesheetMasterTable({
                         : 'hover:bg-slate-50 border-l-4 border-transparent'
                     )}
                   >
-                    <td className="py-2.5 px-3.5">
+                    <td className="py-1.5 px-3.5">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <UserAvatar
                           avatarUrl={dayGroup.user?.avatar_url || dayGroup.user?.employee_profile?.avatar_url}
@@ -122,15 +141,15 @@ export default function TimesheetMasterTable({
                         </div>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-800 text-xs whitespace-nowrap">
+                    <td className="py-1.5 px-3 font-mono font-bold text-slate-800 text-xs whitespace-nowrap">
                       {formatDateSafe(dayGroup.work_date)}
                     </td>
-                    <td className="py-2.5 px-2 text-center">
+                    <td className="py-1.5 px-2 text-center">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 font-mono font-extrabold text-xs shadow-2xs">
                         {dayGroup.total_hours.toFixed(1)} hrs
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-1.5 px-3 text-center">
                       <span
                         className={cn(
                           'inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase whitespace-nowrap',
@@ -152,11 +171,22 @@ export default function TimesheetMasterTable({
         )}
       </div>
 
-      {/* Table Footer */}
-      <div className="p-2.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
-        <span>Showing {filteredDays.length} daily timesheet records</span>
-        <span className="font-semibold text-slate-700">Click any row to inspect</span>
-      </div>
+      {/* Pagination Bar */}
+      {totalItems > 0 && (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 25, 50]}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          className="border-t border-slate-200 shrink-0 py-2"
+        />
+      )}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -21,6 +21,17 @@ export default function JobTimesheetsTab({
   timesheetsLoading = false,
 }) {
   const navigate = useNavigate();
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const totalItems = timesheetsList.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+  const paginatedTimesheets = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return timesheetsList.slice(start, start + pageSize);
+  }, [timesheetsList, currentPage, pageSize]);
 
   const timesheetColumns = [
     {
@@ -153,9 +164,21 @@ export default function JobTimesheetsTab({
 
         <DataTable
           columns={timesheetColumns}
-          data={timesheetsList}
+          data={paginatedTimesheets}
           isLoading={timesheetsLoading}
           emptyMessage="No work logs have been submitted for this project yet."
+          pagination={{
+            currentPage,
+            totalPages,
+            totalItems,
+            pageSize,
+            pageSizeOptions: [10, 25, 50],
+            onPageChange: setCurrentPage,
+            onPageSizeChange: (size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            },
+          }}
         />
       </div>
     </div>

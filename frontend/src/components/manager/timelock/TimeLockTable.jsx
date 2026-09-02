@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Lock,
   Unlock,
@@ -30,6 +30,15 @@ export default function TimeLockTable({
   isLocking = false,
   onNavigateTimesheet,
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const totalItems = jobRows.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return jobRows.slice(start, start + pageSize);
+  }, [jobRows, currentPage, pageSize]);
   const columns = [
     {
       header: 'Project / Job',
@@ -204,10 +213,10 @@ export default function TimeLockTable({
               onClick={() => onDirectLock(row)}
               disabled={isLocking}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
-              title="Lock this period to freeze timesheets"
+              title={row.unlocked_reason ? "Re-lock this period after adjustments" : "Lock this project for this period"}
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Lock</span>
+              <span>Re-lock</span>
             </button>
 
             <button
@@ -227,9 +236,21 @@ export default function TimeLockTable({
   return (
     <DataTable
       columns={columns}
-      data={jobRows}
+      data={paginatedRows}
       isLoading={isLoading}
       emptyMessage="No managed projects found matching your filter."
+      pagination={{
+        currentPage,
+        totalPages,
+        totalItems,
+        pageSize,
+        pageSizeOptions: [10, 25, 50],
+        onPageChange: setCurrentPage,
+        onPageSizeChange: (size) => {
+          setPageSize(size);
+          setCurrentPage(1);
+        },
+      }}
     />
   );
 }

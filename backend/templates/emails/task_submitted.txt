@@ -1,0 +1,18 @@
+{% autoescape off %}Task Submitted for Review: {{ task_title }}
+
+Hello {{ manager_name }}, a team member has completed a task and submitted it for review.
+
+Task Title: {{ task_title }}
+Project: [{{ job_code }}] {{ job_name }}
+Submitted By: {{ assignee_name }} ({{ assignee_email }})
+Status: REVIEWING
+{% if submission_note %}
+Submission Notes:
+{{ submission_note }}
+{% endif %}
+Review the task here: {{ review_url }}
+
+--
+This is an automated message from {{ app_name }}. Please do not reply to this email.
+{% if support_email %}Need help? Contact {{ support_email }}{% endif %}
+{% endautoescape %}

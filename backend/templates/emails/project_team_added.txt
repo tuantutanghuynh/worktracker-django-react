@@ -1,0 +1,17 @@
+{% autoescape off %}Welcome to Project: {{ job_name }}
+
+Hello {{ member_name }}, you have been added as a member of project "{{ job_name }}".
+
+Project: [{{ job_code }}] {{ job_name }}
+Project Manager: {{ manager_name }} ({{ manager_email }})
+Client: {{ client_name|default:"Internal Initiative" }}
+{% if job_description %}
+Project Scope:
+{{ job_description }}
+{% endif %}
+Open the project channel here: {{ channel_url }}
+
+--
+This is an automated message from {{ app_name }}. Please do not reply to this email.
+{% if support_email %}Need help? Contact {{ support_email }}{% endif %}
+{% endautoescape %}

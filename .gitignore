@@ -54,3 +54,8 @@ TuDocs/
 
 # Subagent-driven-development scratch workspaces (per-plan, not project docs)
 .superpowers/
+
+# Celery Beat
+backend/celerybeat-schedule*
+celerybeat-schedule*
+

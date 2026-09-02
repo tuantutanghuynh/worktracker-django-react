@@ -1,0 +1,19 @@
+{% autoescape off %}New Task Assigned: {{ task_title }}
+
+Hello {{ assignee_name }}, you have been assigned to work on a task.
+
+Task Title: {{ task_title }}
+Project: [{{ job_code }}] {{ job_name }}
+Assigned By: {{ creator_name }}
+Priority: {{ priority }}
+Deadline: {{ deadline|default:"No deadline specified" }}
+{% if task_description %}
+Description:
+{{ task_description }}
+{% endif %}
+View task details here: {{ task_url }}
+
+--
+This is an automated message from {{ app_name }}. Please do not reply to this email.
+{% if support_email %}Need help? Contact {{ support_email }}{% endif %}
+{% endautoescape %}

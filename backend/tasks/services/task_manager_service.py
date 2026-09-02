@@ -262,6 +262,12 @@ def create_task(*, user, data, request=None):
                 related_url="/employee/my-tasks",
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
+            # 🚀 Gửi Email thông báo phân công Task mới (2.1)
+            try:
+                from tasks.services.task_email_service import send_task_assigned_email
+                send_task_assigned_email(task, request=request)
+            except Exception:
+                pass
 
     return task
 
@@ -383,6 +389,12 @@ def update_task(*, user, task, data, request=None):
                 related_url="/employee/my-tasks",
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
+            # 🚀 Gửi Email thông báo phân công Task mới (2.1)
+            try:
+                from tasks.services.task_email_service import send_task_assigned_email
+                send_task_assigned_email(locked_task, request=request)
+            except Exception:
+                pass
 
         log_action(
             user=user,

@@ -349,10 +349,6 @@ export default function ManagerTimeLockPage() {
         activeMonth={activeMonth}
         onRefresh={handleRefresh}
         isFetching={isFetching}
-        onBatchLockAll={handleBatchLockAll}
-        isBatchLocking={isBatchLocking}
-        unlockedCount={kpis.unlockedCount}
-        isCurrentPeriod={isCurrentPeriod}
         isGloballyLocked={isGloballyLocked}
       />
 

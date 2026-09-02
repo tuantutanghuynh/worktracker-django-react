@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Bell, 
   CheckCheck, 
@@ -18,6 +18,7 @@ import {
 import { useAuthStore } from '../../../stores/authStore';
 import { cn } from '../../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
+import PaginationBar from '../table/PaginationBar';
 
 /**
  * Hàm phân giải và chuẩn hóa đường dẫn thông báo thông minh theo Role (Manager & Employee)
@@ -97,6 +98,8 @@ export default function NotificationListTable({
 }) {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'UNREAD' | 'TASKS' | 'TIMESHEET'
   const [selectedIds, setSelectedIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Chuẩn hóa hàm callbacks
   const handleMarkReadFn = onMarkAsRead || onMarkRead;
@@ -139,12 +142,21 @@ export default function NotificationListTable({
     );
   };
 
-  const filteredNotifications = notifications.filter(item => {
-    if (activeTab === 'UNREAD') return !item.is_read;
-    if (activeTab === 'TASKS') return item.event_type?.startsWith('TASK_');
-    if (activeTab === 'TIMESHEET') return item.event_type?.startsWith('TIMESHEET_') || item.event_type?.startsWith('LOG_WORK_');
-    return true;
-  });
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(item => {
+      if (activeTab === 'UNREAD') return !item.is_read;
+      if (activeTab === 'TASKS') return item.event_type?.startsWith('TASK_');
+      if (activeTab === 'TIMESHEET') return item.event_type?.startsWith('TIMESHEET_') || item.event_type?.startsWith('LOG_WORK_');
+      return true;
+    });
+  }, [notifications, activeTab]);
+
+  const totalItems = filteredNotifications.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedNotifications = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredNotifications.slice(start, start + pageSize);
+  }, [filteredNotifications, currentPage, pageSize]);
 
   const getEventBadge = (eventType) => {
     switch (eventType) {
@@ -232,7 +244,10 @@ export default function NotificationListTable({
           <button
             key={tab.key}
             type="button"
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setCurrentPage(1);
+            }}
             className={cn(
               "px-3 py-1.5 text-xs rounded-xl transition-all whitespace-nowrap cursor-pointer",
               activeTab === tab.key
@@ -286,7 +301,7 @@ export default function NotificationListTable({
             </div>
           )}
 
-          {filteredNotifications.map((item) => {
+          {paginatedNotifications.map((item) => {
             const badge = getEventBadge(item.event_type);
             const isSelected = selectedIds.includes(item.id);
             const targetUrl = resolveNotificationUrl(item.related_url, item.event_type);
@@ -377,6 +392,21 @@ export default function NotificationListTable({
               </div>
             );
           })}
+
+          {totalItems > 0 && (
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 25, 50]}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </div>
       )}
     </div>

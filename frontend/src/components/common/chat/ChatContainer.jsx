@@ -1218,11 +1218,21 @@ export default function ChatContainer({
                   );
                 });
 
+                const currentUserRole = (user?.role_code || user?.role || '').toUpperCase();
+                const isCurrentManager = currentUserRole === 'MANAGER' || currentUserRole === '2';
+
                 const adminUsers = filtered.filter(
                   (u) => (u.role_code || u.role) === 'ADMIN' || (u.role_code || u.role) === 1
                 );
-                const colleagueUsers = filtered.filter(
-                  (u) => (u.role_code || u.role) !== 'ADMIN' && (u.role_code || u.role) !== 1
+                const managerUsers = filtered.filter(
+                  (u) => (u.role_code || u.role) === 'MANAGER' || (u.role_code || u.role) === 2
+                );
+                const staffUsers = filtered.filter(
+                  (u) =>
+                    (u.role_code || u.role) !== 'ADMIN' &&
+                    (u.role_code || u.role) !== 1 &&
+                    (u.role_code || u.role) !== 'MANAGER' &&
+                    (u.role_code || u.role) !== 2
                 );
 
                 if (filtered.length === 0) {
@@ -1240,7 +1250,7 @@ export default function ChatContainer({
                       <div>
                         <div className="px-2 py-1 text-[10px] font-extrabold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
                           <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                          <span>System Administrators & Support ({adminUsers.length})</span>
+                          <span>System Administrators &amp; Support ({adminUsers.length})</span>
                         </div>
                         <div className="space-y-1 mt-1">
                           {adminUsers.map((u) => (
@@ -1264,7 +1274,7 @@ export default function ChatContainer({
                                 </div>
                               </div>
                               <div className="px-2.5 py-1 bg-purple-600 text-white rounded-lg text-[10px] font-bold group-hover:bg-purple-700 transition">
-                                Chat with Admin
+                                Chat
                               </div>
                             </button>
                           ))}
@@ -1272,17 +1282,56 @@ export default function ChatContainer({
                       </div>
                     )}
 
-                    {/* KHỐI 2: ĐỒNG NGHIỆP CÁC PHÒNG BAN */}
-                    {colleagueUsers.length > 0 && (
+                    {/* KHỐI 2: QUẢN LÝ / DỰ ÁN */}
+                    {managerUsers.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1 text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Briefcase className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>
+                            {isCurrentManager ? 'Colleague Managers' : 'Your Managers & Project Leads'} ({managerUsers.length})
+                          </span>
+                        </div>
+                        <div className="space-y-1 mt-1">
+                          {managerUsers.map((u) => (
+                            <button
+                              key={`mgr-${u.id}`}
+                              onClick={() => handleStartDirectChat(u)}
+                              className="w-full p-2.5 bg-indigo-50/50 hover:bg-indigo-100/70 border border-indigo-200/60 rounded-xl flex items-center justify-between transition-colors text-left group cursor-pointer"
+                            >
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <UserAvatar user={u} size="sm" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5 truncate group-hover:text-indigo-700">
+                                    <span>{u.full_name || u.email}</span>
+                                    <span className="px-1.5 py-0.2 bg-indigo-600 text-white rounded font-mono text-[9px] font-extrabold">
+                                      MANAGER
+                                    </span>
+                                  </p>
+                                  <p className="text-[11px] text-indigo-600 font-medium truncate">
+                                    {u.department_name || 'Project Management'}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* KHỐI 3: ĐỘI NGŨ / ĐỒNG NGHIỆP */}
+                    {staffUsers.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Colleagues & Staff ({colleagueUsers.length})</span>
+                          <span>
+                            {isCurrentManager ? 'Your Team Members & Project Staff' : 'Team & Project Colleagues'} ({staffUsers.length})
+                          </span>
                         </div>
                         <div className="space-y-1 mt-1">
-                          {colleagueUsers.map((u) => (
+                          {staffUsers.map((u) => (
                             <button
-                              key={`user-${u.id}`}
+                              key={`staff-${u.id}`}
                               onClick={() => handleStartDirectChat(u)}
                               className="w-full p-2.5 hover:bg-blue-50 rounded-xl flex items-center justify-between transition-colors text-left group cursor-pointer"
                             >

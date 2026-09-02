@@ -375,4 +375,24 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
 
+        # 🚀 2.2. Gửi Email thông báo khi nhân viên nộp task lên hàng chờ REVIEWING
+        if to_status == Task.Status.REVIEWING:
+            try:
+                from tasks.services.task_email_service import send_task_submitted_email
+                send_task_submitted_email(locked_task, note=clean_reason, request=request)
+            except Exception:
+                pass
+
+        # 🚀 2.3. Gửi Email thông báo khi Manager từ chối Task / Yêu cầu làm lại (REVIEWING -> IN_PROGRESS)
+        if (
+            from_status == Task.Status.REVIEWING
+            and to_status == Task.Status.IN_PROGRESS
+            and user != locked_task.assignee
+        ):
+            try:
+                from tasks.services.task_email_service import send_task_rejected_email
+                send_task_rejected_email(locked_task, reason=clean_reason, reviewer=user, request=request)
+            except Exception:
+                pass
+
     return locked_task

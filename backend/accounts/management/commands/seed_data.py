@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction, connection
+from django.contrib.auth.hashers import make_password
 
 from accounts.models import CustomUser, Role, Department, EmployeeProfile
 from projects.models import Client, Job
@@ -15,7 +16,7 @@ from tasks.services.order_index_manager_service import key_between
 
 
 class Command(BaseCommand):
-    help = "Seed comprehensive enterprise demo dataset in English for Admin, Manager, and Employee roles"
+    help = "Seed standard demo dataset (20 employees, 2 managers, 5 jobs, edge cases: locked client, locked job, August locked period)"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -25,7 +26,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write("=== WorkTracker Pro Seed Data Script (All in English) ===")
+        self.stdout.write(self.style.MIGRATE_HEADING("=== Seeding Standard Enterprise Demo Dataset ==="))
 
         with transaction.atomic():
             if options['reset']:
@@ -47,7 +48,6 @@ class Command(BaseCommand):
                 EmployeeProfile.objects.all().delete()
                 CustomUser.objects.all().delete()
 
-                # RESET AUTO-INCREMENT SEQUENCES BACK TO ID 1 (SQLITE & POSTGRESQL)
                 with connection.cursor() as cursor:
                     if connection.vendor == 'sqlite':
                         cursor.execute("DELETE FROM sqlite_sequence;")
@@ -74,7 +74,7 @@ class Command(BaseCommand):
             # -----------------------------------------------------------------
             # 1. ROLES & DEPARTMENTS
             # -----------------------------------------------------------------
-            self.stdout.write("1. Seeding Roles & Departments...")
+            self.stdout.write("1. Setting up Roles & Departments...")
             role_admin, _ = Role.objects.get_or_create(code="ADMIN", defaults={"name": "System Administrator", "description": "Full system management"})
             role_manager, _ = Role.objects.get_or_create(code="MANAGER", defaults={"name": "Project Manager", "description": "Project and team leadership"})
             role_employee, _ = Role.objects.get_or_create(code="EMPLOYEE", defaults={"name": "Software Engineer", "description": "Task execution and time logging"})
@@ -82,11 +82,17 @@ class Command(BaseCommand):
             dept_it, _ = Department.objects.get_or_create(name="Information Technology", defaults={"description": "Software architecture and engineering"})
             dept_mkt, _ = Department.objects.get_or_create(name="Digital Marketing", defaults={"description": "Growth, branding, and content campaigns"})
             dept_hr, _ = Department.objects.get_or_create(name="Human Resources", defaults={"description": "Talent acquisition and operations"})
+            dept_design, _ = Department.objects.get_or_create(name="UI/UX Design", defaults={"description": "Product design and design system"})
+
+            # Pre-hash common passwords for optimal performance
+            pw_admin = make_password("Admin12345!")
+            pw_manager = make_password("Manager12345!")
+            pw_employee = make_password("Emp12345!")
 
             # -----------------------------------------------------------------
-            # 2. ACCOUNTS (1 ADMIN, 1 MANAGER, 15 EMPLOYEES)
+            # 2. ACCOUNTS (1 ADMIN, 2 MANAGERS, 20 EMPLOYEES)
             # -----------------------------------------------------------------
-            self.stdout.write("2. Seeding Accounts (Admin, Manager & 15 Employees)...")
+            self.stdout.write("2. Seeding Accounts (1 Admin, 2 Managers, 20 Employees)...")
 
             # 🛡️ ADMIN USER
             admin_user, _ = CustomUser.objects.get_or_create(
@@ -97,457 +103,485 @@ class Command(BaseCommand):
                     "is_superuser": True,
                     "is_active": True,
                     "must_change_password": False,
+                    "password": pw_admin,
                 }
             )
-            admin_user.set_password("Admin123!")
-            admin_user.must_change_password = False
-            admin_user.save()
-
             EmployeeProfile.objects.get_or_create(
                 user=admin_user,
                 defaults={
                     "full_name": "System Administrator",
                     "department": dept_it,
                     "phone_number": "+84 901 000 001",
+                    "joined_date": date(2025, 1, 1),
                 }
             )
 
-            # 👔 MANAGER USER
-            manager_user, _ = CustomUser.objects.get_or_create(
+            # 💼 MANAGER 1 (IT / Engineering Lead)
+            manager1, _ = CustomUser.objects.get_or_create(
                 email="manager@worktracker.vn",
                 defaults={
                     "role": role_manager,
-                    "is_staff": True,
                     "is_active": True,
                     "must_change_password": False,
+                    "password": pw_manager,
                 }
             )
-            manager_user.set_password("Manager123!")
-            manager_user.must_change_password = False
-            manager_user.save()
-
             EmployeeProfile.objects.get_or_create(
-                user=manager_user,
+                user=manager1,
                 defaults={
-                    "full_name": "Alexander Wright",
+                    "full_name": "David Miller",
                     "department": dept_it,
-                    "phone_number": "+84 902 000 002",
+                    "phone_number": "+84 902 000 001",
+                    "joined_date": date(2025, 3, 1),
                 }
             )
 
-            # 👔 MANAGER THỨ HAI
-            # Cần ít nhất 2 Manager thì mới thấy được tác dụng của tuyến báo
-            # cáo cố định: mỗi người chỉ nhìn thấy và chỉ giao việc được cho
-            # nhân viên của mình. Một Manager duy nhất thì mọi bộ lọc phạm vi
-            # đều trông như không làm gì.
-            manager_two, _ = CustomUser.objects.get_or_create(
+            # 💼 MANAGER 2 (Marketing & Product Lead)
+            manager2, _ = CustomUser.objects.get_or_create(
                 email="manager2@worktracker.vn",
                 defaults={
                     "role": role_manager,
-                    "is_staff": True,
                     "is_active": True,
                     "must_change_password": False,
+                    "password": pw_manager,
                 }
             )
-            manager_two.set_password("Manager123!")
-            manager_two.must_change_password = False
-            manager_two.save()
-
             EmployeeProfile.objects.get_or_create(
-                user=manager_two,
+                user=manager2,
                 defaults={
-                    "full_name": "Grace Bennett",
+                    "full_name": "Sarah Connor",
                     "department": dept_mkt,
-                    "phone_number": "+84 902 000 003",
+                    "phone_number": "+84 902 000 002",
+                    "joined_date": date(2025, 4, 1),
                 }
             )
 
-            # Link department manager
-            dept_it.manager = manager_user
-            dept_it.save()
-            dept_mkt.manager = manager_two
-            dept_mkt.save()
-            dept_hr.manager = manager_two
-            dept_hr.save()
+            # Update Department heads
+            dept_it.manager = manager1
+            dept_it.save(update_fields=["manager"])
+            dept_mkt.manager = manager2
+            dept_mkt.save(update_fields=["manager"])
 
-            # 👷 15 EMPLOYEE USERS
-            employee_names = [
-                ("Sophia Johnson", "sophia.johnson@worktracker.vn", dept_it, "+84 903 000 101"),
-                ("Ethan Williams", "ethan.williams@worktracker.vn", dept_it, "+84 903 000 102"),
-                ("Emma Brown", "emma.brown@worktracker.vn", dept_mkt, "+84 903 000 103"),
-                ("Oliver Jones", "oliver.jones@worktracker.vn", dept_it, "+84 903 000 104"),
-                ("Ava Garcia", "ava.garcia@worktracker.vn", dept_it, "+84 903 000 105"),
-                ("Liam Miller", "liam.miller@worktracker.vn", dept_it, "+84 903 000 106"),
-                ("Isabella Davis", "isabella.davis@worktracker.vn", dept_mkt, "+84 903 000 107"),
-                ("Noah Rodriguez", "noah.rodriguez@worktracker.vn", dept_it, "+84 903 000 108"),
-                ("Mia Martinez", "mia.martinez@worktracker.vn", dept_hr, "+84 903 000 109"),
-                ("Lucas Hernandez", "lucas.hernandez@worktracker.vn", dept_it, "+84 903 000 110"),
-                ("Charlotte Lopez", "charlotte.lopez@worktracker.vn", dept_it, "+84 903 000 111"),
-                ("James Gonzalez", "james.gonzalez@worktracker.vn", dept_it, "+84 903 000 112"),
-                ("Amelia Wilson", "amelia.wilson@worktracker.vn", dept_mkt, "+84 903 000 113"),
-                ("Benjamin Anderson", "benjamin.anderson@worktracker.vn", dept_it, "+84 903 000 114"),
-                ("Harper Thomas", "harper.thomas@worktracker.vn", dept_it, "+84 903 000 115"),
+            # 👨‍💻 20 EMPLOYEES: 10 under Manager 1 (IT), 10 under Manager 2 (Mkt/Design)
+            emp_definitions = [
+                # 10 under Manager 1
+                ("John Smith", "john.smith@worktracker.vn", dept_it, manager1, "+84 903 000 001"),
+                ("Emma Johnson", "emma.johnson@worktracker.vn", dept_it, manager1, "+84 903 000 002"),
+                ("Michael Brown", "michael.brown@worktracker.vn", dept_it, manager1, "+84 903 000 003"),
+                ("Olivia Davis", "olivia.davis@worktracker.vn", dept_it, manager1, "+84 903 000 004"),
+                ("William Wilson", "william.wilson@worktracker.vn", dept_it, manager1, "+84 903 000 005"),
+                ("Sophia Martinez", "sophia.martinez@worktracker.vn", dept_it, manager1, "+84 903 000 006"),
+                ("James Anderson", "james.anderson@worktracker.vn", dept_it, manager1, "+84 903 000 007"),
+                ("Ava Taylor", "ava.taylor@worktracker.vn", dept_it, manager1, "+84 903 000 008"),
+                ("Lucas Thomas", "lucas.thomas@worktracker.vn", dept_it, manager1, "+84 903 000 009"),
+                ("Mia Jackson", "mia.jackson@worktracker.vn", dept_it, manager1, "+84 903 000 010"),
+                # 10 under Manager 2
+                ("Alexander White", "alexander.white@worktracker.vn", dept_mkt, manager2, "+84 903 000 011"),
+                ("Charlotte Harris", "charlotte.harris@worktracker.vn", dept_mkt, manager2, "+84 903 000 012"),
+                ("Daniel Martin", "daniel.martin@worktracker.vn", dept_design, manager2, "+84 903 000 013"),
+                ("Harper Thompson", "harper.thompson@worktracker.vn", dept_design, manager2, "+84 903 000 014"),
+                ("Henry Garcia", "henry.garcia@worktracker.vn", dept_mkt, manager2, "+84 903 000 015"),
+                ("Evelyn Robinson", "evelyn.robinson@worktracker.vn", dept_hr, manager2, "+84 903 000 016"),
+                ("Sebastian Clark", "sebastian.clark@worktracker.vn", dept_mkt, manager2, "+84 903 000 017"),
+                ("Abigail Rodriguez", "abigail.rodriguez@worktracker.vn", dept_design, manager2, "+84 903 000 018"),
+                ("Logan Lewis", "logan.lewis@worktracker.vn", dept_mkt, manager2, "+84 903 000 019"),
+                ("Emily Lee", "emily.lee@worktracker.vn", dept_design, manager2, "+84 903 000 020"),
             ]
 
             employee_users = []
-            for full_name, email, dept, phone in employee_names:
-                emp, _ = CustomUser.objects.get_or_create(
+            for idx, (name, email, dept, assigned_mgr, phone) in enumerate(emp_definitions):
+                emp, created = CustomUser.objects.get_or_create(
                     email=email,
                     defaults={
                         "role": role_employee,
                         "is_active": True,
                         "must_change_password": False,
+                        "password": pw_employee,
                     }
                 )
-                emp.set_password("Emp12345!")
-                emp.must_change_password = False
-                emp.save()
+                if not created and emp.password != pw_employee:
+                    emp.password = pw_employee
+                    emp.save(update_fields=["password"])
 
-                # Tuyến báo cáo cố định: nhân viên IT thuộc Manager 1, nhân
-                # viên Marketing/HR thuộc Manager 2. Phải gán tường minh chứ
-                # không dựa vào phòng ban — nếu để trống thì Manager mở danh
-                # sách nhân viên ra sẽ thấy rỗng và không giao được task.
-                reporting_manager = manager_user if dept == dept_it else manager_two
-                # Ngay vao lam trai deu tu 12 thang truoc den 1 thang truoc.
-                # Can co du lieu that o day: bang Timesheet Control loc theo
-                # joined_date de khong liet ke nguoi chua vao lam trong ky qua
-                # khu. De NULL het thi bo loc do khong bao gio kich hoat.
-                # Trai deu tu ~2 den ~12 thang truoc. Dung timedelta cho don
-                # gian; khong can ngay chinh xac, chi can moi nguoi mot moc
-                # khac nhau de bo loc vong doi co gi ma loc.
-                so_thang_truoc = 2 + (len(employee_users) % 11)
-                joined = date.today() - timedelta(days=30 * so_thang_truoc)
-                profile, created = EmployeeProfile.objects.get_or_create(
+                joined = date(2025, 6, 1) + timedelta(days=idx * 15)
+                profile, _ = EmployeeProfile.objects.get_or_create(
                     user=emp,
                     defaults={
-                        "full_name": full_name,
+                        "full_name": name,
                         "department": dept,
+                        "manager": assigned_mgr,
                         "phone_number": phone,
-                        "manager": reporting_manager,
                         "joined_date": joined,
                     }
                 )
-                if not created and profile.joined_date is None:
-                    profile.joined_date = joined
-                    profile.save(update_fields=["joined_date"])
-                if not created and profile.manager_id is None:
-                    profile.manager = reporting_manager
-                    profile.save(update_fields=["manager"])
+                profile.manager = assigned_mgr
+                profile.save(update_fields=["manager"])
                 employee_users.append(emp)
 
-            # Chia nhân viên theo Manager để bước tạo Task bên dưới giao việc
-            # đúng tuyến. Giao chéo tuyến sẽ tạo ra dữ liệu mà chính hệ thống
-            # từ chối nếu thao tác qua giao diện — demo sẽ trông sai.
-            employees_by_manager = {
-                manager_user.id: [
-                    e for e in employee_users if e.profile.manager_id == manager_user.id
-                ],
-                manager_two.id: [
-                    e for e in employee_users if e.profile.manager_id == manager_two.id
-                ],
-            }
+            # Phân tách danh sách nhân viên theo Manager
+            mgr1_employees = [e for e in employee_users if e.profile.manager_id == manager1.id]
+            mgr2_employees = [e for e in employee_users if e.profile.manager_id == manager2.id]
 
             # -----------------------------------------------------------------
-            # 3. CLIENTS & JOBS (5 CLIENTS & 10 JOBS)
+            # 3. CLIENTS (4 ACTIVE, 1 LOCKED/INACTIVE)
             # -----------------------------------------------------------------
-            self.stdout.write("3. Seeding 5 Clients & 10 Master Jobs...")
-            client1, _ = Client.objects.get_or_create(client_name="TechCorp Solutions", defaults={"tax_code": "0101234567", "industry": "Technology", "address": "72 Le Thanh Ton, Dist 1, HCMC"})
-            client2, _ = Client.objects.get_or_create(client_name="VinGroup Digital", defaults={"tax_code": "0107654321", "industry": "Real Estate", "address": "Park 5, Landmark 81, Binh Thanh, HCMC"})
-            client3, _ = Client.objects.get_or_create(client_name="Global Finance Ltd", defaults={"tax_code": "0109998887", "industry": "Banking & Fintech", "address": "Bitexco Tower, Dist 1, HCMC"})
-            client4, _ = Client.objects.get_or_create(client_name="Nexus Retail Group", defaults={"tax_code": "0105554443", "industry": "Retail & E-Commerce", "address": "Crescent Mall, Dist 7, HCMC"})
-            client5, _ = Client.objects.get_or_create(client_name="CloudScale Express", defaults={"tax_code": "0103332221", "industry": "Logistics & Supply Chain", "address": "Tan Binh Logistics Park, HCMC"})
-
-            today = date.today()
-            raw_jobs_list = [
-                ("JOB-ERP-01", "ERP System Implementation", client1, Job.Status.ACTIVE, Job.Priority.HIGH, today - timedelta(days=30), today + timedelta(days=60)),
-                ("JOB-MOB-02", "Mobile App Development", client2, Job.Status.ACTIVE, Job.Priority.HIGH, today - timedelta(days=20), today + timedelta(days=40)),
-                ("JOB-WEB-03", "Website Redesign & Refactor", client3, Job.Status.ON_HOLD, Job.Priority.MEDIUM, today - timedelta(days=15), today + timedelta(days=30)),
-                ("JOB-CLD-04", "Cloud Infrastructure Migration", client1, Job.Status.PLANNING, Job.Priority.LOW, today, today + timedelta(days=90)),
-                ("JOB-AI-05", "AI Chatbot & Support Automation", client2, Job.Status.ACTIVE, Job.Priority.HIGH, today - timedelta(days=10), today + timedelta(days=20)),
-                ("JOB-SEC-06", "Security Audit & Hardening", client3, Job.Status.COMPLETED, Job.Priority.MEDIUM, today - timedelta(days=60), today - timedelta(days=5)),
-                ("JOB-BI-07", "Data Analytics & BI Dashboard", client4, Job.Status.ACTIVE, Job.Priority.HIGH, today - timedelta(days=5), today + timedelta(days=45)),
-                ("JOB-PAY-08", "Payment Gateway Integration", client5, Job.Status.ACTIVE, Job.Priority.HIGH, today - timedelta(days=12), today + timedelta(days=25)),
-                ("JOB-HRM-09", "HRMS Employee Portal System", client4, Job.Status.PLANNING, Job.Priority.MEDIUM, today, today + timedelta(days=75)),
-                ("JOB-MKT-10", "Marketing CRM Automation Engine", client5, Job.Status.ACTIVE, Job.Priority.LOW, today - timedelta(days=8), today + timedelta(days=35)),
-            ]
-
-            jobs = []
-            # Chia Job cho 2 Manager (7 cho Manager 1, 3 cho Manager 2) de
-            # moi nguoi deu co du an that su khi demo phan quyen.
-            jobs_of_manager_two = {"JOB-BI-07", "JOB-HRM-09", "JOB-MKT-10"}
-            for code, name, client, status, priority, start, deadline in raw_jobs_list:
-                owning_manager = manager_two if code in jobs_of_manager_two else manager_user
-                j, _ = Job.objects.get_or_create(
-                    job_code=code,
-                    defaults={
-                        "job_name": name,
-                        "client": client,
-                        "manager": owning_manager,
-                        "status": status,
-                        "priority": priority,
-                        "start_date": start,
-                        "deadline": deadline,
-                        "description": f"Comprehensive enterprise implementation for {name} with modern standards."
-                    }
-                )
-                jobs.append(j)
+            self.stdout.write("3. Seeding Clients (4 Active, 1 Locked/Inactive)...")
+            client_techcorp, _ = Client.objects.get_or_create(
+                client_name="TechCorp Solutions",
+                defaults={"tax_code": "0101234567", "industry": "Technology", "address": "72 Le Thanh Ton, Dist 1, HCMC", "is_active": True}
+            )
+            client_vingroup, _ = Client.objects.get_or_create(
+                client_name="VinGroup Digital",
+                defaults={"tax_code": "0107654321", "industry": "Real Estate & Retail", "address": "Landmark 81, Binh Thanh, HCMC", "is_active": True}
+            )
+            client_finance, _ = Client.objects.get_or_create(
+                client_name="Global Finance Ltd",
+                defaults={"tax_code": "0109998887", "industry": "Banking & Fintech", "address": "Bitexco Tower, Dist 1, HCMC", "is_active": True}
+            )
+            client_nexus, _ = Client.objects.get_or_create(
+                client_name="Nexus Retail Group",
+                defaults={"tax_code": "0105554443", "industry": "E-Commerce", "address": "Crescent Mall, Dist 7, HCMC", "is_active": True}
+            )
+            # 🔒 CLIENT BỊ KHÓA / NGỪNG HỢP TÁC (EDGE CASE)
+            client_locked, _ = Client.objects.get_or_create(
+                client_name="Apex Logistics Corp",
+                defaults={"tax_code": "0103332221", "industry": "Logistics", "address": "Tan Binh Logistics Park, HCMC", "is_active": False}
+            )
+            client_locked.is_active = False
+            client_locked.save(update_fields=["is_active"])
 
             # -----------------------------------------------------------------
-            # 4. TASKS (10 TASKS PER JOB = 100 TASKS WITH LEXORANK ORDER_INDEX)
+            # 4. JOBS (5 JOBS: Active, Job-locked, Locked-client, Completed)
             # -----------------------------------------------------------------
-            self.stdout.write("4. Seeding 100 Tasks across 10 Jobs...")
+            self.stdout.write("4. Seeding 5 Master Jobs...")
+            # Job 1: Active Enterprise Job under Manager 1
+            job1, _ = Job.objects.get_or_create(
+                job_code="JOB-ERP-01",
+                defaults={
+                    "job_name": "ERP Enterprise Implementation",
+                    "client": client_techcorp,
+                    "manager": manager1,
+                    "status": Job.Status.ACTIVE,
+                    "priority": Job.Priority.HIGH,
+                    "start_date": date(2026, 8, 1),
+                    "deadline": date(2026, 11, 30),
+                    "description": "Enterprise Resource Planning migration with SAP S/4HANA integration.",
+                }
+            )
 
-            task_pool = [
-                ("Database Schema Architecture", Task.Status.TODO, Task.Priority.HIGH),
-                ("Technical Specification Review", Task.Status.TODO, Task.Priority.MEDIUM),
-                ("User Flow Workshop & Prototyping", Task.Status.TODO, Task.Priority.LOW),
-                ("RESTful API Service Module", Task.Status.IN_PROGRESS, Task.Priority.HIGH),
-                ("Backend Core Business Refactoring", Task.Status.IN_PROGRESS, Task.Priority.HIGH),
-                ("Redis Cache & Session Optimization", Task.Status.IN_PROGRESS, Task.Priority.MEDIUM),
-                ("Responsive UI Interface Implementation", Task.Status.REVIEWING, Task.Priority.MEDIUM),
-                ("Code Review & QA Inspection", Task.Status.REVIEWING, Task.Priority.HIGH),
-                ("End-to-End Automated Test Suite", Task.Status.COMPLETED, Task.Priority.LOW),
-                ("Staging Environment Deployment", Task.Status.CANCELLED, Task.Priority.HIGH),
-            ]
+            # Job 2: Mobile Banking under Manager 1 - WILL HAVE JOB-LEVEL TIMELOCK IN AUGUST
+            job2, _ = Job.objects.get_or_create(
+                job_code="JOB-MOB-02",
+                defaults={
+                    "job_name": "Mobile Banking Application",
+                    "client": client_finance,
+                    "manager": manager1,
+                    "status": Job.Status.ACTIVE,
+                    "priority": Job.Priority.HIGH,
+                    "start_date": date(2026, 8, 1),
+                    "deadline": date(2026, 10, 31),
+                    "description": "Next-generation iOS & Android banking client with biometrics & real-time payments.",
+                }
+            )
+
+            # Job 3: Cloud DevOps under Manager 1 - ATTACHED TO LOCKED CLIENT (EDGE CASE)
+            job3, _ = Job.objects.get_or_create(
+                job_code="JOB-CLD-03",
+                defaults={
+                    "job_name": "Cloud Infrastructure & DevOps",
+                    "client": client_locked,  # 🔒 Client is inactive!
+                    "manager": manager1,
+                    "status": Job.Status.ON_HOLD,
+                    "priority": Job.Priority.MEDIUM,
+                    "start_date": date(2026, 8, 15),
+                    "deadline": date(2026, 12, 15),
+                    "description": "Multi-region Kubernetes migration on AWS (On Hold due to client contract freeze).",
+                }
+            )
+
+            # Job 4: Marketing CRM under Manager 2 - Active
+            job4, _ = Job.objects.get_or_create(
+                job_code="JOB-CRM-04",
+                defaults={
+                    "job_name": "Marketing Automation CRM",
+                    "client": client_vingroup,
+                    "manager": manager2,
+                    "status": Job.Status.ACTIVE,
+                    "priority": Job.Priority.MEDIUM,
+                    "start_date": date(2026, 9, 1),
+                    "deadline": date(2026, 11, 15),
+                    "description": "Customer lifecycle automation, omnichannel lead scoring, and automated campaigns.",
+                }
+            )
+
+            # Job 5: Security Audit under Manager 2 - COMPLETED / LOCKED JOB (EDGE CASE)
+            job5, _ = Job.objects.get_or_create(
+                job_code="JOB-SEC-05",
+                defaults={
+                    "job_name": "Security & PenTest Audit",
+                    "client": client_nexus,
+                    "manager": manager2,
+                    "status": Job.Status.COMPLETED,  # 🔒 Completed job!
+                    "priority": Job.Priority.HIGH,
+                    "start_date": date(2026, 7, 1),
+                    "deadline": date(2026, 8, 31),
+                    "description": "SOC2 Compliance penetration testing and vulnerability mitigation.",
+                }
+            )
+
+            all_jobs = [job1, job2, job3, job4, job5]
+
+            # -----------------------------------------------------------------
+            # 5. TASKS (SPREAD ACROSS AUG, SEPT, OCT, NOV, DEC 2026)
+            # -----------------------------------------------------------------
+            self.stdout.write("5. Seeding Tasks (Spread across Aug, Sept, Oct, Nov, Dec 2026)...")
 
             created_tasks = []
 
-            for job_idx, target_job in enumerate(jobs):
+            # Tasks Template for Job 1 (Manager 1, IT staff)
+            job1_tasks_def = [
+                ("Database Schema & Migration Scripts", Task.Status.COMPLETED, Task.Priority.HIGH, date(2026, 8, 20), mgr1_employees[0]),
+                ("RESTful Integration Layer Setup", Task.Status.COMPLETED, Task.Priority.HIGH, date(2026, 8, 28), mgr1_employees[1]),
+                ("SAP Core Connector Module", Task.Status.IN_PROGRESS, Task.Priority.HIGH, date(2026, 9, 15), mgr1_employees[2]),
+                ("Warehouse Inventory Realtime Sync", Task.Status.REVIEWING, Task.Priority.MEDIUM, date(2026, 9, 10), mgr1_employees[3]),
+                ("Financial Ledger Reconciliation API", Task.Status.TODO, Task.Priority.HIGH, date(2026, 10, 15), mgr1_employees[4]),
+                ("End-of-Year Fiscal Report Generator", Task.Status.TODO, Task.Priority.LOW, date(2026, 11, 20), mgr1_employees[5]),
+            ]
+
+            # Tasks Template for Job 2 (Manager 1, IT staff)
+            job2_tasks_def = [
+                ("Biometric FaceID & TouchID SDK", Task.Status.COMPLETED, Task.Priority.HIGH, date(2026, 8, 25), mgr1_employees[6]),
+                ("Cardholder Transaction History UI", Task.Status.REVIEWING, Task.Priority.HIGH, date(2026, 9, 8), mgr1_employees[7]),
+                ("Instant Peer-to-Peer Transfer Engine", Task.Status.IN_PROGRESS, Task.Priority.HIGH, date(2026, 9, 20), mgr1_employees[8]),
+                ("Push Notification APNS / FCM Pipeline", Task.Status.TODO, Task.Priority.MEDIUM, date(2026, 10, 10), mgr1_employees[9]),
+                ("Quarterly Security Hardening v2", Task.Status.TODO, Task.Priority.MEDIUM, date(2026, 11, 25), mgr1_employees[0]),
+            ]
+
+            # Tasks Template for Job 3 (Manager 1, Locked Client)
+            job3_tasks_def = [
+                ("Terraform Multi-Cloud Baseline", Task.Status.COMPLETED, Task.Priority.HIGH, date(2026, 8, 30), mgr1_employees[1]),
+                ("Kubernetes Ingress Controller Tuning", Task.Status.TODO, Task.Priority.MEDIUM, date(2026, 12, 1), mgr1_employees[2]),
+            ]
+
+            # Tasks Template for Job 4 (Manager 2, Marketing/Design staff)
+            job4_tasks_def = [
+                ("Campaign Workflow Visual Builder", Task.Status.REVIEWING, Task.Priority.HIGH, date(2026, 9, 12), mgr2_employees[0]),
+                ("Customer Segment Dynamic Filtering", Task.Status.IN_PROGRESS, Task.Priority.MEDIUM, date(2026, 9, 25), mgr2_employees[1]),
+                ("Omnichannel Email & SMS Templates", Task.Status.TODO, Task.Priority.LOW, date(2026, 10, 5), mgr2_employees[2]),
+                ("Holiday Promotion Automated Triggers", Task.Status.TODO, Task.Priority.HIGH, date(2026, 11, 15), mgr2_employees[3]),
+                ("Black Friday / New Year Lead Analytics", Task.Status.TODO, Task.Priority.HIGH, date(2026, 12, 20), mgr2_employees[4]),
+            ]
+
+            # Tasks Template for Job 5 (Manager 2, Completed Job)
+            job5_tasks_def = [
+                ("External Penetration Vulnerability Scan", Task.Status.COMPLETED, Task.Priority.HIGH, date(2026, 8, 15), mgr2_employees[5]),
+                ("SOC2 Audit Compliance Remediation", Task.Status.COMPLETED, Task.Priority.HIGH, date(2026, 8, 30), mgr2_employees[6]),
+            ]
+
+            all_tasks_specs = [
+                (job1, job1_tasks_def),
+                (job2, job2_tasks_def),
+                (job3, job3_tasks_def),
+                (job4, job4_tasks_def),
+                (job5, job5_tasks_def),
+            ]
+
+            for target_job, task_list in all_tasks_specs:
                 last_keys = {}
-
-                # Chi giao viec cho nhan vien thuoc tuyen cua Manager so huu
-                # Job nay. Giao cheo tuyen se tao ra du lieu ma chinh he thong
-                # tu choi neu thao tac qua giao dien.
-                job_manager = target_job.manager
-                assignable = employees_by_manager.get(job_manager.id) or employee_users
-
-                for task_idx, (tmpl_title, default_status, default_priority) in enumerate(task_pool):
-                    title = f"{tmpl_title} #{job_idx+1}.{task_idx+1}"
-                    assignee = assignable[(job_idx * 10 + task_idx) % len(assignable)]
-                    deadline = today + timedelta(days=random.randint(-5, 15))
-
-                    prev_key = last_keys.get(default_status)
-                    new_lexo_key = key_between(prev_key, None)
-                    last_keys[default_status] = new_lexo_key
+                for idx, (title, st, pr, deadline, assignee) in enumerate(task_list):
+                    prev_key = last_keys.get(st)
+                    new_lexo = key_between(prev_key, None)
+                    last_keys[st] = new_lexo
 
                     t, _ = Task.objects.get_or_create(
                         title=title,
                         job=target_job,
                         defaults={
-                            "creator": job_manager,
+                            "creator": target_job.manager,
                             "assignee": assignee,
-                            "status": default_status,
-                            "priority": default_priority,
+                            "status": st,
+                            "priority": pr,
                             "deadline": deadline,
-                            "order_index": new_lexo_key,
-                            "description": f"Standard operational guidelines for task '{title}' under {target_job.job_name}."
+                            "order_index": new_lexo,
+                            "description": f"Execution specifications for '{title}' under project {target_job.job_name}.",
                         }
                     )
                     created_tasks.append(t)
-
-                    TaskFollower.objects.get_or_create(task=t, user=job_manager)
+                    TaskFollower.objects.get_or_create(task=t, user=target_job.manager)
                     TaskFollower.objects.get_or_create(task=t, user=assignee)
-                    TaskComment.objects.get_or_create(
-                        task=t,
-                        user=manager_user,
-                        defaults={"content": f"Please process task '{title}' with high priority and ensure clean unit test coverage."}
-                    )
+
+                    # Deliverables / Attachments for REVIEWING tasks (để Manager có deliverables duyệt QA)
+                    if st == Task.Status.REVIEWING:
+                        TaskAttachment.objects.get_or_create(
+                            task=t,
+                            file_name=f"deliverable_release_v1_{t.id}.pdf",
+                            defaults={
+                                "file_url": f"https://example.com/files/deliverable_release_v1_{t.id}.pdf",
+                                "file_size": 2048576,
+                                "user": assignee,
+                            }
+                        )
+                        TaskComment.objects.get_or_create(
+                            task=t,
+                            user=target_job.manager,
+                            content=f"Deliverable specs reviewed for '{title}'. Ready for final acceptance verification.",
+                            defaults={"comment_type": TaskComment.CommentType.NORMAL},
+                        )
+                    else:
+                        TaskComment.objects.get_or_create(
+                            task=t,
+                            user=assignee,
+                            content=f"Initial draft & module implementation for '{title}' actively underway.",
+                            defaults={"comment_type": TaskComment.CommentType.NORMAL},
+                        )
 
             # -----------------------------------------------------------------
-            # 5. TIMESHEETS (LOGWORK RECORDS WITH 8.0H DAILY CEILING)
+            # 6. TIMESHEET LOGWORKS (AUGUST APPROVED, SEPTEMBER PENDING/REVIEW)
             # -----------------------------------------------------------------
-            self.stdout.write("5. Seeding Timesheet LogWorks and Daily Totals...")
+            self.stdout.write("6. Seeding Timesheets (August past records + September active records)...")
 
-            hours_distribution_pool = [
-                [8.0],
-                [4.0, 4.0],
-                [5.0, 3.0],
-                [3.5, 2.5, 2.0],
-                [4.0, 2.5, 1.5],
-                [3.0, 3.0, 2.0],
-                [6.0, 2.0],
-                [7.5],
-            ]
-
+            # 6.1. Tháng 8/2026: Ghi công quá khứ (ĐÃ DUYỆT - APPROVED)
+            august_dates = [date(2026, 8, 25), date(2026, 8, 26), date(2026, 8, 27)]
             for emp in employee_users:
                 emp_tasks = [t for t in created_tasks if t.assignee_id == emp.id]
                 if not emp_tasks:
                     continue
+                chosen_task = emp_tasks[0]
 
-                for d_offset in range(1, 4):
-                    work_date = today - timedelta(days=d_offset)
-                    dist = random.choice(hours_distribution_pool)
+                for w_date in august_dates:
+                    LogWork.objects.get_or_create(
+                        task=chosen_task,
+                        user=emp,
+                        work_date=w_date,
+                        defaults={
+                            "hours_spent": Decimal("8.0"),
+                            "description": f"Completed sprint deliverables in August for {chosen_task.title}.",
+                            "review_status": LogWork.ReviewStatus.APPROVED,
+                            "reviewed_by": emp.profile.manager or manager1,
+                            "review_note": "Reconciled and approved for August payroll.",
+                        }
+                    )
+                    rebuild_daily_user_timesheet(user_id=emp.id, work_date=w_date)
 
-                    num_tasks = min(len(dist), len(emp_tasks))
-                    selected_tasks = random.sample(emp_tasks, num_tasks)
+            # 6.2. Tháng 9/2026: Kỳ công hiện tại (PENDING & APPROVED & REJECTED)
+            sept_dates = [date(2026, 9, 1), date(2026, 9, 2)]
+            for idx, emp in enumerate(employee_users):
+                emp_tasks = [t for t in created_tasks if t.assignee_id == emp.id]
+                if not emp_tasks:
+                    continue
+                chosen_task = emp_tasks[0]
 
-                    for idx, task in enumerate(selected_tasks):
-                        hours = dist[idx] if idx < len(dist) else 2.0
+                # Ngày 01/09: PENDING để Manager vào duyệt
+                LogWork.objects.get_or_create(
+                    task=chosen_task,
+                    user=emp,
+                    work_date=sept_dates[0],
+                    defaults={
+                        "hours_spent": Decimal("8.0"),
+                        "description": f"Active feature development and testing on {chosen_task.title}.",
+                        "review_status": LogWork.ReviewStatus.PENDING,
+                    }
+                )
+                rebuild_daily_user_timesheet(user_id=emp.id, work_date=sept_dates[0])
 
-                        if d_offset == 1:
-                            status_val = LogWork.ReviewStatus.PENDING
-                            reviewed_by_user = None
-                            review_note = None
-                        elif d_offset == 2:
-                            status_val = random.choice([LogWork.ReviewStatus.PENDING, LogWork.ReviewStatus.APPROVED])
-                            reviewed_by_user = manager_user if status_val == LogWork.ReviewStatus.APPROVED else None
-                            review_note = "Excellent progress on feature implementation." if status_val == LogWork.ReviewStatus.APPROVED else None
-                        else:
-                            status_val = random.choice([LogWork.ReviewStatus.APPROVED, LogWork.ReviewStatus.APPROVED, LogWork.ReviewStatus.REJECTED])
-                            reviewed_by_user = manager_user
-                            review_note = "Approved by project manager." if status_val == LogWork.ReviewStatus.APPROVED else "Please provide more detailed work log descriptions."
-
-                        LogWork.objects.get_or_create(
-                            task=task,
-                            user=emp,
-                            work_date=work_date,
-                            defaults={
-                                "hours_spent": hours,
-                                "description": f"Executed engineering work for task: {task.title}",
-                                "review_status": status_val,
-                                "reviewed_by": reviewed_by_user,
-                                "review_note": review_note,
-                            }
-                        )
-
-                    # Automatically rebuild daily timesheets accurately
-                    rebuild_daily_user_timesheet(user_id=emp.id, work_date=work_date)
+                # Ngày 02/09: Pha trộn PENDING, APPROVED, REJECTED
+                status_choice = LogWork.ReviewStatus.PENDING if idx % 3 == 0 else (
+                    LogWork.ReviewStatus.APPROVED if idx % 3 == 1 else LogWork.ReviewStatus.REJECTED
+                )
+                LogWork.objects.get_or_create(
+                    task=chosen_task,
+                    user=emp,
+                    work_date=sept_dates[1],
+                    defaults={
+                        "hours_spent": Decimal("7.5"),
+                        "description": f"Refactoring & QA inspection for {chosen_task.title}.",
+                        "review_status": status_choice,
+                        "reviewed_by": emp.profile.manager if status_choice != LogWork.ReviewStatus.PENDING else None,
+                        "review_note": "Approved" if status_choice == LogWork.ReviewStatus.APPROVED else (
+                            "Please clarify task deliverables." if status_choice == LogWork.ReviewStatus.REJECTED else None
+                        ),
+                    }
+                )
+                rebuild_daily_user_timesheet(user_id=emp.id, work_date=sept_dates[1])
 
             # -----------------------------------------------------------------
-            # 6. TIMELOCKS (1 GLOBAL LOCK FOR ADMIN, 1 JOB LOCK FOR MANAGER)
+            # 7. TIMELOCKS (THÁNG 8 ĐÃ KHÓA GLOBAL & JOB LEVEL)
             # -----------------------------------------------------------------
-            self.stdout.write("6. Seeding Period TimeLocks...")
-            prev_month = today.month - 1 if today.month > 1 else 12
-            prev_year = today.year if today.month > 1 else today.year - 1
+            self.stdout.write("7. Seeding TimeLocks (August 2026 Locked Global + Job Scope)...")
 
-            # Job Scope Lock (Manager)
-            TimeLock.objects.get_or_create(
-                job=jobs[0],
-                lock_scope=TimeLock.LockScope.JOB,
-                lock_year=prev_year,
-                lock_month=prev_month,
-                defaults={
-                    "is_locked": True,
-                    "locked_by": manager_user,
-                    "lock_reason": f"Monthly timesheet cycle completed and reconciled for {jobs[0].job_name}."
-                }
-            )
-
-            # Global Scope Lock (Admin)
+            # 🔒 Global Lock Tháng 8/2026 (Admin Khóa toàn công ty)
             TimeLock.objects.get_or_create(
                 job=None,
                 lock_scope=TimeLock.LockScope.GLOBAL,
-                lock_year=prev_year,
-                lock_month=prev_month,
+                lock_year=2026,
+                lock_month=8,
                 defaults={
                     "is_locked": True,
                     "locked_by": admin_user,
-                    "lock_reason": "Company-wide fiscal timesheet period finalized for payroll processing."
+                    "lock_reason": "Company-wide fiscal period August 2026 finalized and frozen for payroll.",
                 }
             )
 
-            # -----------------------------------------------------------------
-            # 7. CHAT ROOMS & CHAT MESSAGES
-            # -----------------------------------------------------------------
-            self.stdout.write("7. Seeding Realtime Chat Rooms & Messages...")
-            for job in jobs[:4]:
-                room, _ = ChatRoom.objects.get_or_create(
-                    name=f"Channel - {job.job_name}",
-                    room_type=ChatRoom.RoomType.JOB,
-                    job=job,
-                )
-                ChatParticipant.objects.get_or_create(room=room, user=manager_user)
-                for emp in employee_users[:3]:
-                    ChatParticipant.objects.get_or_create(room=room, user=emp)
-
-                ChatMessage.objects.get_or_create(
-                    room=room,
-                    sender=manager_user,
-                    content=f"Welcome team to {job.job_name}. Please coordinate your sprint tasks here.",
-                )
-                ChatMessage.objects.get_or_create(
-                    room=room,
-                    sender=employee_users[0],
-                    content="Acknowledged. The technical baseline has been set up.",
-                )
-
-            # -----------------------------------------------------------------
-            # 8. NOTIFICATIONS FOR ADMIN, MANAGER & EMPLOYEE
-            # -----------------------------------------------------------------
-            self.stdout.write("8. Seeding EventType Notifications across all 3 roles...")
-
-            # Notifications for Admin
-            Notification.objects.get_or_create(
-                user=admin_user,
-                event_type=Notification.EventType.ACCOUNT_OR_PERMISSION_CHANGED,
-                title="Security Policy Updated",
+            # 🔒 Job Scope Lock Tháng 8/2026 (Job 2 Khóa sớm nghiệm thu)
+            TimeLock.objects.get_or_create(
+                job=job2,
+                lock_scope=TimeLock.LockScope.JOB,
+                lock_year=2026,
+                lock_month=8,
                 defaults={
-                    "content": "Administrator password policy and permission mappings have been reloaded.",
-                    "related_url": "/admin/users/search",
-                    "is_read": False,
+                    "is_locked": True,
+                    "locked_by": manager1,
+                    "lock_reason": "Early acceptance cutoff signed with Global Finance on 25 August 2026.",
                 }
             )
+
+            # -----------------------------------------------------------------
+            # 8. CHAT CHANNELS & NOTIFICATIONS
+            # -----------------------------------------------------------------
+            self.stdout.write("8. Seeding Chat Rooms & Realtime Notifications...")
+            for j in [job1, job2, job4]:
+                room, _ = ChatRoom.objects.get_or_create(
+                    name=f"Project Room - {j.job_name}",
+                    room_type=ChatRoom.RoomType.JOB,
+                    job=j,
+                )
+                ChatParticipant.objects.get_or_create(room=room, user=j.manager)
+                ChatParticipant.objects.get_or_create(room=room, user=admin_user)
+                ChatMessage.objects.get_or_create(
+                    room=room,
+                    sender=j.manager,
+                    content=f"Welcome to {j.job_name} sprint channel. Please coordinate deliverable handovers here.",
+                )
+
+            # Notifications
             Notification.objects.get_or_create(
                 user=admin_user,
                 event_type=Notification.EventType.TIMESHEET_LOCK,
                 title="Global Period Lock Active",
                 defaults={
-                    "content": f"Global payroll cycle for {prev_month}/{prev_year} has been locked successfully.",
+                    "content": "August 2026 payroll timesheet cycle is completely locked.",
                     "related_url": "/admin/timesheets",
                     "is_read": True,
                 }
             )
-
-            # Notifications for Manager
-            first_task = created_tasks[0]
             Notification.objects.get_or_create(
-                user=manager_user,
-                event_type=Notification.EventType.TASK_SUBMITTED,
-                title="Task Submitted for QA Review",
+                user=manager1,
+                event_type=Notification.EventType.TASK_ASSIGNED,
+                title="Sprint Deliverables Pending QA",
                 defaults={
-                    "content": f"Employee Sophia Johnson submitted '{first_task.title}' for QA inspection.",
+                    "content": "Deliverables for ERP & Mobile Banking are ready in your review queue.",
                     "related_url": "/manager/tasks/review",
                     "is_read": False,
                 }
             )
-            Notification.objects.get_or_create(
-                user=manager_user,
-                event_type=Notification.EventType.TASK_COMMENT,
-                title="New Task Discussion",
-                defaults={
-                    "content": "Sophia Johnson commented on the database indexing strategy.",
-                    "related_url": f"/manager/jobs/{jobs[0].id}",
-                    "is_read": True,
-                }
-            )
 
-            # Notifications for Employee (Sophia)
-            sophia_user = employee_users[0]
-            Notification.objects.get_or_create(
-                user=sophia_user,
-                event_type=Notification.EventType.TASK_ASSIGNED,
-                title="New Task Assigned",
-                defaults={
-                    "content": f"Manager Alexander Wright assigned you to '{first_task.title}'.",
-                    "related_url": "/employee/my-tasks",
-                    "is_read": False,
-                }
-            )
-            Notification.objects.get_or_create(
-                user=sophia_user,
-                event_type=Notification.EventType.LOG_WORK_APPROVED,
-                title="Log Work Approved",
-                defaults={
-                    "content": f"Your work log entry on '{first_task.title}' was approved by Alexander Wright.",
-                    "related_url": "/employee/timesheet",
-                    "is_read": False,
-                }
-            )
-
-            self.stdout.write(self.style.SUCCESS(
-                f"Successfully seeded enterprise data in English!\n"
-                f"• Admin: admin@worktracker.vn / Admin123!\n"
-                f"• Manager: manager@worktracker.vn / Manager123!\n"
-                f"• Employee: sophia.johnson@worktracker.vn / Emp12345!\n"
-                f"• Total Tasks: {len(created_tasks)}, Jobs: {len(jobs)}, LogWorks: {LogWork.objects.count()}"
-            ))
+        self.stdout.write(self.style.SUCCESS("=== Standard Enterprise Demo Dataset Seeded Successfully! ==="))
+        self.stdout.write("Accounts created:")
+        self.stdout.write("  Admin:     admin@worktracker.vn / Admin12345!")
+        self.stdout.write("  Manager 1: manager@worktracker.vn / Manager12345! (10 IT Staff)")
+        self.stdout.write("  Manager 2: manager2@worktracker.vn / Manager12345! (10 Marketing/Design Staff)")
+        self.stdout.write("  Employees: john.smith@worktracker.vn ... emily.lee@worktracker.vn / Emp12345!")
+        self.stdout.write("Time distribution:")
+        self.stdout.write("  - August 2026: LOCKED (Global & Job Lock) with approved logs")
+        self.stdout.write("  - September 2026: OPEN with Pending/Review logworks & QA deliverables")
+        self.stdout.write("  - Oct, Nov, Dec 2026: Future scheduled milestone tasks")

@@ -15,10 +15,11 @@ export default function TeamMonthlyEffortCard({
   month = 8,
   year = 2026,
   heatmapRawData = [],
-  totalHours = '377.5h',
+  totalHours = '0.0h',
+  approvedHours: approvedHoursProp = null,
 }) {
   // Compute daily hours data for each day of the month (1 -> daysInMonth)
-  const { chartData, totalMonthHours, approvedHours, avgDailyHours } = useMemo(() => {
+  const { chartData, totalMonthHours, approvedHours, avgDailyHours, verifiedRatio } = useMemo(() => {
     const daysCount = getDaysInMonth(new Date(year, month - 1));
     const daysMap = {};
 
@@ -47,15 +48,26 @@ export default function TeamMonthlyEffortCard({
 
     const activeDays = data.filter((d) => d.hours > 0).length || 1;
     const avg = total > 0 ? (total / activeDays).toFixed(1) : '0.0';
-    const approved = (total * 0.85).toFixed(1); // Estimated verified ratio
+
+    const actualApproved =
+      approvedHoursProp !== null && approvedHoursProp !== undefined
+        ? parseFloat(approvedHoursProp).toFixed(1)
+        : '0.0';
+
+    const finalTotalNum = total > 0 ? total : parseFloat(totalHours) || 0;
+    const verifiedRatio =
+      finalTotalNum > 0 && parseFloat(actualApproved) > 0
+        ? `${Math.round((parseFloat(actualApproved) / finalTotalNum) * 100)}% rate`
+        : '0% rate';
 
     return {
       chartData: data,
-      totalMonthHours: total > 0 ? total.toFixed(1) : (parseFloat(totalHours) || 0).toFixed(1),
-      approvedHours: total > 0 ? approved : '312.0',
-      avgDailyHours: avg !== '0.0' ? avg : '18.5',
+      totalMonthHours: finalTotalNum.toFixed(1),
+      approvedHours: actualApproved,
+      avgDailyHours: avg !== '0.0' ? avg : '0.0',
+      verifiedRatio,
     };
-  }, [month, year, heatmapRawData, totalHours]);
+  }, [month, year, heatmapRawData, totalHours, approvedHoursProp]);
 
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs h-full flex flex-col justify-between space-y-3">
@@ -132,7 +144,7 @@ export default function TeamMonthlyEffortCard({
               </div>
             </div>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
-              +42.5h
+              {parseFloat(totalMonthHours) > 0 ? `+${totalMonthHours}h` : '0.0h'}
             </span>
           </div>
 
@@ -148,7 +160,7 @@ export default function TeamMonthlyEffortCard({
               </div>
             </div>
             <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shrink-0">
-              85% rate
+              {verifiedRatio}
             </span>
           </div>
 

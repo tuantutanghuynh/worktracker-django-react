@@ -91,13 +91,14 @@ export default function TeamGridView({
       </div>
 
       {/* Phân trang cho Grid View */}
-      {totalPages > 1 && (
+      {totalItems > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-2xs">
           <PaginationBar
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={totalItems}
             pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50]}
             onPageChange={onPageChange}
             onPageSizeChange={onPageSizeChange}
           />

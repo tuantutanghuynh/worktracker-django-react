@@ -1,0 +1,72 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Task Rework Requested: {{ task_title }}{% endblock %}
+
+{% block content %}
+  <p style="margin:0 0 16px; font-size:18px; font-weight:600; color:#dc2626;">
+    Task Rework Requested
+  </p>
+
+  <p style="margin:0 0 20px; font-size:14px; color:#334155; line-height:1.7;">
+    Hello <strong>{{ assignee_name }}</strong>, your manager has reviewed the deliverable for task <strong>"{{ task_title }}"</strong> and requested updates before sign-off.
+  </p>
+
+  <!-- Lý do từ chối / Phản hồi của Quản lý -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background-color:#fffbeb; border-left:4px solid #f59e0b; border-radius:4px; margin:0 0 24px;">
+    <tr>
+      <td style="padding:16px 20px;">
+        <p style="margin:0 0 6px; font-size:11px; font-weight:700; color:#92400e; text-transform:uppercase; letter-spacing:0.5px;">
+          Manager's Feedback &amp; Required Adjustments
+        </p>
+        <p style="margin:0; font-size:14px; color:#78350f; line-height:1.6; white-space:pre-line;">
+          {{ rejection_reason|default:"Please revise according to project requirements and re-submit." }}
+        </p>
+        {% if reviewer_name %}
+          <p style="margin:8px 0 0; font-size:12px; color:#b45309; font-weight:600;">
+            — Reviewed by {{ reviewer_name }}
+          </p>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <!-- Thông tin Task -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin:0 0 20px;">
+    <tr>
+      <td style="padding:16px 20px;">
+        <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+          Task Title
+        </p>
+        <p style="margin:0 0 14px; font-size:14px; font-weight:600; color:#0f172a;">
+          {{ task_title }}
+        </p>
+
+        <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+          Project / Job
+        </p>
+        <p style="margin:0; font-size:13px; color:#0f172a;">
+          <strong style="color:#2563eb;">[{{ job_code }}]</strong> {{ job_name }}
+        </p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Nút cập nhật Task -->
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <tr>
+      <td style="background-color:#dc2626; border-radius:8px;">
+        <a href="{{ task_url }}"
+           style="display:inline-block; padding:12px 28px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none;">
+          View &amp; Update Task
+        </a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0 0 20px; font-size:12px; color:#64748b; line-height:1.6;">
+    If the button does not work, copy this link into your browser:<br>
+    <span style="color:#dc2626; word-break:break-all;">{{ task_url }}</span>
+  </p>
+{% endblock %}

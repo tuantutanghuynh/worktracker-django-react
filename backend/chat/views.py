@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
+from accounts.models import EmployeeProfile
 from projects.models import Job
 from tasks.models import Task
 from system.models import Notification
@@ -59,6 +60,79 @@ def sync_user_job_channels(user):
             defaults={"name": room_name},
         )
         ChatParticipant.objects.get_or_create(room=room, user=user)
+
+
+def get_chat_allowed_user_ids(user):
+    """
+    Phạm vi nhân sự được phép nhắn tin 1-1 (Data Scoping):
+    - ADMIN: Thấy tất cả user active.
+    - MANAGER:
+        * Admin (hỗ trợ kỹ thuật / vận hành)
+        * Nhân viên do Manager này trực tiếp phụ trách (profile.manager_id = user.id)
+        * Nhân viên đang làm task trong các Job do Manager này quản lý
+        * Các Manager khác trong công ty (trao đổi ngang cấp)
+    - EMPLOYEE:
+        * Admin (hỗ trợ kỹ thuật / vận hành)
+        * Manager trực tiếp (profile.manager_id)
+        * Manager của các Job mà Employee này có task
+        * Đồng nghiệp cùng Manager trực tiếp
+        * Đồng nghiệp cùng tham gia các Job mà Employee này có task
+    """
+    if not user.is_authenticated:
+        return set()
+
+    role_code = getattr(getattr(user, "role", None), "code", "").upper()
+    if role_code == "ADMIN" or getattr(user, "is_superuser", False):
+        return set(User.objects.exclude(id=user.id).filter(is_active=True).values_list("id", flat=True))
+
+    if role_code == "MANAGER":
+        # 1. Nhân viên do Manager này trực tiếp phụ trách
+        managed_emp_ids = set(
+            EmployeeProfile.objects.filter(manager_id=user.id).values_list("user_id", flat=True)
+        )
+        # 2. Nhân viên có task trong Job thuộc Manager này
+        project_emp_ids = set(
+            Task.objects.filter(job__manager_id=user.id).exclude(assignee__isnull=True).values_list("assignee_id", flat=True)
+        )
+        # 3. Admin và các Manager khác
+        leadership_ids = set(
+            User.objects.filter(role__code__in=["ADMIN", "MANAGER"], is_active=True)
+            .exclude(id=user.id)
+            .values_list("id", flat=True)
+        )
+        return (managed_emp_ids | project_emp_ids | leadership_ids) - {user.id}
+
+    if role_code == "EMPLOYEE":
+        # 1. Admin
+        admin_ids = set(
+            User.objects.filter(role__code="ADMIN", is_active=True).values_list("id", flat=True)
+        )
+        # 2. Manager trực tiếp
+        direct_mgr_id = getattr(getattr(user, "profile", None), "manager_id", None)
+        manager_ids = {direct_mgr_id} if direct_mgr_id else set()
+
+        # 3. Manager của các Job mà Employee này có task
+        job_mgr_ids = set(
+            Task.objects.filter(assignee=user).exclude(job__manager__isnull=True).values_list("job__manager_id", flat=True)
+        )
+        manager_ids |= job_mgr_ids
+
+        # 4. Đồng nghiệp cùng Manager trực tiếp
+        teammate_ids = set()
+        if direct_mgr_id:
+            teammate_ids |= set(
+                EmployeeProfile.objects.filter(manager_id=direct_mgr_id).values_list("user_id", flat=True)
+            )
+
+        # 5. Đồng nghiệp cùng tham gia các Job mà Employee này có task
+        my_job_ids = Task.objects.filter(assignee=user).values_list("job_id", flat=True).distinct()
+        teammate_ids |= set(
+            Task.objects.filter(job_id__in=my_job_ids).exclude(assignee__isnull=True).values_list("assignee_id", flat=True)
+        )
+
+        return (admin_ids | manager_ids | teammate_ids) - {user.id, None}
+
+    return set()
 
 
 class ChatRoomViewSet(viewsets.ModelViewSet):
@@ -260,6 +334,14 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         if current_user.id == target_user.id:
             return Response({"detail": "Cannot create direct chat with yourself."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Kiểm tra phân quyền phạm vi chat (Data Scoping)
+        allowed_ids = get_chat_allowed_user_ids(current_user)
+        if target_user.id not in allowed_ids:
+            return Response(
+                {"detail": "You do not have permission to start a direct chat with this user."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # Tìm phòng 1-1 đã tồn tại giữa 2 người
         existing_rooms = ChatRoom.objects.filter(
             room_type=ChatRoom.RoomType.DIRECT,
@@ -323,8 +405,13 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def directory(self, request):
         """
-        Danh sách tất cả đồng nghiệp / nhân sự trong công ty để bắt đầu chat 1-1.
+        Danh sách nhân sự được phép chat 1-1 theo phạm vi phân quyền (Scoping).
         """
-        users = User.objects.exclude(id=request.user.id).filter(is_active=True).select_related("role", "profile")
+        allowed_ids = get_chat_allowed_user_ids(request.user)
+        users = (
+            User.objects.filter(id__in=allowed_ids, is_active=True)
+            .select_related("role", "profile", "profile__department")
+            .order_by("role__id", "email")
+        )
         serializer = ChatUserSerializer(users, many=True)
         return Response(serializer.data)

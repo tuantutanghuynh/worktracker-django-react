@@ -20,6 +20,7 @@ import {
   useTimeLocks,
   managerTimesheetKeys,
 } from '../../hooks/queries/manager/useManagerTimesheets';
+import { managerDashboardKeys } from '../../hooks/queries/manager/useManagerDashboard';
 import { useManagerJobs } from '../../hooks/queries/manager/useManagerJobs';
 
 export default function ManagerTimesheetReviewPage() {
@@ -299,6 +300,7 @@ export default function ManagerTimesheetReviewPage() {
         successCount++;
       }
       queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      queryClient.invalidateQueries({ queryKey: managerDashboardKeys.all });
       toast.success(
         `Approved all ${pendingItems.length} task${pendingItems.length > 1 ? 's' : ''} for ${selectedDayGroup.employeeName}`
       );
@@ -306,6 +308,7 @@ export default function ManagerTimesheetReviewPage() {
       autoAdvanceToNextDay(selectedDayGroup.key);
     } catch (err) {
       queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      queryClient.invalidateQueries({ queryKey: managerDashboardKeys.all });
       if (successCount > 0) {
         toast.warning(`Approved ${successCount}/${pendingItems.length} tasks. Some failed.`);
         refetch();

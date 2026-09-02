@@ -48,38 +48,6 @@ export default function TimeLockHeroHeader({
           <RotateCcw className={cn('w-3.5 h-3.5 text-slate-500', isFetching && 'animate-spin')} />
           <span>Refresh</span>
         </button>
-
-        {/* Nút 1-Click Khóa Toàn Bộ Dự Án Của Manager */}
-        <button
-          onClick={onBatchLockAll}
-          disabled={isFetching || unlockedCount === 0 || isCurrentPeriod || isGloballyLocked}
-          className={cn(
-            'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-md',
-            isGloballyLocked
-              ? 'bg-purple-100 text-purple-700 border border-purple-300 cursor-not-allowed shadow-none'
-              : isCurrentPeriod
-              ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed shadow-none'
-              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20 cursor-pointer disabled:opacity-50'
-          )}
-          title={
-            isGloballyLocked
-              ? 'Period is already globally locked company-wide by Admin.'
-              : isCurrentPeriod
-              ? `Month ${String(activeMonth).padStart(2, '0')} is currently in progress. You can only lock after the month ends.`
-              : 'Lock all unlocked projects for this period'
-          }
-        >
-          <Lock className="w-4 h-4" />
-          <span>
-            {isBatchLocking
-              ? 'Locking All...'
-              : isGloballyLocked
-              ? `Globally Locked by Admin (Month ${String(activeMonth).padStart(2, '0')})`
-              : isCurrentPeriod
-              ? `In Progress (Cannot Lock Month ${String(activeMonth).padStart(2, '0')})`
-              : `Lock All My Projects (Month ${String(activeMonth).padStart(2, '0')})`}
-          </span>
-        </button>
       </div>
     </div>
   );

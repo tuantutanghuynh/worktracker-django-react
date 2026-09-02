@@ -1,0 +1,17 @@
+{% autoescape off %}Task Rework Requested: {{ task_title }}
+
+Hello {{ assignee_name }}, your manager has reviewed the deliverable for task "{{ task_title }}" and requested adjustments.
+
+Manager's Feedback:
+{{ rejection_reason|default:"Please revise according to project requirements and re-submit." }}
+{% if reviewer_name %}— Reviewed by {{ reviewer_name }}{% endif %}
+
+Task: {{ task_title }}
+Project: [{{ job_code }}] {{ job_name }}
+
+Update your task here: {{ task_url }}
+
+--
+This is an automated message from {{ app_name }}. Please do not reply to this email.
+{% if support_email %}Need help? Contact {{ support_email }}{% endif %}
+{% endautoescape %}

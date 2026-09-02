@@ -61,14 +61,17 @@ export default function ManagerDashboardPage() {
     year: selectedYear,
   });
 
-  const { data: tasksResponse } = useManagerTasks({ page_size: 50 });
-  const { data: pendingLogsResponse } = useLogWorks({ review_status: 'PENDING', page_size: 200 });
-  const { data: auditResponse } = useManagerAuditLogs();
+  const { data: tasksResponse, refetch: refetchTasks } = useManagerTasks({ page_size: 50 });
+  const { data: pendingLogsResponse, refetch: refetchPendingLogs } = useLogWorks({ review_status: 'PENDING', page_size: 200 });
+  const { data: auditResponse, refetch: refetchAudit } = useManagerAuditLogs();
 
   const handleRefresh = useCallback(() => {
     refetch();
+    refetchPendingLogs();
+    refetchTasks();
+    refetchAudit();
     toast.success('Dashboard metrics refreshed!');
-  }, [refetch]);
+  }, [refetch, refetchPendingLogs, refetchTasks, refetchAudit]);
 
   // Chuẩn hóa 5 chỉ số KPI cốt lõi
   const metrics = useMemo(() => {
@@ -91,9 +94,14 @@ export default function ManagerDashboardPage() {
       if (userId && date) uniquePendingDays.add(`${userId}_${date}`);
     });
 
+    const pendingTimesheetsCount =
+      dashboardData?.pending_timesheets_count !== undefined
+        ? dashboardData.pending_timesheets_count
+        : uniquePendingDays.size;
+
     const teamMembersCount = Array.isArray(dashboardData?.workload_per_employee)
       ? dashboardData.workload_per_employee.length
-      : 15;
+      : 0;
 
     return {
       managed_jobs: dashboardData?.managed_jobs_count ?? 0,
@@ -102,7 +110,7 @@ export default function ManagerDashboardPage() {
       overdue_rate_num: overdueRateNum,
       overdue_count: overdueObj?.overdue_tasks ?? 0,
       active_tasks_count: overdueObj?.total_active_tasks ?? 0,
-      pending_timesheets: uniquePendingDays.size,
+      pending_timesheets: pendingTimesheetsCount,
       team_work_hours: teamHoursStr,
     };
   }, [dashboardData, pendingLogsResponse]);
@@ -212,6 +220,7 @@ export default function ManagerDashboardPage() {
             year={selectedYear}
             heatmapRawData={dashboardData?.productivity_heatmap || []}
             totalHours={metrics.team_work_hours}
+            approvedHours={dashboardData?.team_approved_hours}
           />
         </div>
 

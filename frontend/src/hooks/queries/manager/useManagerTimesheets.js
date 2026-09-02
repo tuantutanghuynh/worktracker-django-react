@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { toast } from 'sonner';
 import managerTimesheetService from '../../../services/manager/managerTimesheetService';
 import { getErrorMessage } from '../../../utils/errorMessages';
+import { managerDashboardKeys } from './useManagerDashboard';
 
 /**
  * Query Key Factory for Manager Timesheets & TimeLocks
@@ -50,6 +51,7 @@ export function useApproveLogWork() {
     mutationFn: ({ id, note }) => managerTimesheetService.approveLogWork(id, note),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      queryClient.invalidateQueries({ queryKey: managerDashboardKeys.all });
       toast.success('LogWork entry approved successfully!');
     },
     onError: (err) => {
@@ -68,6 +70,7 @@ export function useRejectLogWork() {
     mutationFn: ({ id, reason }) => managerTimesheetService.rejectLogWork(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      queryClient.invalidateQueries({ queryKey: managerDashboardKeys.all });
       toast.success('LogWork entry rejected!');
     },
     onError: (err) => {
@@ -86,6 +89,7 @@ export function useCorrectLogWork() {
     mutationFn: ({ id, data }) => managerTimesheetService.correctLogWork(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      queryClient.invalidateQueries({ queryKey: managerDashboardKeys.all });
       toast.success('LogWork hours adjusted successfully!');
     },
     onError: (err) => {
@@ -104,6 +108,7 @@ export function useVoidLogWork() {
     mutationFn: ({ id, reason }) => managerTimesheetService.voidLogWork(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: managerTimesheetKeys.all });
+      queryClient.invalidateQueries({ queryKey: managerDashboardKeys.all });
       toast.success('LogWork entry voided!');
     },
     onError: (err) => {

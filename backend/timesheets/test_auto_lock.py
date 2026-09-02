@@ -1,5 +1,8 @@
 """
-Test tự động khoá kỳ công khi sang tháng mới.
+Test tự động khoá kỳ công khi sang tháng mới (Quy trình 2 giai đoạn):
+  - Ngày 1: Tự động khoá cấp JOB (Manager scope) để chặn nhân viên log/sửa công.
+  - Ngày 1..4: Cửa sổ ân hạn (grace period) cho Manager review công.
+  - Ngày 5: Tự động khoá cấp GLOBAL (Admin scope) đóng băng dữ liệu cho payroll.
 
 Luật quan trọng nhất: CHỈ khoá tháng đã qua. Khoá nhầm tháng hiện tại sẽ
 khiến toàn công ty không chấm công được — sự cố nghiêm trọng nhất mà tính
@@ -34,7 +37,6 @@ def ghim_hom_nay(monkeypatch, hom_nay):
     class _FakeTimezone:
         @staticmethod
         def now():
-            # Giữ nguyên timezone thật để so sánh datetime không vỡ khi USE_TZ=True
             return timezone_that.make_aware(
                 datetime(hom_nay.year, hom_nay.month, hom_nay.day, 12, 0)
             )
@@ -51,6 +53,24 @@ def admin(db):
     )
 
 
+@pytest.fixture
+def manager(db):
+    role = baker.make("accounts.Role", code="MANAGER")
+    return baker.make(
+        "accounts.CustomUser", email="manager@test.com", role=role, is_active=True
+    )
+
+
+@pytest.fixture
+def sample_job(db, manager):
+    return baker.make(
+        "projects.Job",
+        job_name="Website Redesign",
+        manager=manager,
+        start_date=date(2026, 1, 1),
+    )
+
+
 def khoa_global(month, year, is_locked=True, user=None):
     return baker.make(
         "timesheets.TimeLock",
@@ -63,10 +83,20 @@ def khoa_global(month, year, is_locked=True, user=None):
     )
 
 
-def dang_khoa(month, year):
+def dang_khoa_global(month, year):
     return TimeLock.objects.filter(
         lock_scope=TimeLock.LockScope.GLOBAL,
         job__isnull=True,
+        lock_month=month,
+        lock_year=year,
+        is_locked=True,
+    ).exists()
+
+
+def dang_khoa_job(job, month, year):
+    return TimeLock.objects.filter(
+        lock_scope=TimeLock.LockScope.JOB,
+        job=job,
         lock_month=month,
         lock_year=year,
         is_locked=True,
@@ -91,60 +121,84 @@ class TestTinhThangTruoc:
 
 
 @pytest.mark.django_db
-class TestChiKhoaThangDaQua:
+class TestQuyTrinhHaiGiaiDoan:
+    """
+    Quy trình 2 giai đoạn:
+      - Ngày 1: Tự động khoá Job, để ngỏ Global lock cho Manager review.
+      - Ngày 5: Tự động khoá Global toàn hệ thống cho payroll.
+    """
 
-    def test_khoa_dung_thang_vua_ket_thuc(self, admin):
-        ket_qua = auto_lock_previous_period(today=date(2026, 9, 3))
+    def test_ngay_1_khoa_job_nhung_chua_khoa_global(self, admin, sample_job):
+        ket_qua = auto_lock_previous_period(today=date(2026, 9, 1))
 
         assert ket_qua["status"] == "locked"
-        assert (ket_qua["month"], ket_qua["year"]) == (8, 2026)
-        assert dang_khoa(8, 2026)
+        assert ket_qua["month"] == 8 and ket_qua["year"] == 2026
 
-    def test_KHONG_khoa_thang_hien_tai(self, admin):
+        # Cấp Job đã được khóa
+        assert dang_khoa_job(sample_job, 8, 2026)
+        assert ket_qua["job_locks"]["locked_count"] >= 1
+
+        # Cấp Global CHƯA bị khóa (để ngỏ cho Manager review)
+        assert not dang_khoa_global(8, 2026)
+        assert ket_qua["global_lock"]["status"] == "pending_until_day_5"
+
+    def test_ngay_3_van_trong_thoi_gian_an_han(self, admin, sample_job):
+        """Từ ngày 1 đến ngày 4: Global vẫn ở trạng thái pending_until_day_5."""
+        ket_qua = auto_lock_previous_period(today=date(2026, 9, 3))
+
+        assert not dang_khoa_global(8, 2026)
+        assert ket_qua["global_lock"]["status"] == "pending_until_day_5"
+
+    def test_ngay_5_chinh_thuc_khoa_global(self, admin, sample_job):
+        """Đúng ngày 5: Hết hạn ân hạn, hệ thống tự động khóa GLOBAL toàn công ty."""
+        ket_qua = auto_lock_previous_period(today=date(2026, 9, 5))
+
+        assert ket_qua["status"] == "locked"
+        assert dang_khoa_global(8, 2026)
+        assert ket_qua["global_lock"]["status"] == "locked"
+        assert dang_khoa_job(sample_job, 8, 2026)
+
+
+@pytest.mark.django_db
+class TestChiKhoaThangDaQua:
+
+    def test_KHONG_khoa_thang_hien_tai(self, admin, sample_job):
         """
         Chốt chặn quan trọng nhất của cả tính năng. Khoá nhầm tháng đang
         chấm công thì toàn công ty không log giờ được.
         """
-        auto_lock_previous_period(today=date(2026, 9, 3))
+        auto_lock_previous_period(today=date(2026, 9, 5))
 
-        assert not dang_khoa(9, 2026)
+        assert not dang_khoa_global(9, 2026)
+        assert not dang_khoa_job(sample_job, 9, 2026)
 
-    def test_KHONG_khoa_thang_tuong_lai(self, admin):
-        auto_lock_previous_period(today=date(2026, 9, 3))
+    def test_KHONG_khoa_thang_tuong_lai(self, admin, sample_job):
+        auto_lock_previous_period(today=date(2026, 9, 5))
 
-        assert not dang_khoa(10, 2026)
+        assert not dang_khoa_global(10, 2026)
+        assert not dang_khoa_job(sample_job, 10, 2026)
 
-    def test_ngay_dau_thang_van_khoa_duoc_thang_truoc(self, admin):
-        """
-        Chay dung ngay mung 1: thang truoc vua ket thuc hom qua, phai khoa
-        duoc ngay chu khong doi them ngay nao.
-        """
-        ket_qua = auto_lock_previous_period(today=date(2026, 9, 1))
-        assert ket_qua["status"] == "locked"
-        assert dang_khoa(8, 2026)
-
-    def test_giao_nam_khoa_thang_12_nam_truoc(self, admin):
+    def test_giao_nam_khoa_thang_12_nam_truoc(self, admin, sample_job):
         ket_qua = auto_lock_previous_period(today=date(2026, 1, 5))
 
         assert (ket_qua["month"], ket_qua["year"]) == (12, 2025)
-        assert dang_khoa(12, 2025)
-        assert not dang_khoa(1, 2026)
+        assert dang_khoa_global(12, 2025)
+        assert not dang_khoa_global(1, 2026)
 
 
 @pytest.mark.django_db
 class TestChayLaiNhieuLan:
     """
-    Beat chạy MỖI NGÀY chứ không chỉ ngày mùng 1 — nếu máy chủ tắt đúng
-    mùng 1 thì tháng đó sẽ không bao giờ được khoá. Đổi lại, từ ngày 2 trở
-    đi task gặp kỳ đã khoá, và điều đó phải là chuyện bình thường.
+    Beat chạy MỖI NGÀY — task đảm bảo tính idempotent, không tạo trùng
+    và không lỗi khi chạy lại nhiều lần.
     """
 
-    def test_chay_lan_hai_khong_loi(self, admin):
-        assert auto_lock_previous_period(today=date(2026, 9, 3))["status"] == "locked"
-        assert auto_lock_previous_period(today=date(2026, 9, 4))["status"] == "already_locked"
+    def test_chay_lai_ngay_5_va_6_khong_loi(self, admin, sample_job):
+        assert auto_lock_previous_period(today=date(2026, 9, 5))["status"] == "locked"
+        assert auto_lock_previous_period(today=date(2026, 9, 6))["status"] == "already_locked"
 
-    def test_khong_tao_them_ban_ghi_trung(self, admin):
-        for ngay in range(3, 8):
+    def test_khong_tao_them_ban_ghi_global_trung(self, admin, sample_job):
+        for ngay in range(5, 10):
             auto_lock_previous_period(today=date(2026, 9, ngay))
 
         so_ban_ghi = TimeLock.objects.filter(
@@ -153,14 +207,10 @@ class TestChayLaiNhieuLan:
         assert so_ban_ghi == 1
 
     def test_khong_ghi_de_len_ky_Admin_da_khoa_tay(self, admin):
-        """
-        Admin khoá tay trước, task tự động không được đụng vào — nếu ghi đè
-        thì lý do và người thực hiện trong lịch sử bị thay mất.
-        """
         khoa_global(8, 2026, user=admin)
         goc = TimeLock.objects.get(lock_month=8, lock_year=2026, lock_scope="GLOBAL")
 
-        auto_lock_previous_period(today=date(2026, 9, 3))
+        auto_lock_previous_period(today=date(2026, 9, 5))
 
         goc.refresh_from_db()
         assert goc.lock_reason != "Automatically locked by the system"
@@ -170,48 +220,37 @@ class TestChayLaiNhieuLan:
 class TestTruongHopBienDoi:
 
     def test_khong_co_admin_thi_bao_loi_khong_ngat(self, db):
-        """
-        TimeLock.locked_by la NOT NULL nen phai co nguoi dung ten. Khong co
-        Admin thi bo qua va ghi log, KHONG duoc nem ngoai le lam chet task.
-        """
-        ket_qua = auto_lock_previous_period(today=date(2026, 9, 3))
+        ket_qua = auto_lock_previous_period(today=date(2026, 9, 5))
 
         assert ket_qua["status"] == "no_admin"
-        assert not dang_khoa(8, 2026)
+        assert not dang_khoa_global(8, 2026)
 
     def test_admin_da_khoa_khong_duoc_dung_ten(self, db):
         role = baker.make("accounts.Role", code="ADMIN")
         baker.make("accounts.CustomUser", role=role, is_active=False)
 
-        assert auto_lock_previous_period(today=date(2026, 9, 3))["status"] == "no_admin"
+        assert auto_lock_previous_period(today=date(2026, 9, 5))["status"] == "no_admin"
 
-    def test_ky_da_mo_khoa_thi_khoa_lai(self, admin):
-        """
-        Admin mở khoá kỳ cũ để sửa số liệu rồi quên khoá lại — lần chạy sau
-        của task phải đóng lại. Bản ghi đã tồn tại với is_locked=False.
-        """
+    def test_ky_da_mo_khoa_thi_khoa_lai_vao_ngay_5(self, admin):
         khoa_global(8, 2026, is_locked=False, user=admin)
 
-        assert auto_lock_previous_period(today=date(2026, 9, 3))["status"] == "locked"
-        assert dang_khoa(8, 2026)
+        assert auto_lock_previous_period(today=date(2026, 9, 5))["status"] == "locked"
+        assert dang_khoa_global(8, 2026)
 
-    def test_ghi_ro_day_la_lenh_tu_dong(self, admin):
-        """Admin doc lich su phai phan biet duoc khoa tay va khoa tu dong."""
-        auto_lock_previous_period(today=date(2026, 9, 3))
+    def test_ghi_ro_day_la_lenh_tu_dong(self, admin, sample_job):
+        auto_lock_previous_period(today=date(2026, 9, 5))
 
-        tl = TimeLock.objects.get(lock_month=8, lock_year=2026, lock_scope="GLOBAL")
-        assert "Automatically locked" in tl.lock_reason
+        tl_global = TimeLock.objects.get(lock_month=8, lock_year=2026, lock_scope="GLOBAL")
+        assert "Automatically locked" in tl_global.lock_reason
+
+        tl_job = TimeLock.objects.get(lock_month=8, lock_year=2026, lock_scope="JOB", job=sample_job)
+        assert "Automatically locked" in tl_job.lock_reason
 
 
 @pytest.mark.django_db
 class TestKhongKhoaTayKyDangDienRa:
     """
     Chốt chặn cho việc khoá TAY qua giao diện Admin.
-
-    GLOBAL lock chặn ghi LogWork ở MỌI job, nên khoá nhầm tháng đang diễn ra
-    làm toàn công ty không chấm công được cho tới khi có người mở khoá. Mã
-    lỗi CANNOT_LOCK_ACTIVE_PERIOD đã có sẵn trong từ điển lỗi của frontend
-    từ lâu, nhưng phía Admin chưa bao giờ kiểm tra — chỉ phía Manager có.
     """
 
     def _khoa(self, admin, month, year):
@@ -227,28 +266,24 @@ class TestKhongKhoaTayKyDangDienRa:
         with pytest.raises(svc.TimeLockError) as exc:
             self._khoa(admin, 9, 2026)
         assert "CANNOT_LOCK_ACTIVE_PERIOD" in str(exc.value)
-        assert not dang_khoa(9, 2026)
+        assert not dang_khoa_global(9, 2026)
 
     def test_khoa_thang_tuong_lai_bi_tu_choi(self, admin, monkeypatch):
         svc = ghim_hom_nay(monkeypatch, date(2026, 9, 15))
 
         with pytest.raises(svc.TimeLockError):
             self._khoa(admin, 12, 2026)
-        assert not dang_khoa(12, 2026)
+        assert not dang_khoa_global(12, 2026)
 
     def test_khoa_thang_da_qua_van_duoc(self, admin, monkeypatch):
-        """Chốt chặn không được cản trở thao tác hợp lệ."""
         ghim_hom_nay(monkeypatch, date(2026, 9, 15))
 
         self._khoa(admin, 8, 2026)
-        assert dang_khoa(8, 2026)
+        assert dang_khoa_global(8, 2026)
 
     def test_ngay_cuoi_thang_van_chua_khoa_duoc(self, admin, monkeypatch):
-        """
-        Ranh giới: ngày 30/09 vẫn còn trong kỳ tháng 9 — nhân viên còn cả
-        ngày hôm đó để chấm công, chưa được khoá.
-        """
         svc = ghim_hom_nay(monkeypatch, date(2026, 9, 30))
 
         with pytest.raises(svc.TimeLockError):
             self._khoa(admin, 9, 2026)
+

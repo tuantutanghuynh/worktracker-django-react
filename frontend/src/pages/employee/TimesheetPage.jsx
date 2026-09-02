@@ -54,6 +54,8 @@ export function TimesheetPage() {
     const [statusValue, setStatusValue] = useState("")
     const [monthValue, setMonthValue] = useState("")
     const [projectValue, setProjectValue] = useState("")
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
     const [voidingId, setVoidingId] = useState(null)
     const [editingEntry, setEditingEntry] = useState(null)
 
@@ -84,6 +86,13 @@ export function TimesheetPage() {
         })
     }, [entries, searchQuery, statusValue, monthValue, projectValue])
 
+    const totalItems = filteredEntries.length
+    const totalPages = Math.ceil(totalItems / pageSize) || 1
+    const paginatedEntries = useMemo(() => {
+        const start = (currentPage - 1) * pageSize
+        return filteredEntries.slice(start, start + pageSize)
+    }, [filteredEntries, currentPage, pageSize])
+
     const todayHours = useMemo(() => {
         return entries
             .filter((e) => e.work_date === today && e.review_status !== "VOIDED")
@@ -93,12 +102,12 @@ export function TimesheetPage() {
     const [view, setView] = useState("list")
     const [weekOffset, setWeekOffset] = useState(0)
 
-
     function handleClearFilters() {
         setSearchQuery("")
         setStatusValue("")
         setMonthValue("")
         setProjectValue("")
+        setCurrentPage(1)
     }
 
     async function handleQuickLog({ task_id, work_date, hours_spent, description }) {
@@ -243,9 +252,21 @@ export function TimesheetPage() {
             {view === "list" ? (
                 <DataTable
                     columns={columns}
-                    data={filteredEntries}
+                    data={paginatedEntries}
                     isLoading={loading}
                     emptyMessage="No timesheet entries yet."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        totalItems,
+                        pageSize,
+                        pageSizeOptions: [10, 25, 50],
+                        onPageChange: setCurrentPage,
+                        onPageSizeChange: (size) => {
+                            setPageSize(size)
+                            setCurrentPage(1)
+                        },
+                    }}
                 />
             ) : (
                 <WeekView

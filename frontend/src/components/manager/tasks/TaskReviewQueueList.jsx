@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Search, X, Award, AlertTriangle, Paperclip, PauseCircle } from "lucide-react";
 import UserAvatar from "../../common/avatar/UserAvatar";
+import PaginationBar from "../../common/table/PaginationBar";
 import { cn } from "../../../utils/cn";
 
 export default function TaskReviewQueueList({
@@ -18,10 +19,24 @@ export default function TaskReviewQueueList({
   onResetFilters,
   reviewTab = "REVIEWING",
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedJobId, selectedDate, reviewTab]);
+
+  const totalItems = tasks.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedTasks = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return tasks.slice(start, start + pageSize);
+  }, [tasks, currentPage, pageSize]);
+
   return (
     <section className="w-[56%] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden min-h-0">
       {/* Filter Toolbar - ALWAYS VISIBLE */}
-      <div className="p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
+      <div className="p-2.5 border-b border-slate-200 bg-white space-y-2 shrink-0">
         <div className="flex items-center gap-2 text-xs">
           {/* 1. Search Bar (Compact) */}
           <div className="relative flex-1 min-w-0">
@@ -97,7 +112,7 @@ export default function TaskReviewQueueList({
       </div>
 
       {/* MASTER TABLE / EMPTY STATES */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 flex flex-col">
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="w-7 h-7 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
@@ -128,17 +143,22 @@ export default function TaskReviewQueueList({
             )}
           </div>
         ) : (
-          <table className="w-full text-left text-sm table-fixed">
+          <table
+            className={cn(
+              "w-full text-left text-sm table-fixed",
+              paginatedTasks.length >= 8 && "h-full"
+            )}
+          >
             <thead className="bg-slate-50/90 text-slate-600 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xs">
               <tr>
-                <th className="py-2.5 px-3 w-[40%]">TASK TITLE &amp; AUDIT</th>
-                <th className="py-2.5 px-2.5 w-[24%]">ASSIGNEE</th>
-                <th className="py-2.5 px-2 text-center w-[18%]">DELIVERABLES</th>
-                <th className="py-2.5 px-3 text-center w-[18%]">STATUS</th>
+                <th className="py-2 px-3 w-[40%]">TASK TITLE &amp; AUDIT</th>
+                <th className="py-2 px-2.5 w-[24%]">ASSIGNEE</th>
+                <th className="py-2 px-2 text-center w-[18%]">DELIVERABLES</th>
+                <th className="py-2 px-3 text-center w-[18%]">STATUS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {tasks.map((task) => {
+              {paginatedTasks.map((task) => {
                 const isSelected = String(task.id) === String(selectedTaskId);
                 const taskCode = task.code || `TSK-${task.id}`;
                 const empName = task.assignee?.full_name || task.assignee_name || "Unassigned";
@@ -158,7 +178,7 @@ export default function TaskReviewQueueList({
                         : "hover:bg-slate-50 border-l-4 border-transparent",
                     )}
                   >
-                    <td className="py-2.5 px-3 min-w-0">
+                    <td className="py-1.5 px-3 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-mono font-bold text-purple-700 text-xs shrink-0">{taskCode}</span>
                         <span className="font-bold text-slate-900 text-xs truncate max-w-[200px]">{task.title}</span>
@@ -174,7 +194,7 @@ export default function TaskReviewQueueList({
                       </div>
                       <p className="text-[10px] text-slate-400 font-mono truncate mt-0.5">{parentJob}</p>
                     </td>
-                    <td className="py-2.5 px-2.5">
+                    <td className="py-1.5 px-2.5">
                       <div className="flex items-center gap-2 min-w-0">
                         <UserAvatar avatarUrl={task.assignee?.avatar_url || task.assignee_avatar} fullName={empName} size="xs" />
                         <div className="min-w-0">
@@ -183,7 +203,7 @@ export default function TaskReviewQueueList({
                         </div>
                       </div>
                     </td>
-                    <td className="py-2.5 px-2 text-center">
+                    <td className="py-1.5 px-2 text-center">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold text-[11px]">
                         <Paperclip className="w-3 h-3 text-purple-600" />
                         <span>
@@ -191,7 +211,7 @@ export default function TaskReviewQueueList({
                         </span>
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-1.5 px-3 text-center">
                       {taskJobFrozen ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 border border-slate-300 text-[9px] font-extrabold uppercase whitespace-nowrap">
                           <PauseCircle className="w-2.5 h-2.5 text-slate-600 shrink-0" />
@@ -223,13 +243,22 @@ export default function TaskReviewQueueList({
         )}
       </div>
 
-      {/* Table Footer */}
-      <div className="p-2.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
-        <span>
-          Showing {tasks.length} deliverables in '{reviewTab}' tab
-        </span>
-        <span className="font-semibold text-slate-700">Click any task to inspect details</span>
-      </div>
+      {/* Pagination Bar */}
+      {totalItems > 0 && (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 25, 50]}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          className="border-t border-slate-200 shrink-0 py-2"
+        />
+      )}
     </section>
   );
 }

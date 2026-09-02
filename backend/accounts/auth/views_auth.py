@@ -144,6 +144,8 @@ class ResetPasswordView(APIView):
 # Authenticated endpoint: any logged-in user can change their own password.
 # permission_classes is plain IsAuthenticated (not HasPermission) on purpose
 # — see the file header above and permissions.py for why.
+from accounts.models import RolePermission
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -152,7 +154,7 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.apply_new_password()
 
-        # Thu hồi mọi session: blacklist toàn bộ refresh token của user này
+        # Thu hồi mọi session: blacklist toàn bộ refresh token cũ của user này
         # (cùng model OutstandingToken/BlacklistedToken của simplejwt, dùng
         # cho "logout everywhere"), cộng thêm access token hiện tại — access
         # token không tự mất hiệu lực chỉ vì refresh token bị blacklist.
@@ -160,13 +162,14 @@ class ChangePasswordView(APIView):
             BlacklistedToken.objects.get_or_create(token=outstanding)
 
         token = request.auth
-        jti = token["jti"]
-        ttl = token["exp"] - int(time.time())
-        if ttl > 0:
-            try:
-                blacklist_cache.set(f"blacklist:{jti}", "1", timeout=ttl)
-            except redis.exceptions.RedisError:
-                pass  # best-effort — đổi mật khẩu vẫn đã thành công, không rollback vì lỗi Redis
+        if token and "jti" in token:
+            jti = token["jti"]
+            ttl = token["exp"] - int(time.time())
+            if ttl > 0:
+                try:
+                    blacklist_cache.set(f"blacklist:{jti}", "1", timeout=ttl)
+                except redis.exceptions.RedisError:
+                    pass  # best-effort — đổi mật khẩu vẫn đã thành công, không rollback vì lỗi Redis
 
         log_audit_event(
             actor=request.user,
@@ -176,6 +179,32 @@ class ChangePasswordView(APIView):
             request=request,
         )
 
+        # Cấp token mới cho phiên làm việc hiện tại, đưa thẳng vào Dashboard không cần đăng nhập lại
+        refresh = RefreshToken.for_user(request.user)
+        refresh["email"] = request.user.email
+        refresh["role"] = request.user.role.code if request.user.role else None
+
+        access = refresh.access_token
+
+        perms = (
+            list(
+                RolePermission.objects.filter(role=request.user.role).values_list(
+                    "permission__code", flat=True
+                )
+            )
+            if request.user.role
+            else []
+        )
+
         return Response({
-            "detail": "Password changed successfully. Please log in again with your new password.",
+            "detail": "Password changed successfully.",
+            "access": str(access),
+            "refresh": str(refresh),
+            "user": {
+                "id": request.user.id,
+                "email": request.user.email,
+                "role": request.user.role.code if request.user.role else None,
+                "must_change_password": False,
+                "permissions": perms,
+            },
         }, status=status.HTTP_200_OK)
