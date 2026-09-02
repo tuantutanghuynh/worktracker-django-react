@@ -1,0 +1,92 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Your {{ app_name }} account is ready{% endblock %}
+
+{% block content %}
+  <p style="margin:0 0 16px; font-size:18px; font-weight:600; color:#0f172a;">
+    Welcome to {{ app_name }}
+  </p>
+
+  <p style="margin:0 0 20px; font-size:14px; color:#334155; line-height:1.7;">
+    An administrator has created an account for you. Use the details below to sign in
+    for the first time.
+  </p>
+
+  <!-- Thông tin đăng nhập -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin:0 0 20px;">
+    <tr>
+      <td style="padding:16px 20px;">
+        <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+          Email
+        </p>
+        <p style="margin:0 0 14px; font-size:14px; color:#0f172a; font-family:'Courier New',monospace;">
+          {{ user_email }}
+        </p>
+
+        {% if temp_password %}
+          <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+            Temporary password
+          </p>
+          <p style="margin:0; font-size:14px; color:#0f172a; font-family:'Courier New',monospace;">
+            {{ temp_password }}
+          </p>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  {% if temp_password %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background-color:#fffbeb; border-left:3px solid #f59e0b; border-radius:4px; margin:0 0 24px;">
+      <tr>
+        <td style="padding:12px 16px;">
+          <p style="margin:0; font-size:13px; color:#92400e; line-height:1.6;">
+            You will be asked to set a new password the first time you sign in.
+            Do not share this temporary password with anyone.
+          </p>
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
+  <!-- Nút đăng nhập -->
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <tr>
+      <td style="background-color:#2563eb; border-radius:8px;">
+        <a href="{{ login_url }}"
+           style="display:inline-block; padding:12px 28px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none;">
+          Sign in to {{ app_name }}
+        </a>
+      </td>
+    </tr>
+  </table>
+
+  {# Nhieu client email chan nut bam, nen luon kem link dang chu de con copy #}
+  <p style="margin:0 0 20px; font-size:12px; color:#64748b; line-height:1.6;">
+    If the button does not work, copy this link into your browser:<br>
+    <span style="color:#2563eb; word-break:break-all;">{{ login_url }}</span>
+  </p>
+
+  <!-- Thông tin tài khoản -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="border-top:1px solid #e2e8f0; padding-top:16px;">
+    <tr>
+      <td style="padding-top:16px;">
+        <p style="margin:0 0 8px; font-size:13px; color:#475569;">
+          <strong style="color:#0f172a;">Role:</strong> {{ role_name }}
+        </p>
+        {% if department_name %}
+          <p style="margin:0 0 8px; font-size:13px; color:#475569;">
+            <strong style="color:#0f172a;">Department:</strong> {{ department_name }}
+          </p>
+        {% endif %}
+        {% if manager_email %}
+          <p style="margin:0; font-size:13px; color:#475569;">
+            <strong style="color:#0f172a;">Reporting to:</strong> {{ manager_email }}
+          </p>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+{% endblock %}

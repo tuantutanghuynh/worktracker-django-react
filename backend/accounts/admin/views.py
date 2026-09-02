@@ -27,6 +27,7 @@ from ..authentication import set_user_active_status, require_reauth
 from system.models import AuditLog, Notification
 from system.utils import log_audit_event
 from system.services.notification_manager_service import notify
+from accounts.services.account_email_service import send_welcome_email
 from system.services.admin_report_export_service import (
     build_xlsx_response,
     USER_HEADERS,
@@ -164,6 +165,24 @@ class UserViewSet(viewsets.ModelViewSet):
             headers=USER_HEADERS,
             rows=user_rows(queryset),
             filename="worktracker_users.xlsx",
+        )
+
+    # Gửi thư chào mừng ngay sau khi tạo tài khoản.
+    #
+    # Đặt SAU transaction.on_commit chứ không gọi thẳng: nếu vẫn còn trong
+    # transaction mà email gửi đi rồi transaction bị rollback, người dùng
+    # nhận được thư cho một tài khoản không tồn tại. on_commit đảm bảo chỉ
+    # gửi khi bản ghi đã thực sự nằm trong database.
+    #
+    # Mật khẩu tạm lấy từ validated_data TRƯỚC khi save(), vì
+    # UserCreateSerializer.create() pop nó ra khỏi dict.
+    @transaction.atomic
+    def perform_create(self, serializer):
+        raw_password = serializer.validated_data.get("password")
+        instance = serializer.save()
+
+        transaction.on_commit(
+            lambda: send_welcome_email(instance, temp_password=raw_password)
         )
 
     # Forces any already-issued token to re-authenticate the moment the

@@ -1,0 +1,21 @@
+{% autoescape off %}Welcome to {{ app_name }}
+
+An administrator has created an account for you. Use the details below to
+sign in for the first time.
+
+Email: {{ user_email }}
+{% if temp_password %}Temporary password: {{ temp_password }}
+
+You will be asked to set a new password the first time you sign in.
+Do not share this temporary password with anyone.
+{% endif %}
+Sign in here: {{ login_url }}
+
+Role: {{ role_name }}
+{% if department_name %}Department: {{ department_name }}
+{% endif %}{% if manager_email %}Reporting to: {{ manager_email }}
+{% endif %}
+--
+This is an automated message from {{ app_name }}. Please do not reply to this email.
+{% if support_email %}Need help? Contact {{ support_email }}
+{% endif %}{% endautoescape %}
