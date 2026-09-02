@@ -107,6 +107,7 @@ export function CreateUserPage() {
           control={control}
           render={({ field }) => (
             <SelectDropdown
+              theme="light"
               label="Role"
               options={roleOptions}
               value={field.value}
@@ -121,6 +122,7 @@ export function CreateUserPage() {
           control={control}
           render={({ field }) => (
             <SelectDropdown
+              theme="light"
               label="Department (optional)"
               options={departmentOptions}
               value={field.value}
@@ -137,6 +139,7 @@ export function CreateUserPage() {
               control={control}
               render={({ field }) => (
                 <SelectDropdown
+                  theme="light"
                   label="Manager"
                   options={managerOptions}
                   value={field.value}
@@ -146,8 +149,8 @@ export function CreateUserPage() {
               )}
             />
             <p className="text-[11px] text-amber-600">
-              Nên gán ngay. Nhân viên chưa có Manager sẽ không Manager nào nhìn thấy
-              và không ai giao việc được.
+              Assign one now. An employee without a Manager is invisible to every
+              Manager and cannot be given any task.
             </p>
           </div>
         )}

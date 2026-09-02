@@ -52,10 +52,10 @@ const STATUS_LABELS = {
 // Giải thích ý nghĩa từng status khi rê chuột — tránh Admin hiểu nhầm
 // "No Log" = quên chấm công (thực tế có thể là nghỉ phép).
 const STATUS_HINTS = {
-  NORMAL: 'Đã log đủ ngày và đạt mức giờ mong đợi tính tới hôm nay.',
-  WARNING: 'Đã log đủ ngày nhưng tổng giờ dưới 80% mức mong đợi tính tới hôm nay.',
-  MISSING: 'Có ngày làm việc chưa có log giờ. Lưu ý: hệ thống chưa quản lý nghỉ phép/ngày lễ, nên ngày nghỉ phép cũng hiện ở đây.',
-  OVER_LIMIT: 'Có ngày log vượt quá số giờ chuẩn trong ngày.',
+  NORMAL: 'Logged every working day and met the expected hours so far this month.',
+  WARNING: 'Logged every working day, but total hours are below 80% of what is expected so far.',
+  MISSING: 'Some working days have no logged hours. Note: leave and public holidays are not tracked yet, so approved days off also appear here.',
+  OVER_LIMIT: 'At least one day exceeds the standard daily hours.',
 };
 
 function StatusPill({ status }) {
@@ -242,6 +242,7 @@ export function TimesheetControlPage() {
           </div>
           <InputField label="Period" type="month" value={monthValue} onChange={onMonthChange} />
           <SelectDropdown
+            theme="light"
             label="Department"
             placeholder="All departments"
             options={departmentOptions}
@@ -249,6 +250,7 @@ export function TimesheetControlPage() {
             onChange={setDepartment}
           />
           <SelectDropdown
+            theme="light"
             label="Manager"
             placeholder="All managers"
             options={managerOptions}
@@ -256,6 +258,7 @@ export function TimesheetControlPage() {
             onChange={setManager}
           />
           <SelectDropdown
+            theme="light"
             label="Status"
             placeholder="All status"
             options={STATUS_OPTIONS}
@@ -410,7 +413,7 @@ export function TimesheetControlPage() {
                 <div className="flex items-center justify-between p-2 rounded bg-slate-800/60">
                   <span
                     className="text-slate-300 font-medium"
-                    title="Ngày làm việc đã qua nhưng chưa có log giờ. Hệ thống chưa quản lý nghỉ phép/ngày lễ nên ngày nghỉ phép cũng được đếm ở đây."
+                    title="Working days that have passed with no logged hours. Leave and public holidays are not tracked yet, so days off are counted here too."
                   >
                     Working days without a log
                   </span>

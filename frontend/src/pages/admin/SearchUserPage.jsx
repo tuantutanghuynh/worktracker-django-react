@@ -124,7 +124,7 @@ export function SearchUserPage() {
   // Ban dung cho filter: them muc "Chua gan" de Admin tim ra nhung nhan vien
   // khong thuoc tuyen nao — ho vo hinh voi moi Manager nen phai gan lai.
   const managerFilterOptions = [
-    { value: 'none', label: 'Chưa gán Manager' },
+    { value: 'none', label: 'No Manager assigned' },
     ...managers.map((m) => ({ value: String(m.id), label: managerLabel(m) })),
   ];
 
@@ -266,6 +266,7 @@ export function SearchUserPage() {
             </div>
           </div>
           <SelectDropdown
+            theme="light"
             label="Role"
             placeholder="All roles"
             options={roleFilterOptions}
@@ -273,6 +274,7 @@ export function SearchUserPage() {
             onChange={setRoleFilter}
           />
           <SelectDropdown
+            theme="light"
             label="Department"
             placeholder="All departments"
             options={departmentFilterOptions}
@@ -280,6 +282,7 @@ export function SearchUserPage() {
             onChange={setDepartmentFilter}
           />
           <SelectDropdown
+            theme="light"
             label="Manager"
             placeholder="All managers"
             options={managerFilterOptions}
@@ -287,6 +290,7 @@ export function SearchUserPage() {
             onChange={setManagerFilter}
           />
           <SelectDropdown
+            theme="light"
             label="Status"
             placeholder="All status"
             options={STATUS_FILTER_OPTIONS}
@@ -366,12 +370,12 @@ export function SearchUserPage() {
                       }
                     >
                       {u.profile.manager_email}
-                      {u.profile.manager_is_active === false && ' (đã khoá)'}
+                      {u.profile.manager_is_active === false && ' (locked)'}
                     </span>
                   ) : (
                     // Chua gan Manager = khong Manager nao nhin thay nguoi nay,
                     // cung khong ai giao viec duoc. To do de Admin thay ngay.
-                    <span className="text-[11px] font-semibold text-amber-600">Chưa gán</span>
+                    <span className="text-[11px] font-semibold text-amber-600">Unassigned</span>
                   )}
                 </td>
                 <td className="px-3 py-2 truncate">
@@ -414,6 +418,7 @@ export function SearchUserPage() {
                 control={control}
                 render={({ field }) => (
                   <SelectDropdown
+                    theme="light"
                     label="Role"
                     options={roleOptions}
                     value={field.value}
@@ -433,6 +438,7 @@ export function SearchUserPage() {
 
             <div className="space-y-1.5 border-t border-slate-100 pt-3">
               <SelectDropdown
+                theme="light"
                 label="Department"
                 options={departmentOptions}
                 value={selectedUser.profile?.department ? String(selectedUser.profile.department) : ''}
@@ -447,6 +453,7 @@ export function SearchUserPage() {
             {selectedUser.role_detail?.code === 'EMPLOYEE' && (
               <div className="space-y-1.5 border-t border-slate-100 pt-3">
                 <SelectDropdown
+                  theme="light"
                   label="Manager"
                   options={managerOptions}
                   value={selectedUser.profile?.manager ? String(selectedUser.profile.manager) : ''}
@@ -454,8 +461,8 @@ export function SearchUserPage() {
                   disabled={managerMutation.isPending}
                 />
                 <p className="text-[11px] text-slate-400">
-                  Manager phụ trách quyết định ai nhìn thấy và giao việc được cho nhân
-                  viên này. Bỏ trống thì không Manager nào thấy họ.
+                  The assigned Manager controls who can see this employee and give them
+                  tasks. Leave empty and no Manager will see them.
                 </p>
               </div>
             )}

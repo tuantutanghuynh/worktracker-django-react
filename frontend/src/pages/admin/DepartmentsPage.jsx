@@ -240,6 +240,7 @@ export function DepartmentsPage() {
             control={control}
             render={({ field }) => (
               <SelectDropdown
+                theme="light"
                 label="Manager"
                 placeholder="No manager"
                 options={managerOptions}

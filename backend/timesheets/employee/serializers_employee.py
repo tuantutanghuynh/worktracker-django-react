@@ -43,8 +43,8 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
         today = timezone.localdate()
         if value > today:
             raise serializers.ValidationError(
-                f"Không thể chấm công cho ngày trong tương lai ({value}). "
-                f"Hôm nay là {today}."
+                f"Cannot log work for a future date ({value}). "
+                f"Today is {today}."
             )
         return value
 

@@ -27,7 +27,6 @@ import {
 import { useAdminClients } from '../../hooks/queries/admin/useAdminClients';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
 import { getErrorMessage } from '../../utils/errorMessages';
-import { cn } from '../../utils/cn';
 
 const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
@@ -173,12 +172,6 @@ export function JobsPage() {
   }));
   const managerEmailById = Object.fromEntries(managers.map((m) => [m.id, m.email]));
 
-  // Danh sách Employee để Admin phân bổ vào Project Team của Job (Giai đoạn 1)
-  const { data: employeesPage } = useAdminUsers({ role: 'EMPLOYEE', page_size: 500 });
-  const employees = employeesPage?.results || [];
-  const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState([]);
-  const [selectedEditTeamMemberIds, setSelectedEditTeamMemberIds] = useState([]);
-
   const {
     register,
     handleSubmit,
@@ -223,7 +216,6 @@ export function JobsPage() {
   }, []);
 
   function openCreate() {
-    setSelectedTeamMemberIds([]);
     reset({
       client: '',
       manager: '',
@@ -248,7 +240,6 @@ export function JobsPage() {
         description: data.description || null,
         start_date: data.start_date,
         deadline: data.deadline,
-        initial_team_member_ids: selectedTeamMemberIds.map(Number),
       },
       { onSuccess: () => setIsCreateOpen(false) }
     );
@@ -260,8 +251,6 @@ export function JobsPage() {
   function openEditJob(job) {
     acquireLockMutation.mutate(job.id, {
       onSuccess: () => {
-        const currentMemberIds = (job.project_team || []).map((m) => m.id);
-        setSelectedEditTeamMemberIds(currentMemberIds);
         resetEdit({
           manager: String(job.manager),
           job_name: job.job_name,
@@ -294,7 +283,6 @@ export function JobsPage() {
           description: data.description || null,
           start_date: data.start_date,
           deadline: data.deadline,
-          initial_team_member_ids: selectedEditTeamMemberIds.map(Number),
         },
       },
       { onSuccess: closeEditModal }
@@ -454,8 +442,11 @@ export function JobsPage() {
               control={control}
               render={({ field }) => (
                 <SelectDropdown
+                  theme="light"
                   label="Client"
                   required
+                  searchable
+                  placeholder="Type to search..."
                   options={clientOptions}
                   value={field.value}
                   onChange={field.onChange}
@@ -468,8 +459,11 @@ export function JobsPage() {
               control={control}
               render={({ field }) => (
                 <SelectDropdown
+                  theme="light"
                   label="Manager"
                   required
+                  searchable
+                  placeholder="Type to search..."
                   options={managerOptions}
                   value={field.value}
                   onChange={field.onChange}
@@ -490,6 +484,7 @@ export function JobsPage() {
               control={control}
               render={({ field }) => (
                 <SelectDropdown
+                  theme="light"
                   label="Priority"
                   required
                   options={PRIORITY_OPTIONS}
@@ -507,89 +502,6 @@ export function JobsPage() {
             error={errors.description?.message}
             {...register('description')}
           />
-
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-slate-700">
-                Project Team Allocation (Initial Staffing)
-              </label>
-              <span className="text-[11px] text-slate-400">
-                {selectedTeamMemberIds.length} selected
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Select active employees across departments to form the initial project team.
-            </p>
-            <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 space-y-1.5 text-xs">
-              {employees.length === 0 ? (
-                <div className="text-slate-400 py-2 text-center">No active employees available</div>
-              ) : (
-                employees.map((emp) => {
-                  const isSelected = selectedTeamMemberIds.includes(emp.id);
-                  const wl = emp.workload;
-                  return (
-                    <label
-                      key={emp.id}
-                      className={cn(
-                        'flex items-center justify-between gap-3 rounded-lg p-2.5 cursor-pointer transition-colors border',
-                        isSelected ? 'bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs' : 'bg-white border-slate-200/80 text-slate-700 hover:bg-slate-50'
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedTeamMemberIds([...selectedTeamMemberIds, emp.id]);
-                            } else {
-                              setSelectedTeamMemberIds(selectedTeamMemberIds.filter((id) => id !== emp.id));
-                            }
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-xs truncate text-slate-900">{emp.profile?.full_name || emp.email}</p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {emp.email} · <span className="font-medium text-slate-600">{emp.profile?.department_name || emp.profile?.department?.name || 'No Department'}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      {wl ? (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="text-[10px] text-slate-600 bg-slate-100/90 px-2 py-1 rounded-md flex items-center gap-1.5">
-                            <span><strong className="text-slate-900">{wl.active_tasks_count}</strong> Tasks</span>
-                            <span className="text-slate-300">|</span>
-                            <span><strong className="text-slate-900">{wl.active_jobs_count}</strong> Jobs</span>
-                            <span className="text-slate-300">|</span>
-                            <span>
-                              Capacity: <strong className={cn(
-                                wl.capacity_pct < 50 ? 'text-emerald-700' : wl.capacity_pct <= 100 ? 'text-amber-700' : 'text-rose-700'
-                              )}>{wl.capacity_pct}%</strong>
-                            </span>
-                          </div>
-
-                          <span
-                            className={cn(
-                              'inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0',
-                              wl.workload_status === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                              wl.workload_status === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
-                              wl.workload_status === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200'
-                            )}
-                          >
-                            {wl.workload_status === 'AVAILABLE' ? '🟢 Available' : wl.workload_status === 'BALANCED' ? '🟡 Balanced' : '🔴 Overloaded'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">Employee</span>
-                      )}
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -631,8 +543,11 @@ export function JobsPage() {
               control={editControl}
               render={({ field }) => (
                 <SelectDropdown
+                  theme="light"
                   label="Manager"
                   required
+                  searchable
+                  placeholder="Type to search..."
                   options={managerOptions}
                   value={field.value}
                   onChange={field.onChange}
@@ -645,6 +560,7 @@ export function JobsPage() {
               control={editControl}
               render={({ field }) => (
                 <SelectDropdown
+                  theme="light"
                   label="Status"
                   required
                   options={getStatusOptionsFor(editTarget?.status)}
@@ -688,6 +604,7 @@ export function JobsPage() {
             control={editControl}
             render={({ field }) => (
               <SelectDropdown
+                theme="light"
                 label="Priority"
                 required
                 options={PRIORITY_OPTIONS}
@@ -704,85 +621,44 @@ export function JobsPage() {
             {...registerEdit('description')}
           />
 
+          {/* Project Team — CHI XEM.
+              Admin tao Job rong roi gan cho Manager; Manager moi la nguoi
+              chon nhan vien cua tuyen minh vao du an. Admin van xem duoc
+              thanh vien de nam tinh hinh, nhung khong sua. */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-semibold text-slate-700">
-                Project Team Allocation
+                Project Team
               </label>
               <span className="text-[11px] text-slate-400">
-                {selectedEditTeamMemberIds.length} allocated
+                {(editTarget?.project_team || []).length} member(s)
               </span>
             </div>
             <p className="text-[11px] text-slate-500">
-              Manage employees participating in this project team.
+              The assigned Manager picks employees from their own reporting line. Admin has view-only access.
             </p>
-            <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 space-y-1.5 text-xs">
-              {employees.length === 0 ? (
-                <div className="text-slate-400 py-2 text-center">No active employees available</div>
+            <div className="max-h-32 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 space-y-1 text-xs">
+              {(editTarget?.project_team || []).length === 0 ? (
+                <div className="text-slate-400 py-2 text-center">
+                  The Manager has not assigned any employee yet
+                </div>
               ) : (
-                employees.map((emp) => {
-                  const isSelected = selectedEditTeamMemberIds.includes(emp.id);
-                  const wl = emp.workload;
-                  return (
-                    <label
-                      key={emp.id}
-                      className={cn(
-                        'flex items-center justify-between gap-3 rounded-lg p-2.5 cursor-pointer transition-colors border',
-                        isSelected ? 'bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs' : 'bg-white border-slate-200/80 text-slate-700 hover:bg-slate-50'
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedEditTeamMemberIds([...selectedEditTeamMemberIds, emp.id]);
-                            } else {
-                              setSelectedEditTeamMemberIds(selectedEditTeamMemberIds.filter((id) => id !== emp.id));
-                            }
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-xs truncate text-slate-900">{emp.profile?.full_name || emp.email}</p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {emp.email} · <span className="font-medium text-slate-600">{emp.profile?.department_name || emp.profile?.department?.name || 'No Department'}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      {wl ? (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="text-[10px] text-slate-600 bg-slate-100/90 px-2 py-1 rounded-md flex items-center gap-1.5">
-                            <span><strong className="text-slate-900">{wl.active_tasks_count}</strong> Tasks</span>
-                            <span className="text-slate-300">|</span>
-                            <span><strong className="text-slate-900">{wl.active_jobs_count}</strong> Jobs</span>
-                            <span className="text-slate-300">|</span>
-                            <span>
-                              Capacity: <strong className={cn(
-                                wl.capacity_pct < 50 ? 'text-emerald-700' : wl.capacity_pct <= 100 ? 'text-amber-700' : 'text-rose-700'
-                              )}>{wl.capacity_pct}%</strong>
-                            </span>
-                          </div>
-
-                          <span
-                            className={cn(
-                              'inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0',
-                              wl.workload_status === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                              wl.workload_status === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
-                              wl.workload_status === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200'
-                            )}
-                          >
-                            {wl.workload_status === 'AVAILABLE' ? '🟢 Available' : wl.workload_status === 'BALANCED' ? '🟡 Balanced' : '🔴 Overloaded'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">Employee</span>
-                      )}
-                    </label>
-                  );
-                })
+                editTarget.project_team.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-200/80 p-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-xs truncate text-slate-900">
+                        {m.full_name || m.email}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">{m.email}</p>
+                    </div>
+                    <span className="text-[10px] text-slate-500 shrink-0">
+                      {m.department_name || 'No Department'}
+                    </span>
+                  </div>
+                ))
               )}
             </div>
           </div>

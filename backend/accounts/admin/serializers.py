@@ -64,7 +64,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         # để Admin biết ngay là mình chọn nhầm.
         if manager and role and getattr(role, 'code', None) != 'EMPLOYEE':
             raise serializers.ValidationError(
-                {'manager': 'Chỉ tài khoản EMPLOYEE mới có Manager phụ trách.'}
+                {'manager': 'Only EMPLOYEE accounts can have an assigned Manager.'}
             )
         return attrs
 

@@ -80,8 +80,8 @@ def get_active_employee_or_error(user_id, manager=None):
             raise ValidationError(
                 {
                     "assignee_id": (
-                        "Nhân viên này không thuộc tuyến quản lý của bạn. "
-                        "Liên hệ Admin nếu cần điều chuyển."
+                        "This employee is not in your reporting line. "
+                        "Contact an Admin if they need to be transferred."
                     )
                 }
             )

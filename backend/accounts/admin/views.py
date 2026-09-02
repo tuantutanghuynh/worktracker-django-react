@@ -67,8 +67,8 @@ def assert_not_self(actor, target, what):
     """Cấm Admin thao tác lên chính tài khoản đang đăng nhập."""
     if actor.id == target.id:
         raise ValidationError(
-            f"Bạn không thể {what} tài khoản của chính mình. "
-            "Nhờ một Admin khác thực hiện nếu thực sự cần."
+            f"You cannot {what} your own account. "
+            "Ask another Admin to do it if it is really needed."
         )
 
 
@@ -89,8 +89,8 @@ def assert_not_last_admin(target, what):
     )
     if remaining == 0:
         raise ValidationError(
-            f"Không thể {what} Admin đang hoạt động cuối cùng. "
-            "Tạo hoặc mở khoá một Admin khác trước."
+            f"Cannot {what} the last active Admin. "
+            "Create or unlock another Admin first."
         )
 
 
@@ -180,8 +180,8 @@ class UserViewSet(viewsets.ModelViewSet):
         # vẫn phải cho phép.
         new_role = serializer.validated_data.get("role")
         if new_role is not None and new_role.id != old_role_id:
-            assert_not_self(self.request.user, serializer.instance, "đổi role của")
-            assert_not_last_admin(serializer.instance, "hạ role của")
+            assert_not_self(self.request.user, serializer.instance, "change the role of")
+            assert_not_last_admin(serializer.instance, "change the role of")
 
         old_values = UserSerializer(serializer.instance).data
         instance = serializer.save()
@@ -218,11 +218,11 @@ class UserViewSet(viewsets.ModelViewSet):
                     )
                     notify_other_admins(
                         self.request.user,
-                        title="Nhân viên cần gán lại Manager",
+                        title="Employees need a new Manager",
                         content=(
-                            f"{instance.email} không còn là Manager. "
-                            f"{len(orphaned)} nhân viên đã được gỡ khỏi tuyến báo cáo "
-                            f"và đang chờ gán lại."
+                            f"{instance.email} is no longer a Manager. "
+                            f"{len(orphaned)} employee(s) were removed from that reporting "
+                            f"line and are waiting to be reassigned."
                         ),
                         related_url="/admin/users/search?manager=none",
                     )
@@ -249,8 +249,8 @@ class UserViewSet(viewsets.ModelViewSet):
     # DELETE, so Audit Logs reflects what actually happened to the record.
     @transaction.atomic
     def perform_destroy(self, instance):
-        assert_not_self(self.request.user, instance, "xoá")
-        assert_not_last_admin(instance, "xoá")
+        assert_not_self(self.request.user, instance, "delete")
+        assert_not_last_admin(instance, "delete")
 
         old_values = UserSerializer(instance).data
         instance.is_active = False
@@ -276,8 +276,8 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"], url_path="lock")
     def lock(self, request, pk=None):
         user = self.get_object()
-        assert_not_self(request.user, user, "khoá")
-        assert_not_last_admin(user, "khoá")
+        assert_not_self(request.user, user, "lock")
+        assert_not_last_admin(user, "lock")
 
         old_values = UserSerializer(user).data
         user.is_active = False
@@ -410,17 +410,17 @@ class UserViewSet(viewsets.ModelViewSet):
         manager_id = request.data.get("manager")
 
         if user.role and user.role.code != "EMPLOYEE":
-            raise ValidationError("Chỉ tài khoản EMPLOYEE mới có Manager phụ trách.")
+            raise ValidationError("Only EMPLOYEE accounts can have an assigned Manager.")
 
         # manager_id = None nghĩa là gỡ Manager (đưa về "Chưa gán"), hợp lệ.
         if manager_id is not None:
             manager = CustomUser.objects.filter(id=manager_id).select_related("role").first()
             if manager is None:
-                raise ValidationError("Manager không tồn tại.")
+                raise ValidationError("Manager does not exist.")
             if not manager.is_active:
-                raise ValidationError("Không thể gán cho một Manager đã bị khoá.")
+                raise ValidationError("Cannot assign to a locked Manager.")
             if not manager.role or manager.role.code != "MANAGER":
-                raise ValidationError("Người được gán phải có role MANAGER.")
+                raise ValidationError("The assigned user must have the MANAGER role.")
 
         # Cùng cái bẫy đã xử lý ở assign_department: hasattr() không bắt được
         # DoesNotExist, và full_name là NOT NULL nên phải có defaults.

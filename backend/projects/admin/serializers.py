@@ -12,11 +12,12 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 class JobSerializer(serializers.ModelSerializer):
-    initial_team_member_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        required=False,
-        write_only=True
-    )
+    # Admin KHONG gan nhan vien vao Job. Quy trinh: Admin tao Job rong roi
+    # giao cho mot Manager phu trach; Manager moi la nguoi chon nhan vien
+    # trong tuyen bao cao cua minh vao du an (xem
+    # projects/manager/serializers_manager.py).
+    #
+    # `project_team` van tra ve de Admin XEM duoc thanh vien, nhung chi doc.
     project_team = serializers.SerializerMethodField(read_only=True)
     team_size = serializers.SerializerMethodField(read_only=True)
 
@@ -102,7 +103,6 @@ class JobSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        initial_team_ids = validated_data.pop('initial_team_member_ids', [])
         job = super().create(validated_data)
 
         # Khởi tạo Kênh Chat Dự án và gán Project Team (KHÔNG tạo task rác)
@@ -116,16 +116,9 @@ class JobSerializer(serializers.ModelSerializer):
         if job.manager:
             ChatParticipant.objects.get_or_create(room=room, user=job.manager)
 
-        if initial_team_ids:
-            User = get_user_model()
-            employees = User.objects.filter(id__in=initial_team_ids, is_active=True, role__code='EMPLOYEE')
-            for emp in employees:
-                ChatParticipant.objects.get_or_create(room=room, user=emp)
-
         return job
 
     def update(self, instance, validated_data):
-        initial_team_ids = validated_data.pop('initial_team_member_ids', None)
         job = super().update(instance, validated_data)
 
         # Cập nhật Project Team qua ChatParticipant của Job (KHÔNG tạo task rác)
@@ -138,12 +131,6 @@ class JobSerializer(serializers.ModelSerializer):
         )
         if job.manager:
             ChatParticipant.objects.get_or_create(room=room, user=job.manager)
-
-        if initial_team_ids is not None:
-            User = get_user_model()
-            employees = User.objects.filter(id__in=initial_team_ids, is_active=True, role__code='EMPLOYEE')
-            for emp in employees:
-                ChatParticipant.objects.get_or_create(room=room, user=emp)
 
         return job
 

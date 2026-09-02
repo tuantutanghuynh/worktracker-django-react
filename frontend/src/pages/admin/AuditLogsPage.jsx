@@ -193,6 +193,7 @@ export function AuditLogsPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <SelectDropdown
+            theme="light"
             label="Action"
             placeholder="All actions"
             options={actionOptions}
@@ -200,6 +201,7 @@ export function AuditLogsPage() {
             onChange={(val) => setFilter('action', val)}
           />
           <SelectDropdown
+            theme="light"
             label="Severity"
             placeholder="All severities"
             options={SEVERITY_OPTIONS}
@@ -207,6 +209,7 @@ export function AuditLogsPage() {
             onChange={(val) => setFilter('severity', val)}
           />
           <SelectDropdown
+            theme="light"
             label="Actor"
             placeholder="All users"
             searchable
