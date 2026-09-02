@@ -12,8 +12,8 @@ export const ERROR_DICTIONARY = {
   ACCOUNT_INACTIVE: 'Your account is deactivated or inactive.',
   INVALID_CREDENTIALS: 'Invalid email or password.',
   MUST_CHANGE_PASSWORD: 'You must change your password before performing this action.',
-  TOKEN_REVOKED: 'Your session token has been revoked or blacklisted. Please log in again.',
-  TOKEN_INVALID_EXPIRED: 'Your authentication token is invalid or expired.',
+  TOKEN_REVOKED: 'Your session has expired. Please sign in again.',
+  TOKEN_INVALID_EXPIRED: 'Your session has expired. Please sign in again.',
   PERMISSION_DENIED: 'You do not have permission to perform this action.',
   USER_IS_NOT_MANAGER: 'Only Manager role is allowed to perform this action.',
   MANAGER_ROLE_REQUIRED: 'Only Manager role is allowed to perform this action.',
@@ -62,6 +62,8 @@ export const ERROR_DICTIONARY = {
   JOB_PERIOD_IS_LOCKED: 'Timesheet period for this project is currently locked.',
   JOB_PERIOD_ALREADY_LOCKED: 'Timesheet period for this project is already locked.',
   JOB_PERIOD_NOT_LOCKED: 'Timesheet period for this project is not currently locked.',
+  GLOBAL_PERIOD_ALREADY_LOCKED: 'This period is already locked company-wide.',
+  GLOBAL_PERIOD_NOT_LOCKED: 'This period is not currently locked.',
   CANNOT_LOCK_ACTIVE_PERIOD: 'Cannot lock the current active period. You can only lock periods after the month has fully ended.',
   MAX_DAILY_HOURS_EXCEEDED: 'Logged hours exceed the maximum allowed daily total limit.',
 
@@ -79,6 +81,100 @@ export const ERROR_DICTIONARY = {
   DEFAULT_ERROR: 'An unexpected error occurred. Please try again.',
 };
 
+// Câu do simplejwt sinh ra khi CHECK_REVOKE_TOKEN thấy hash mật khẩu trong
+// token không khớp với hash trong DB. Đúng về mặt kỹ thuật nhưng vô nghĩa với
+// người dùng: họ vừa bấm "Lock Period" chứ có đổi mật khẩu gì đâu. Thực chất
+// phiên đăng nhập đã hỏng và họ cần đăng nhập lại.
+const RAW_MESSAGE_OVERRIDES = {
+  "The user's password has been changed.": 'Your session is no longer valid. Please sign in again.',
+  'Given token not valid for any token type': 'Your session has expired. Please sign in again.',
+  'Token is invalid or expired': 'Your session has expired. Please sign in again.',
+  'User not found': 'Your session is no longer valid. Please sign in again.',
+  'User is inactive': 'Your account has been deactivated. Contact an administrator.',
+};
+
+// Những khoá KHÔNG phải tên field — không được ghép "key: value" cho chúng.
+// Đây chính là nguyên nhân toast từng hiện "detail: The user's password has
+// been changed.": hàm cũ coi `detail` như tên một field.
+const RESERVED_KEYS = new Set(['detail', 'non_field_errors', 'error', 'errors', 'message']);
+
+// Thông báo mặc định theo mã HTTP, dùng khi body không nói gì hữu ích.
+const STATUS_FALLBACK = {
+  400: 'The submitted data is invalid. Please review the form and try again.',
+  401: 'Your session has expired. Please sign in again.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested resource was not found.',
+  405: 'HTTP method not allowed for this endpoint.',
+  409: 'This record was changed by someone else. Refresh the page and try again.',
+  413: 'The uploaded file is too large.',
+  423: 'This record is currently locked by another user.',
+  429: 'Too many attempts. Please wait a minute and try again.',
+  500: 'Something went wrong on the server. Please try again or contact support.',
+  502: 'The server is unavailable right now. Please try again shortly.',
+  503: 'The server is unavailable right now. Please try again shortly.',
+  504: 'The server took too long to respond. Please try again.',
+};
+
+// "client_name" -> "Client name" — hiện tên field cho người đọc, không phải
+// tên cột trong database.
+const prettifyField = (key) =>
+  key
+    .replace(/_/g, ' ')
+    .replace(/\bid\b/gi, 'ID')
+    .replace(/^./, (c) => c.toUpperCase());
+
+// Lấy chuỗi đầu tiên có nghĩa từ một giá trị lỗi của DRF. DRF trả về nhiều
+// hình dạng: chuỗi, mảng chuỗi, hoặc dict lồng cho serializer lồng nhau.
+const firstString = (value) => {
+  if (typeof value === 'string') return value.trim() || null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = firstString(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (value && typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      const found = firstString(value[key]);
+      if (found) return found;
+    }
+    return null;
+  }
+  return null;
+};
+
+// Mã lỗi backend trông như ALL_CAPS_WITH_UNDERSCORES. Nếu không có trong từ
+// điển thì đổi thành câu đọc được thay vì hiện nguyên mã cho người dùng.
+const looksLikeErrorCode = (text) => /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(text.trim());
+const humanizeCode = (code) =>
+  code.trim().toLowerCase().replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) + '.';
+
+// Backend hay trả về dạng "MA_LOI: câu giải thích cho người đọc" — ví dụ
+// "CANNOT_LOCK_ACTIVE_PERIOD: Period 9/2026 is currently in progress...".
+// Phần sau dấu hai chấm mới là thứ người dùng cần, và nó còn cụ thể hơn câu
+// trong từ điển vì có kèm số liệu thật (ngày kết thúc kỳ, tên dự án...).
+const CODE_PREFIX = /^([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\s*:\s*(.*)$/;
+
+// Dịch một chuỗi bất kỳ từ backend sang câu hiển thị cho người dùng.
+const translate = (text) => {
+  const trimmed = text.trim();
+  if (ERROR_DICTIONARY[trimmed]) return ERROR_DICTIONARY[trimmed];
+  if (RAW_MESSAGE_OVERRIDES[trimmed]) return RAW_MESSAGE_OVERRIDES[trimmed];
+
+  const khop = trimmed.match(CODE_PREFIX);
+  if (khop) {
+    const [, ma, phanConLai] = khop;
+    // Có câu giải thích thì dùng nó — cụ thể hơn từ điển.
+    if (phanConLai.trim()) return phanConLai.trim();
+    // Chỉ có mã trần thì tra từ điển, cuối cùng mới tự chuyển thành câu.
+    return ERROR_DICTIONARY[ma] || humanizeCode(ma);
+  }
+
+  if (looksLikeErrorCode(trimmed)) return humanizeCode(trimmed);
+  return trimmed;
+};
+
 /**
  * Extracts human-readable error string from Axios error objects
  * @param {Error|Object} err - Axios error object
@@ -88,37 +184,68 @@ export const ERROR_DICTIONARY = {
 export const getErrorMessage = (err, fallback = ERROR_DICTIONARY.DEFAULT_ERROR) => {
   if (!err) return fallback;
 
-  const data = err?.response?.data;
-  const detail = data?.detail;
-
-  // 1. Direct match in dictionary
-  if (typeof detail === 'string' && ERROR_DICTIONARY[detail]) {
-    return ERROR_DICTIONARY[detail];
-  }
-
-  // 2. Field-level DRF errors (e.g. { title: ["This field is required."] })
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const firstKey = Object.keys(data)[0];
-    const firstVal = data[firstKey];
-    if (Array.isArray(firstVal) && firstVal.length > 0) {
-      return `${firstKey}: ${firstVal[0]}`;
+  // 1. Không có phản hồi nào -> lỗi mạng, không phải lỗi nghiệp vụ.
+  //    Phải kiểm tra TRƯỚC mọi thứ khác: khi máy chủ không chạy thì
+  //    err.response là undefined và mọi bước đọc body bên dưới đều vô nghĩa.
+  if (!err.response) {
+    if (err.code === 'ECONNABORTED' || err.message === 'timeout') {
+      return 'The server took too long to respond. Please try again.';
     }
-    if (typeof firstVal === 'string') {
-      return `${firstKey}: ${firstVal}`;
+    if (err.message?.includes('Network Error') || err.code === 'ERR_NETWORK') {
+      return 'Unable to reach the server. Check your connection and make sure the backend is running.';
+    }
+    return fallback;
+  }
+
+  const status = err.response.status;
+  const data = err.response.data;
+
+  // 2. Body là chuỗi thuần (thường là trang lỗi HTML của Django khi DEBUG=False).
+  //    Không đổ nguyên HTML ra toast.
+  if (typeof data === 'string') {
+    const isHtml = data.trim().startsWith('<');
+    return isHtml ? STATUS_FALLBACK[status] || fallback : translate(data);
+  }
+
+  if (data && typeof data === 'object') {
+    // 3. 429 — DRF trả "Request was throttled. Expected available in N
+    //    seconds." Giữ lại con số giây vì đó là thứ người dùng cần biết,
+    //    nhưng viết lại cho dễ hiểu thay vì dùng chữ "throttled".
+    if (status === 429) {
+      const detail429 = firstString(data.detail) || '';
+      const giay = detail429.match(/(\d+)\s*second/i);
+      return giay
+        ? `Too many attempts. Please wait ${giay[1]} seconds and try again.`
+        : STATUS_FALLBACK[429];
+    }
+
+    // 4. `detail` — khoá chuẩn của DRF cho lỗi cấp request.
+    //    Xử lý TRƯỚC lỗi cấp field, nếu không nó sẽ bị ghép thành
+    //    "detail: ..." như bug cũ.
+    const detail = firstString(data.detail);
+    if (detail) return translate(detail);
+
+    // 5. non_field_errors — lỗi của serializer không thuộc field nào.
+    const nonField = firstString(data.non_field_errors);
+    if (nonField) return translate(nonField);
+
+    // 6. Lỗi theo từng field. Bỏ qua các khoá dành riêng ở trên.
+    for (const key of Object.keys(data)) {
+      if (RESERVED_KEYS.has(key)) continue;
+      const message = firstString(data[key]);
+      if (!message) continue;
+
+      const translated = translate(message);
+      // Backend đã nói rõ tên field trong câu rồi thì không lặp lại.
+      if (translated.toLowerCase().includes(key.replace(/_/g, ' ').toLowerCase())) {
+        return translated;
+      }
+      return `${prettifyField(key)}: ${translated}`;
     }
   }
 
-  // 3. String detail without underscores (human-readable string from DRF)
-  if (typeof detail === 'string' && detail.trim().length > 0 && !detail.includes('_')) {
-    return detail;
-  }
-
-  // 4. Network or Timeout Error
-  if (err.code === 'ECONNABORTED' || err.message?.includes('Network Error')) {
-    return 'Unable to connect to server. Please check your network connection.';
-  }
-
-  return fallback;
+  // 7. Body rỗng hoặc không đọc được -> dựa vào mã HTTP.
+  return STATUS_FALLBACK[status] || fallback;
 };
 
 export default getErrorMessage;

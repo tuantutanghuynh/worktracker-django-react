@@ -229,7 +229,7 @@ export function DepartmentsPage() {
         title={modalState?.mode === 'edit' ? 'Edit Department' : 'New Department'}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <InputField label="Name" error={errors.name?.message} {...register('name')} />
+          <InputField label="Name" required placeholder="e.g. Information Technology" error={errors.name?.message} {...register('name')} />
           <InputField
             label="Description"
             error={errors.description?.message}

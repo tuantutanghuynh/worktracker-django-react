@@ -302,6 +302,26 @@ def lock_global_period(
     """
     validate_month_year(lock_month, lock_year)
 
+    # ➕ CHỐT CHẶN: chỉ khoá được kỳ ĐÃ KẾT THÚC.
+    #
+    # Trước đây chốt này chỉ có ở lock_job_period() (phía Manager), còn
+    # Admin thì khoá được cả tháng đang diễn ra — mà GLOBAL lock chặn ghi
+    # LogWork ở MỌI job, nên một cú bấm nhầm làm toàn công ty không chấm
+    # công được cho tới khi có người mở khoá.
+    #
+    # Dùng lại đúng mã lỗi CANNOT_LOCK_ACTIVE_PERIOD đã khai báo sẵn trong
+    # từ điển lỗi của frontend.
+    _, last_day = calendar.monthrange(int(lock_year), int(lock_month))
+    period_end_date = date(int(lock_year), int(lock_month), last_day)
+    today = timezone.now().date()
+
+    if today <= period_end_date:
+        raise TimeLockError(
+            f"CANNOT_LOCK_ACTIVE_PERIOD: Period {lock_month}/{lock_year} is currently in progress "
+            f"(ends on {period_end_date.strftime('%d/%m/%Y')}). "
+            "You can only lock past completed periods."
+        )
+
     clean_reason = reason.strip() if isinstance(reason, str) else reason
 
     with transaction.atomic():

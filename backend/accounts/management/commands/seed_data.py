@@ -208,6 +208,15 @@ class Command(BaseCommand):
                 # không dựa vào phòng ban — nếu để trống thì Manager mở danh
                 # sách nhân viên ra sẽ thấy rỗng và không giao được task.
                 reporting_manager = manager_user if dept == dept_it else manager_two
+                # Ngay vao lam trai deu tu 12 thang truoc den 1 thang truoc.
+                # Can co du lieu that o day: bang Timesheet Control loc theo
+                # joined_date de khong liet ke nguoi chua vao lam trong ky qua
+                # khu. De NULL het thi bo loc do khong bao gio kich hoat.
+                # Trai deu tu ~2 den ~12 thang truoc. Dung timedelta cho don
+                # gian; khong can ngay chinh xac, chi can moi nguoi mot moc
+                # khac nhau de bo loc vong doi co gi ma loc.
+                so_thang_truoc = 2 + (len(employee_users) % 11)
+                joined = date.today() - timedelta(days=30 * so_thang_truoc)
                 profile, created = EmployeeProfile.objects.get_or_create(
                     user=emp,
                     defaults={
@@ -215,8 +224,12 @@ class Command(BaseCommand):
                         "department": dept,
                         "phone_number": phone,
                         "manager": reporting_manager,
+                        "joined_date": joined,
                     }
                 )
+                if not created and profile.joined_date is None:
+                    profile.joined_date = joined
+                    profile.save(update_fields=["joined_date"])
                 if not created and profile.manager_id is None:
                     profile.manager = reporting_manager
                     profile.save(update_fields=["manager"])

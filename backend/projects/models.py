@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 
 # ============================================================
@@ -70,6 +71,23 @@ class Client(models.Model):
 
     class Meta:
         db_table = "clients"
+        constraints = [
+            # Tên khách hàng phải là duy nhất, KHÔNG phân biệt hoa thường.
+            #
+            # Dùng Lower() chứ không phải unique=True trên field: ràng buộc
+            # thường chỉ so khớp chính xác, nên "ABC Corp" và "abc corp" vẫn
+            # lọt qua và tạo ra 2 dòng nhìn y hệt nhau trong danh sách.
+            # Trim() vì cùng lý do: "  ABC  " cũng phải tính là trùng.
+            #
+            # Đây là lớp cuối. ClientSerializer đã chặn sớm với thông báo dễ
+            # hiểu; ràng buộc này bắt những đường không đi qua serializer:
+            # lệnh seed, shell, script quản trị, và cả hai request gửi lên
+            # cùng lúc mà cả hai đều thấy "chưa trùng".
+            models.UniqueConstraint(
+                Lower(Trim("client_name")),
+                name="unique_client_name_case_insensitive",
+            ),
+        ]
 
     def __str__(self):
         return self.client_name  

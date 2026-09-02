@@ -282,15 +282,15 @@ export function ClientsPage() {
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <InputField label="Client Name" error={errors.client_name?.message} {...register('client_name')} />
-            <InputField label="Tax Code" error={errors.tax_code?.message} {...register('tax_code')} />
+            <InputField label="Client Name" required placeholder="Company legal name" error={errors.client_name?.message} {...register('client_name')} />
+            <InputField label="Tax Code" required placeholder="10 or 13 digits" error={errors.tax_code?.message} {...register('tax_code')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <InputField label="Contact Person" error={errors.contact_person?.message} {...register('contact_person')} />
-            <InputField label="Contact Email" type="email" error={errors.contact_email?.message} {...register('contact_email')} />
+            <InputField label="Contact Email" type="email" placeholder="name@company.com" error={errors.contact_email?.message} {...register('contact_email')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <InputField label="Contact Phone" error={errors.contact_phone?.message} {...register('contact_phone')} />
+            <InputField label="Contact Phone" placeholder="+84 xxx xxx xxx" error={errors.contact_phone?.message} {...register('contact_phone')} />
             <InputField label="Industry" error={errors.industry?.message} {...register('industry')} />
           </div>
           <InputField label="Address" error={errors.address?.message} {...register('address')} />

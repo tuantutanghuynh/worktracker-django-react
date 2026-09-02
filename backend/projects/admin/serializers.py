@@ -6,9 +6,81 @@ from tasks.models import Task
 
 
 class ClientSerializer(serializers.ModelSerializer):
+    # Khai bao tay de BO UniqueValidator ma DRF tu them tu model
+    # (tax_code co unique=True). Validator mac dinh tra ve cau chung chung
+    # "client with this tax code already exists." — khong cho Admin biet ho
+    # dang dung ma so thue cua ai, va cang khong biet ban ghi do da bi khoa.
+    tax_code = serializers.CharField(max_length=50, validators=[])
+
     class Meta:
         model = Client
         fields = '__all__'
+
+    def _khac_chinh_no(self, queryset):
+        """Bo chinh ban ghi dang sua ra khoi phep kiem tra trung.
+
+        Khong co buoc nay thi moi lan sua mot client ma giu nguyen ten se bi
+        bao "ten da ton tai" — chinh no dung do.
+        """
+        if self.instance is not None:
+            return queryset.exclude(pk=self.instance.pk)
+        return queryset
+
+    def validate_client_name(self, value):
+        """
+        Ten khach hang khong duoc trung.
+
+        So sanh khong phan biet hoa thuong va da cat khoang trang: "ABC Corp",
+        "abc corp" va " ABC Corp " la cung mot cong ty. Neu chi so chuoi thuan
+        thi Admin van tao duoc 3 ban ghi trong danh sach nhin y het nhau.
+        """
+        ten = (value or "").strip()
+        if not ten:
+            raise serializers.ValidationError("Client name is required.")
+
+        trung = (
+            self._khac_chinh_no(Client.objects.filter(client_name__iexact=ten))
+            .order_by("-is_active", "id")
+            .first()
+        )
+        if trung is not None:
+            if not trung.is_active:
+                # Bao ro la ban ghi da khoa, neu khong Admin se boi roi vi
+                # tim trong danh sach khong thay client nao ten nhu vay.
+                raise serializers.ValidationError(
+                    f"A deactivated client named '{trung.client_name}' already exists "
+                    f"(tax code {trung.tax_code}). Reactivate that client instead of "
+                    f"creating a duplicate."
+                )
+            raise serializers.ValidationError(
+                f"A client named '{trung.client_name}' already exists "
+                f"(tax code {trung.tax_code}). Client names must be unique."
+            )
+        return ten
+
+    def validate_tax_code(self, value):
+        """
+        Ma so thue la dinh danh phap ly cua doanh nghiep — moi ma chi thuoc ve
+        dung mot cong ty. Trung ma so thue nhung khac ten nghia la mot trong
+        hai ban ghi nhap sai, phai chi ro ben kia la ai de Admin doi chieu.
+        """
+        ma = (value or "").strip()
+        if not ma:
+            raise serializers.ValidationError("Tax code is required.")
+
+        trung = (
+            self._khac_chinh_no(Client.objects.filter(tax_code__iexact=ma))
+            .order_by("-is_active", "id")
+            .first()
+        )
+        if trung is not None:
+            trang_thai = "" if trung.is_active else " (deactivated)"
+            raise serializers.ValidationError(
+                f"Tax code '{ma}' is already used by '{trung.client_name}'{trang_thai}. "
+                f"A tax code identifies one single company - check the code again, or "
+                f"update the existing client instead."
+            )
+        return ma
 
 
 class JobSerializer(serializers.ModelSerializer):

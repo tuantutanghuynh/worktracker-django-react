@@ -434,7 +434,7 @@ export function JobsPage() {
 
       <BaseModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="New Job" maxWidth="max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <InputField label="Job Name" required error={errors.job_name?.message} {...register('job_name')} />
+          <InputField label="Job Name" required placeholder="Short, recognisable project name" error={errors.job_name?.message} {...register('job_name')} />
 
           <div className="grid grid-cols-2 gap-3">
             <Controller
@@ -494,7 +494,7 @@ export function JobsPage() {
                 />
               )}
             />
-            <InputField label="Job Code (optional)" error={errors.job_code?.message} {...register('job_code')} />
+            <InputField label="Job Code (optional)" placeholder="e.g. JOB-ERP-01" error={errors.job_code?.message} {...register('job_code')} />
           </div>
 
           <InputField
@@ -530,7 +530,7 @@ export function JobsPage() {
         maxWidth="max-w-2xl"
       >
         <form onSubmit={handleEditSubmit(onSubmitEdit)} className="space-y-3">
-          <InputField label="Job Name" required error={editErrors.job_name?.message} {...registerEdit('job_name')} />
+          <InputField label="Job Name" required placeholder="Short, recognisable project name" error={editErrors.job_name?.message} {...registerEdit('job_name')} />
 
           <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
             Client: <span className="font-semibold text-slate-700">{clientNameById[editTarget?.client]}</span>{' '}

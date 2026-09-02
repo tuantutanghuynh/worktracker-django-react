@@ -87,20 +87,24 @@ export function CreateUserPage() {
         <InputField
           label="Email (login ID)"
           type="email"
+          required
+          placeholder="name@company.com"
           error={errors.email?.message}
           {...register('email')}
         />
 
+        {/* helperText thay vi the <p> rieng ben duoi: InputField tu an
+            helperText khi co loi, nen nguoi dung khong thay 2 dong chu chong
+            nhau luc go sai. */}
         <InputField
           label="Default Password"
           type="password"
+          required
+          placeholder="Min 8 chars, A-Z, a-z, 0-9, symbol"
+          helperText="At least 8 characters, upper & lower case, a number, and a special symbol. The user must change it on first login."
           error={errors.password?.message}
           {...register('password')}
         />
-        <p className="text-[11px] text-slate-400">
-          At least 8 characters, upper &amp; lower case, a number, and a special symbol. The
-          user will be forced to change this password on first login.
-        </p>
 
         <Controller
           name="role"
@@ -109,6 +113,8 @@ export function CreateUserPage() {
             <SelectDropdown
               theme="light"
               label="Role"
+              required
+              placeholder="-- Select a role --"
               options={roleOptions}
               value={field.value}
               onChange={field.onChange}
