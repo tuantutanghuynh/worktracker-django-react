@@ -313,23 +313,24 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                     {"deadline": "Job deadline must not be earlier than start date."}
                 )
 
-            # ➕ KIỂM TRA RÀNG BUỘC TIẾN ĐỘ: Chặn rút ngắn Deadline Job nhỏ hơn Task con đang mở
-            max_task = (
-                job.tasks.exclude(status=Task.Status.CANCELLED)
-                .order_by("-deadline")
-                .first()
-            )
-            
-            if max_task and max_task.deadline > new_deadline:
-                raise serializers.ValidationError(
-                    {
-                        "deadline": (
-                            f"Cannot shorten job deadline to {new_deadline} because child task "
-                            f"'{max_task.title}' has a deadline of {max_task.deadline}. "
-                            "Please adjust child task deadlines first."
-                        )
-                    }
+            # ➕ KIỂM TRA RÀNG BUỘC TIẾN ĐỘ: Chỉ chặn khi Manager thực sự RÚT NGẮN Deadline Job nhỏ hơn Task con đang mở
+            if job.deadline and new_deadline < job.deadline:
+                max_task = (
+                    job.tasks.exclude(status=Task.Status.CANCELLED)
+                    .order_by("-deadline")
+                    .first()
                 )
+                
+                if max_task and max_task.deadline and max_task.deadline > new_deadline:
+                    raise serializers.ValidationError(
+                        {
+                            "deadline": (
+                                f"Cannot shorten job deadline to {new_deadline} because child task "
+                                f"'{max_task.title}' has a deadline of {max_task.deadline}. "
+                                "Please adjust child task deadlines first."
+                            )
+                        }
+                    )
 
         team_member_ids = attrs.get("team_member_ids")
         if team_member_ids is not None:

@@ -275,7 +275,7 @@ class Command(BaseCommand):
                             assignee=assignee,
                             status=st,
                             priority=Task.Priority.HIGH if t_idx % 3 == 0 else Task.Priority.MEDIUM,
-                            deadline=today + timedelta(days=(t_idx - 5) * 3),
+                            deadline=min(job.deadline, today + timedelta(days=(t_idx - 5) * 3)) if job.deadline else today + timedelta(days=(t_idx - 5) * 3),
                             order_index=new_lexo,
                             description=f"Detailed specifications for workload #{job.id}.{t_idx:02d}.",
                         )
