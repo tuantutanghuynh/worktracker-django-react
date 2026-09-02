@@ -75,8 +75,14 @@ def get_admin_timesheet_summary(month, year):
     start_date, end_date = get_month_range(month, year)
     daily_hours = _daily_working_hours()
 
+    # Cùng luật vòng đời với get_admin_employee_timesheet_list(): người vào
+    # làm sau ngày cuối kỳ không thuộc kỳ này. Hai hàm phải dùng chung một
+    # tập nhân viên, nếu không thẻ KPI sẽ nói một đằng còn bảng bên dưới
+    # hiện một nẻo.
     employee_ids = list(
-        CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True).values_list("id", flat=True)
+        CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True)
+        .filter(Q(profile__joined_date__isnull=True) | Q(profile__joined_date__lte=end_date))
+        .values_list("id", flat=True)
     )
 
     logs_in_range = LogWork.objects.filter(
@@ -161,6 +167,22 @@ def get_admin_employee_timesheet_list(month, year, department_id=None, manager_i
 
     employees = CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True).select_related(
         "profile", "profile__department"
+    )
+    # LỌC THEO VÒNG ĐỜI NHÂN SỰ
+    #
+    # Nhân viên vào làm SAU ngày cuối kỳ thì không thuộc kỳ đó — họ chưa
+    # thuộc công ty, không thể chấm công, và không thể "thiếu" gì cả. Trước
+    # đây mọi kỳ quá khứ đều liệt kê đủ nhân viên và gắn MISSING cho tất cả,
+    # kể cả những tháng hệ thống chưa có một dòng log nào.
+    #
+    # Cùng nguyên tắc với ManagerTimeLockPage của phần Manager: Job có
+    # start_date sau ngày cuối kỳ thì không hiện trong kỳ đó.
+    #
+    # joined_date NULL nghĩa là KHÔNG BIẾT ngày vào làm — vẫn hiện, vì ẩn đi
+    # sẽ giấu mất người thật. Hiện thừa thì Admin còn thấy để sửa dữ liệu;
+    # ẩn nhầm thì không ai biết là đang thiếu.
+    employees = employees.filter(
+        Q(profile__joined_date__isnull=True) | Q(profile__joined_date__lte=end_date)
     )
     if department_id:
         employees = employees.filter(profile__department_id=department_id)

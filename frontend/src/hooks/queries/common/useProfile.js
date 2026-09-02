@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import profileService from '../../../services/common/profileService';
 import { useAuthStore } from '../../../stores/authStore';
+import { getErrorMessage } from '../../../utils/errorMessages';
 
 export const PROFILE_QUERY_KEY = ['profile', 'me'];
 
@@ -37,7 +38,7 @@ export function useUpdateProfile() {
     },
     onError: (err) => {
       console.error('Update profile error:', err);
-      toast.error(err.response?.data?.detail || 'Failed to update profile.');
+      toast.error(getErrorMessage(err, 'Could not save your profile. Please try again.'));
     },
   });
 }
@@ -60,11 +61,7 @@ export function useUploadAvatar() {
     },
     onError: (err) => {
       console.error('Upload avatar error:', err);
-      const msg =
-        err.response?.data?.avatar?.[0] ||
-        err.response?.data?.detail ||
-        'Failed to upload avatar.';
-      toast.error(msg);
+      toast.error(getErrorMessage(err, 'Could not upload the avatar. Please try again.'));
     },
   });
 }
@@ -80,12 +77,9 @@ export function useChangePassword() {
     },
     onError: (err) => {
       console.error('Change password error:', err);
-      const msg =
-        err.response?.data?.old_password?.[0] ||
-        err.response?.data?.new_password?.[0] ||
-        err.response?.data?.detail ||
-        'Failed to change password. Please verify your current password.';
-      toast.error(msg);
+      toast.error(
+        getErrorMessage(err, 'Could not change the password. Check your current password.')
+      );
     },
   });
 }

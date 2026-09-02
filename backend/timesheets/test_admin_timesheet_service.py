@@ -288,3 +288,69 @@ def self_log(user, task, day, hours, month=5, year=2026):
     )
     row.total_hours = row.total_hours + Decimal(str(hours))
     row.save()
+
+
+@pytest.mark.django_db
+class TestLocTheoVongDoi:
+    """
+    Nhân viên vào làm SAU ngày cuối kỳ thì không thuộc kỳ đó.
+
+    Trước khi có bộ lọc này, mọi kỳ quá khứ đều liệt kê đủ nhân viên và gắn
+    MISSING cho tất cả — kể cả tháng hệ thống chưa có một dòng log nào, và
+    kể cả người khi đó chưa vào công ty.
+
+    Cùng nguyên tắc với ManagerTimeLockPage: Job có start_date sau ngày cuối
+    kỳ thì không hiện trong kỳ đó.
+    """
+
+    def _ids_trong_ky(self, month, year):
+        return {r["user_id"] for r in svc.get_admin_employee_timesheet_list(month=month, year=year)}
+
+    def test_vao_lam_sau_ky_thi_khong_hien(self, monkeypatch, employee):
+        freeze_today(monkeypatch, date(2026, 5, 15))
+        employee.profile.joined_date = date(2026, 5, 1)
+        employee.profile.save()
+
+        # Ky thang 3 ket thuc 31/3, nguoi nay vao 1/5 -> chua thuoc cong ty
+        assert employee.id not in self._ids_trong_ky(3, 2026)
+
+    def test_vao_lam_trong_ky_thi_van_hien(self, monkeypatch, employee):
+        freeze_today(monkeypatch, date(2026, 5, 15))
+        employee.profile.joined_date = date(2026, 5, 10)
+        employee.profile.save()
+
+        assert employee.id in self._ids_trong_ky(5, 2026)
+
+    def test_vao_lam_dung_ngay_cuoi_ky_van_hien(self, monkeypatch, employee):
+        """Ranh gioi: joined_date == ngay cuoi thang thi van thuoc ky do."""
+        freeze_today(monkeypatch, date(2026, 6, 15))
+        employee.profile.joined_date = date(2026, 5, 31)
+        employee.profile.save()
+
+        assert employee.id in self._ids_trong_ky(5, 2026)
+
+    def test_joined_date_NULL_thi_van_hien(self, monkeypatch, employee):
+        """
+        NULL nghĩa là KHÔNG BIẾT ngày vào làm, không phải "chưa vào làm".
+        Ẩn đi sẽ giấu mất người thật — hiện thừa thì Admin còn thấy để sửa
+        dữ liệu, ẩn nhầm thì không ai biết là đang thiếu.
+        """
+        freeze_today(monkeypatch, date(2026, 5, 15))
+        employee.profile.joined_date = None
+        employee.profile.save()
+
+        assert employee.id in self._ids_trong_ky(1, 2020)
+
+    def test_KPI_tong_dung_cung_tap_nhan_vien_voi_bang(self, monkeypatch, employee):
+        """
+        Hai ham phai loc giong nhau, neu khong the KPI se noi mot dang con
+        bang ben duoi hien mot neo.
+        """
+        freeze_today(monkeypatch, date(2026, 5, 15))
+        employee.profile.joined_date = date(2026, 5, 1)
+        employee.profile.save()
+
+        rows = svc.get_admin_employee_timesheet_list(month=3, year=2026)
+        kpi = svc.get_admin_timesheet_summary(month=3, year=2026)
+        assert len(rows) == 0
+        assert kpi["missing_timesheets"] == 0

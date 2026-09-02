@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { login as loginApi } from "../../api/authApi"
 import { useAuth } from "../useAuth"
+import { getErrorMessage } from "../../utils/errorMessages"
 
 // Wraps the login form flow: calls the API, updates auth state on
 // success, and navigates to the dashboard. Exposes loading/error state
@@ -25,7 +26,7 @@ export function useLogin() {
         login(data, data.user, rememberMe)
         navigate("/")
     } catch (err) {
-        setError(err.response?.data?.detail || "Login failed")
+        setError(getErrorMessage(err, "Unable to sign in. Please try again."))
     } finally {
         setLoading(false)
     }

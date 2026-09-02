@@ -13,6 +13,7 @@
 # └─────────────────────────────────────────────────────────────────────┘
 import os
 from datetime import timedelta
+from celery.schedules import crontab
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -266,5 +267,24 @@ CELERY_TASK_SERIALIZER   = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE          = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
+
+# Lich chay dinh ky (Celery beat).
+#
+# Dung beat_schedule tinh trong settings, KHONG dung django-celery-beat:
+# dat lich trong DB doi them mot app + migration, ma du an chi co dung mot
+# tac vu dinh ky. Doi lich thi sua file nay roi khoi dong lai beat.
+#
+# Chay moi ngay luc 00:05 chu khong phai 00:00: tranh dung dinh moc doi ngay,
+# va de he thong on dinh vai phut truoc khi ghi du lieu.
+#
+# Chay HANG NGAY chu khong phai chi ngay 1: neu may chu tat dung ngay mung 1
+# thi thang do khong bao gio duoc khoa. Chay moi ngay thi cac lan sau chi
+# ghi nhan "da khoa roi" va bo qua — task duoc thiet ke idempotent.
+CELERY_BEAT_SCHEDULE = {
+    "auto-lock-previous-timesheet-period": {
+        "task": "timesheets.auto_lock_previous_period",
+        "schedule": crontab(hour=0, minute=5),
+    },
+}
 
 

@@ -34,6 +34,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useAuthStore } from '../../../stores/authStore';
 import { cn } from '../../../utils/cn';
 import UserAvatar from '../avatar/UserAvatar';
+import { getErrorMessage } from '../../../utils/errorMessages';
 
 /**
  * Format timestamp hiển thị trong danh sách tin nhắn
@@ -338,7 +339,7 @@ export default function ChatContainer({
       setTimeout(scrollToBottom, 50);
     } catch (err) {
       console.error('Send message failed:', err);
-      toast.error(err.response?.data?.detail || 'Failed to send message');
+      toast.error(getErrorMessage(err, 'Could not send the message. Please try again.'));
     } finally {
       setSending(false);
       setUploadingFile(false);

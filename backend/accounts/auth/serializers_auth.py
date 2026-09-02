@@ -47,6 +47,12 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
+    # Email khong phan biet hoa thuong. Nguoi dung go "Admin@X.com" hay
+    # "admin@x.com" deu phai vao duoc cung mot tai khoan — ho khong nho
+    # chinh xac hoa thuong luc Admin tao tai khoan cho ho.
+    def validate_email(self, value):
+        return (value or "").strip().lower()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Declared upfront so the attribute always exists, even if
@@ -58,7 +64,9 @@ class LoginSerializer(serializers.Serializer):
         email = attrs.get("email")
         password = attrs.get("password")
 
-        user = User.objects.filter(email=email).first()
+        # __iexact chu khong phai so khop chuoi da lowercase: van dung ke ca
+        # khi trong DB con ban ghi cu luu chu hoa, tao truoc khi co chuan hoa.
+        user = User.objects.filter(email__iexact=email).first()
 
         # Same message for "email not found" and "wrong password" so we
         # don't leak which emails exist in the system (anti user-enumeration)
@@ -126,10 +134,16 @@ class LoginSerializer(serializers.Serializer):
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
+    # Cung ly do voi LoginSerializer: "Admin@X.com" va "admin@x.com" la mot.
+    # Chuan hoa o day con dam bao ban ghi PasswordReset ben duoi luu email
+    # chu thuong, de buoc doi mat khau tra cuu lai dung nguoi.
+    def validate_email(self, value):
+        return (value or "").strip().lower()
+
     # Generates a secure token, persists a PasswordReset record, and returns it (or None if email unknown).
     def create_reset_token(self):
         email = self.validated_data["email"]
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
 
         if user is None:
             return None
@@ -192,7 +206,7 @@ class ResetPasswordSerializer(serializers.Serializer):
             if reset.expires_at < timezone.now():
                 raise serializers.ValidationError("This reset link has expired.")
 
-            user = User.objects.filter(email=reset.email).first()
+            user = User.objects.filter(email__iexact=reset.email).first()
             user.set_password(self.validated_data["new_password"])
             user.save()
 

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { toast } from 'sonner';
+import { getErrorMessage } from '../../utils/errorMessages';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Headphones, RefreshCw } from "lucide-react";
 import { chatService } from "../../services/common/chatService";
@@ -166,7 +168,7 @@ export default function AdminSupportDeskPage() {
       refetchRooms();
     } catch (err) {
       console.error("Failed to send message:", err);
-      alert(err.response?.data?.detail || "Failed to send message.");
+      toast.error(getErrorMessage(err, "Could not send the message. Please try again."));
     } finally {
       setIsSending(false);
     }
@@ -207,7 +209,7 @@ export default function AdminSupportDeskPage() {
       refetchRooms();
     } catch (err) {
       console.error("Upload failed:", err);
-      alert(err.response?.data?.detail || "Failed to upload attachment.");
+      toast.error(getErrorMessage(err, "Could not upload the attachment. Please try again."));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

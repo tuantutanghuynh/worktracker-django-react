@@ -184,6 +184,16 @@ export function TimesheetControlPage() {
   }
 
   const monthValue = `${year}-${String(month).padStart(2, '0')}`;
+  // GIỚI HẠN KỲ CHỌN ĐƯỢC
+  //
+  // Trước đây input month để trống min/max nên Admin gõ được 01/1990 và
+  // trang vẫn dựng bảng cho một kỳ chưa từng tồn tại. Chặn ở hai đầu:
+  //   - max = tháng hiện tại (kỳ tương lai chưa có gì để kiểm soát)
+  //   - min = 12 tháng trước, khớp với cách ManagerTimeLockPage liệt kê kỳ
+  const maxMonthValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const minDate = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+  const minMonthValue = `${minDate.getFullYear()}-${String(minDate.getMonth() + 1).padStart(2, '0')}`;
+
   function onMonthChange(e) {
     const [y, m] = e.target.value.split('-').map(Number);
     if (y && m) {
@@ -240,7 +250,14 @@ export function TimesheetControlPage() {
               />
             </div>
           </div>
-          <InputField label="Period" type="month" value={monthValue} onChange={onMonthChange} />
+          <InputField
+            label="Period"
+            type="month"
+            min={minMonthValue}
+            max={maxMonthValue}
+            value={monthValue}
+            onChange={onMonthChange}
+          />
           <SelectDropdown
             theme="light"
             label="Department"
