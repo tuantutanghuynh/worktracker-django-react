@@ -8,10 +8,17 @@ User = get_user_model()
 class ChatUserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
+    role_code = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "role", "department_name"]
+        fields = ["id", "email", "full_name", "role", "role_code", "department_name", "avatar_url"]
+
+    def get_role_code(self, obj):
+        if getattr(obj, "role", None):
+            return obj.role.code if hasattr(obj.role, "code") else str(obj.role).upper()
+        return "EMPLOYEE"
 
     def get_full_name(self, obj):
         profile = getattr(obj, "profile", None)
@@ -19,10 +26,19 @@ class ChatUserSerializer(serializers.ModelSerializer):
             return profile.full_name
         return getattr(obj, "full_name", "") or obj.email.split("@")[0]
 
+    def get_avatar_url(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile and getattr(profile, "avatar_url", None):
+            return profile.avatar_url
+        return None
+
     def get_department_name(self, obj):
         profile = getattr(obj, "profile", None)
         if profile and getattr(profile, "department", None):
             return profile.department.name
+        role_code = self.get_role_code(obj)
+        if role_code == "ADMIN":
+            return "System & IT Operations"
         return None
 
 
@@ -85,12 +101,17 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         ]
 
     def get_last_message(self, obj):
-        last_msg = obj.messages.order_by("-created_at").first()
-        if last_msg:
+        last_msg = obj.messages.select_related("sender", "sender__role").order_by("-created_at").first()
+        if last_msg and last_msg.sender:
+            sender_role = getattr(last_msg.sender.role, "code", "EMPLOYEE") if getattr(last_msg.sender, "role", None) else ("ADMIN" if last_msg.sender.is_superuser else "EMPLOYEE")
+            is_from_admin = (sender_role == "ADMIN") or last_msg.sender.is_superuser
             return {
                 "id": last_msg.id,
                 "content": last_msg.content or (f"[Attachment] {last_msg.attachment_name}" if last_msg.attachment_name else ""),
+                "sender_id": last_msg.sender.id,
                 "sender_name": getattr(last_msg.sender, "full_name", "") or last_msg.sender.email.split("@")[0],
+                "sender_role": sender_role,
+                "is_from_admin": is_from_admin,
                 "created_at": last_msg.created_at,
             }
         return None
@@ -125,11 +146,13 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
                 continue
             profile = getattr(p.user, "profile", None)
             dept_name = None
+            avatar_url = None
             full_name = ""
             phone_number = ""
             if profile:
                 full_name = getattr(profile, "full_name", "") or ""
                 phone_number = getattr(profile, "phone_number", "") or ""
+                avatar_url = getattr(profile, "avatar_url", None)
                 if getattr(profile, "department", None):
                     dept_name = profile.department.name
             
@@ -141,6 +164,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
                 "id": p.user.id,
                 "email": p.user.email,
                 "full_name": full_name or p.user.email.split("@")[0],
+                "avatar_url": avatar_url,
                 "role": role_code,
                 "department_name": dept_name or "General Staff",
                 "phone_number": phone_number,

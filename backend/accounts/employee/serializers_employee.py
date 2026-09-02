@@ -4,13 +4,15 @@ from accounts.models import EmployeeProfile
 
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source="user.email", read_only=True)
+    role = serializers.CharField(source="user.role.name", read_only=True)
     department = serializers.SlugRelatedField(slug_field="name", read_only=True)
     manager_name = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeProfile
-        fields = ["full_name", "phone_number", "department", "manager_name", "avatar_url", "joined_date", "updated_at"]
-        read_only_fields = ["department", "manager_name", "avatar_url", "joined_date", "updated_at"]
+        fields = ["email", "role", "full_name", "phone_number", "department", "manager_name", "avatar_url", "joined_date", "updated_at"]
+        read_only_fields = ["email", "role", "department", "manager_name", "avatar_url", "joined_date", "updated_at"]
 
     def get_manager_name(self, obj):
         manager = obj.department.manager if obj.department else None

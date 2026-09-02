@@ -12,6 +12,7 @@ from channels.layers import get_channel_layer
 
 from projects.models import Job
 from tasks.models import Task
+from system.models import Notification
 from .models import ChatRoom, ChatParticipant, ChatMessage
 from .serializers import (
     ChatRoomListSerializer,
@@ -20,6 +21,18 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+import html
+
+# Danh mục định dạng file an toàn và cấm độc hại
+ALLOWED_ATTACHMENT_EXTENSIONS = {
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip", "rar", "7z",
+    "png", "jpg", "jpeg", "webp", "gif", "svg", "csv"
+}
+BLOCKED_ATTACHMENT_EXTENSIONS = {
+    "exe", "bat", "cmd", "sh", "vbs", "msi", "php", "py", "js", "html", "htm", "dll", "com", "scr", "apk", "jar"
+}
 
 
 def sync_user_job_channels(user):
@@ -55,6 +68,22 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         sync_user_job_channels(user)
+        user_role = (user.role.code if getattr(user, "role", None) else "").upper()
+
+        # Nếu là ADMIN: được xem toàn bộ các phòng Direct / Support gửi tới Ban Quản Trị
+        if user_role == "ADMIN" or getattr(user, "is_superuser", False):
+            return (
+                ChatRoom.objects.filter(
+                    Q(room_type=ChatRoom.RoomType.JOB, participants__user=user)
+                    | Q(room_type=ChatRoom.RoomType.DIRECT, participants__user__role__code="ADMIN", messages__isnull=False)
+                    | Q(room_type=ChatRoom.RoomType.DIRECT, participants__user=user, messages__isnull=False)
+                )
+                .select_related("job")
+                .prefetch_related("participants__user", "participants__user__role", "messages")
+                .distinct()
+                .order_by("-updated_at")
+            )
+
         if self.action == "list":
             return (
                 ChatRoom.objects.filter(
@@ -120,12 +149,16 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["POST"])
     def send_message(self, request, pk=None):
         """
-        Gửi tin nhắn qua REST API (hỗ trợ cả text và file đính kèm) và phát sóng WebSocket.
+        Gửi tin nhắn qua REST API (hỗ trợ cả text và file đính kèm) kèm 5 quy tắc Validate dữ liệu an toàn.
         """
         room = self.get_object()
         user = request.user
 
-        # Kiểm tra nếu Job đã hoàn thành/hủy thì không cho gửi tin mới (Read-only)
+        # 1. Validate trạng thái tài khoản người gửi
+        if not user.is_active:
+            return Response({"detail": "Your account is deactivated. Cannot send message."}, status=status.HTTP_403_FORBIDDEN)
+
+        # 2. Validate kênh dự án đã hoàn thành / đóng (Read-only)
         if room.room_type == ChatRoom.RoomType.JOB and room.job:
             if room.job.status in ["COMPLETED", "CANCELLED"]:
                 return Response(
@@ -133,7 +166,24 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        content = request.data.get("content", "").strip()
+        # 3. Validate tài khoản người nhận trong Chat 1-1 (Nếu người nhận bị khóa)
+        if room.room_type == ChatRoom.RoomType.DIRECT:
+            other_p = room.participants.exclude(user=user).select_related("user").first()
+            if other_p and other_p.user and not other_p.user.is_active:
+                return Response(
+                    {"detail": "Recipient account is deactivated. Cannot send message."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        raw_content = request.data.get("content", "")
+        # 4. Validate độ dài tin nhắn (Tối đa 4,000 ký tự) và chống XSS
+        if len(raw_content) > 4000:
+            return Response(
+                {"detail": "Message content exceeds maximum allowed length of 4,000 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        content = html.escape(raw_content.strip())
         attachment_url = request.data.get("attachment_url", None)
         attachment_name = request.data.get("attachment_name", None)
         attachment_size = request.data.get("attachment_size", None)
@@ -157,12 +207,15 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         ChatParticipant.objects.filter(room=room, user=user).update(last_read_at=timezone.now())
 
         # Serialize tin nhắn để trả về và broadcast
+
+        # Serialize tin nhắn để trả về và broadcast
         msg_data = ChatMessageSerializer(message, context={"request": request}).data
 
         # Phát sóng Realtime qua Redis Channel Layer
         channel_layer = get_channel_layer()
         if channel_layer:
             try:
+                # 1. Phát sóng tới phòng chat hiện tại
                 async_to_sync(channel_layer.group_send)(
                     f"chat_room_{room.id}",
                     {
@@ -170,6 +223,20 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                         "message": msg_data,
                     },
                 )
+
+                # 2. Gửi tín hiệu đồng bộ Badge Sidebar nhẹ tới kênh cá nhân của từng thành viên
+                other_participants = room.participants.exclude(user=user)
+                for participant in other_participants:
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{participant.user_id}",
+                        {
+                            "type": "notification.message",
+                            "payload": {
+                                "type": "chat_badge_sync",
+                                "room_id": room.id,
+                            },
+                        },
+                    )
             except Exception:
                 pass
 
@@ -216,14 +283,31 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["POST"])
     def upload_attachment(self, request):
         """
-        Tải file đính kèm lên Server nội bộ an toàn (Giới hạn 20MB).
+        Tải file đính kèm lên Server nội bộ an toàn (Giới hạn 20MB & kiểm duyệt định dạng file).
         """
         file_obj = request.FILES.get("file")
         if not file_obj:
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # 1. Kiểm tra dung lượng tối đa 20MB
         if file_obj.size > 20 * 1024 * 1024:
             return Response({"detail": "File size exceeds 20MB limit."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Kiểm duyệt định dạng đuôi file
+        filename = file_obj.name or ""
+        ext = filename.split(".")[-1].lower() if "." in filename else ""
+
+        if ext in BLOCKED_ATTACHMENT_EXTENSIONS:
+            return Response(
+                {"detail": f"File type '.{ext}' is strictly blocked for security reasons."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ext and ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+            return Response(
+                {"detail": f"File type '.{ext}' is not supported. Please upload documents or images."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Lưu file vào media/chat_attachments/
         upload_dir = os.path.join("chat_attachments", str(request.user.id))

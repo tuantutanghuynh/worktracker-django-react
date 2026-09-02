@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Send, Lock, PauseCircle, RotateCcw } from "lucide-react"
 import { format, parseISO, formatDistanceToNowStrict } from "date-fns"
+import { toast } from "sonner"
 import { useTaskDetail } from "../../../hooks/queries/employee/useTaskDetail"
 import SideDrawer from "../../common/drawer/SideDrawer"
 import StatusBadge from "../../common/badges/StatusBadge"
@@ -38,8 +39,7 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
     const isLocked = task?.status === "REVIEWING" || task?.status === "COMPLETED" || task?.status === "CANCELLED"
     // isFrozenOpenTask (không phải isTaskFrozen thô) — 1 task đã COMPLETED/
     // CANCELLED thì job không ACTIVE cũng chẳng còn hành động nào để chặn,
-    // hiện banner "Project Frozen" lúc đó chỉ gây nhiễu bên cạnh banner
-    // "Task is CLOSED" (isLocked) đã đủ giải thích rồi.
+    // nhưng TODO/IN_PROGRESS/REVIEWING thì phải khóa mọi tương tác.
     const isFrozen = isFrozenOpenTask(task ?? {})
     const totalLoggedHours = workLogs
         .filter((log) => log.review_status !== "VOIDED")
@@ -53,7 +53,16 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
     }
 
     async function handleLogWork() {
-        if (!hoursSpent || isLocked || isFrozen) return
+        if (isLocked || isFrozen) return
+        const h = Number(hoursSpent)
+        if (!hoursSpent || isNaN(h) || h <= 0) {
+            toast.error("Hours spent must be greater than 0.")
+            return
+        }
+        if (h > 8.0) {
+            toast.error("Single log entry cannot exceed standard 8.0 hours.")
+            return
+        }
         const ok = await submitLogWork({ work_date: workDate, hours_spent: hoursSpent, description: logDescription })
         if (ok) {
             setHoursSpent("")
@@ -80,19 +89,25 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
     // khung footer khi prop này truthy, nên phải tính trước.
     const footerAction = task ? getFooterAction(task, isFrozen, { onStartTask, onRequestSubmit, onRequestRecall }) : null
 
+    const subtitleContent = task?.job_name ? (
+        <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-purple-50 border border-purple-200 text-purple-700">
+            Project: {task.job_name}
+        </span>
+    ) : null
+
     return (
         <>
             <SideDrawer
                 isOpen={Boolean(task)}
                 onClose={onClose}
                 title={task?.title}
-                subtitle={task?.job_name}
+                subtitle={subtitleContent}
                 footer={footerAction}
             >
                 {task && (
                     <div className="space-y-6">
                         <div>
-                            <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                            <p className="text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider">
                                 Task &middot; TASK-{task.id}
                             </p>
                             <div className="flex items-center gap-2 mt-2">
@@ -102,11 +117,11 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                         </div>
 
                         {isFrozen && (
-                            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
                                 <PauseCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <div>
                                     <p className="font-bold text-amber-900">Project is Frozen ({task.job_status || "Client Inactive"})</p>
-                                    <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                                    <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed font-medium">
                                         {task.job_client_is_active === false
                                             ? "The client for this project is inactive. Task status transitions and work logging are temporarily locked."
                                             : "This project is currently on hold or cancelled. Task status transitions and work logging are paused."}
@@ -116,11 +131,11 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                         )}
 
                         {isLocked && (
-                            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
-                                <Lock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                                <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <div>
                                     <p className="font-bold text-amber-900">Task is in {task.status} status</p>
-                                    <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                                    <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed font-medium">
                                         {task.status === "REVIEWING"
                                             ? "This task is currently submitted for Manager QA Review. Work logging, edits, and comments are locked. To make adjustments, click 'Recall' on the task table."
                                             : "This task is closed. Work logging, edits, and comments are permanently locked."}
@@ -130,60 +145,68 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                         )}
 
                         <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Description</p>
-                            <p className="text-sm text-slate-800">{task.description}</p>
+                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description</p>
+                            <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80">
+                                <p className="text-sm font-medium text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                    {task.description || "No description provided."}
+                                </p>
+                            </div>
                         </div>
 
                         <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Deadline</p>
-                            {deadlineInfo ? (
-                                <div>
-                                    <p className="text-sm font-medium text-slate-800">{deadlineInfo.label}</p>
-                                    <p className={`text-xs font-semibold ${DEADLINE_TONE_STYLES[deadlineInfo.tone]}`}>{deadlineInfo.relative}</p>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-slate-400">No deadline set</p>
-                            )}
+                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Deadline</p>
+                            <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80">
+                                {deadlineInfo ? (
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900">{deadlineInfo.label}</p>
+                                        <p className={`text-xs font-bold mt-0.5 ${DEADLINE_TONE_STYLES[deadlineInfo.tone]}`}>{deadlineInfo.relative}</p>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs font-medium text-slate-500">No deadline set</p>
+                                )}
+                            </div>
                         </div>
 
                         {task.updated_at && (
-                            <p className="text-[11px] text-slate-400">
-                                Updated {formatDistanceToNowStrict(parseISO(task.updated_at), { addSuffix: true })}
+                            <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                                <span>Updated</span>
+                                <span className="font-semibold text-slate-700">{formatDistanceToNowStrict(parseISO(task.updated_at), { addSuffix: true })}</span>
                             </p>
                         )}
 
-                        {/* Log Work — ẩn hẳn khi dự án đang frozen (backend sẽ từ
-                            chối), chỉ hiện khi Task chưa bị khóa (TODO hoặc IN_PROGRESS) */}
+                        {/* Log Work — ẩn hẳn khi dự án đang frozen, chỉ hiện khi Task chưa bị khóa */}
                         {isFrozen ? (
-                            <div className="border-t border-slate-100 pt-4">
-                                <p className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Log Work</p>
-                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 italic">
+                            <div className="border-t border-slate-200 pt-5">
+                                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Log Work</p>
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 italic">
                                     Work logging is disabled because this project is currently frozen ({task.job_status || "Client Inactive"}).
                                 </div>
                             </div>
                         ) : !isLocked && (
-                            <div className="border-t border-slate-100 pt-4 space-y-2">
-                                <p className="text-xs font-semibold text-slate-400 uppercase">Log Work</p>
-                                <div className="grid grid-cols-2 gap-2">
+                            <div className="border-t border-slate-200 pt-5 space-y-3">
+                                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Log Work</p>
+                                <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-semibold text-slate-500">Date</label>
+                                        <label className="text-xs font-bold text-slate-700">Date</label>
                                         <input
                                             type="date"
+                                            max={new Date().toISOString().split("T")[0]}
                                             value={workDate}
                                             onChange={(e) => setWorkDate(e.target.value)}
-                                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
+                                            className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs transition"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-semibold text-slate-500">Hours</label>
+                                        <label className="text-xs font-bold text-slate-700">Hours</label>
                                         <input
                                             type="number"
                                             step="0.5"
-                                            min="0"
+                                            min="0.5"
+                                            max="8"
                                             placeholder="e.g. 1.5"
                                             value={hoursSpent}
                                             onChange={(e) => setHoursSpent(e.target.value)}
-                                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
+                                            className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs transition"
                                         />
                                     </div>
                                 </div>
@@ -191,67 +214,71 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                                     placeholder="What did you work on?"
                                     value={logDescription}
                                     onChange={(e) => setLogDescription(e.target.value)}
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
+                                    className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs transition placeholder:text-slate-400"
                                     rows={2}
                                 />
-                                <p className="text-[10px] text-slate-400">
-                                    Capped at 8 hours total per day, across all your tasks.
+                                <p className="text-[11px] font-medium text-slate-600">
+                                    Standard limit: 8.0 hours maximum per day across all tasks.
                                 </p>
                                 <button
                                     type="button"
                                     onClick={handleLogWork}
                                     disabled={submitting || !hoursSpent}
-                                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer"
+                                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
                                 >
                                     Log Work
                                 </button>
                             </div>
                         )}
 
-                        {/* Logged Hours — list các entry đã tạo, Void & Edit chỉ hiện khi chưa bị Lock/Frozen và còn PENDING */}
-                        <div className="border-t border-slate-100 pt-4 space-y-2">
+                        {/* Logged Hours — list các entry đã tạo */}
+                        <div className="border-t border-slate-200 pt-5 space-y-3">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-semibold text-slate-400 uppercase">Logged Hours</p>
+                                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Logged Hours</p>
                                 {totalLoggedHours > 0 && (
-                                    <p className="text-xs font-bold text-slate-700">{totalLoggedHours}h total</p>
+                                    <span className="text-xs font-bold text-slate-900 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                                        {totalLoggedHours}h total
+                                    </span>
                                 )}
                             </div>
                             {loadingDetail ? (
-                                <p className="text-xs text-slate-500">Loading...</p>
+                                <p className="text-xs font-medium text-slate-500">Loading hours...</p>
                             ) : workLogs.length === 0 ? (
-                                <p className="text-xs text-slate-500">No hours logged yet.</p>
+                                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-600 text-center">
+                                    No hours logged yet.
+                                </div>
                             ) : (
                                 <div className="space-y-2">
                                     {workLogs.map((log) => (
-                                        <div key={log.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 flex items-start justify-between gap-2">
+                                        <div key={log.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex items-start justify-between gap-3">
                                             <div>
                                                 <p className="text-xs font-bold text-slate-900">
-                                                    {format(parseISO(log.work_date), "MMM d")} — {log.hours_spent}h
+                                                    {format(parseISO(log.work_date), "MMM d, yyyy")} — <span className="text-blue-700 font-extrabold">{log.hours_spent}h</span>
                                                 </p>
-                                                <p className="text-[11px] text-slate-500">{log.description}</p>
+                                                <p className="text-xs font-medium text-slate-600 mt-0.5">{log.description || "No description"}</p>
                                                 {log.review_status === "VOIDED" && (
-                                                    <p className="text-[11px] text-rose-600 mt-1">Voided: {log.adjustment_reason}</p>
+                                                    <p className="text-[11px] font-semibold text-rose-600 mt-1">Voided: {log.adjustment_reason}</p>
                                                 )}
                                             </div>
                                             {!isLocked && !isFrozen && log.review_status === "PENDING" ? (
-                                                <div className="flex items-center gap-2.5 shrink-0">
+                                                <div className="flex items-center gap-2 shrink-0">
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingLog(log)}
-                                                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                                                        className="px-2 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition cursor-pointer"
                                                     >
                                                         Edit
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setVoidingLogId(log.id)}
-                                                        className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
+                                                        className="px-2 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer"
                                                     >
                                                         Void
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${LOG_STATUS_STYLES[log.review_status] ?? "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                                                <span className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${LOG_STATUS_STYLES[log.review_status] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
                                                     {log.review_status}
                                                 </span>
                                             )}
@@ -262,25 +289,27 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                         </div>
 
                         {/* Comments */}
-                        <div className="border-t border-slate-100 pt-4 space-y-3">
-                            <p className="text-xs font-semibold text-slate-400 uppercase">Comments</p>
+                        <div className="border-t border-slate-200 pt-5 space-y-3">
+                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Comments & Discussion</p>
                             {loadingDetail ? (
-                                <p className="text-xs text-slate-500">Loading...</p>
+                                <p className="text-xs font-medium text-slate-500">Loading comments...</p>
                             ) : comments.length === 0 ? (
-                                <p className="text-xs text-slate-400 italic py-2">No comments yet.</p>
+                                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-600 text-center">
+                                    No comments yet. Start a discussion below.
+                                </div>
                             ) : (
                                 <div className="space-y-2">
                                     {comments.map((c) => (
-                                        <div key={c.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                                        <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-1">
                                             <div className="flex items-center justify-between gap-2">
-                                                <p className="text-[11px] font-bold text-slate-800">{c.author_name}</p>
+                                                <p className="text-xs font-bold text-slate-900">{c.author_name}</p>
                                                 {c.created_at && (
-                                                    <p className="text-[10px] text-slate-400 shrink-0">
+                                                    <p className="text-[10px] font-medium text-slate-500 shrink-0">
                                                         {formatDistanceToNowStrict(parseISO(c.created_at), { addSuffix: true })}
                                                     </p>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-slate-600 mt-0.5">{c.content}</p>
+                                            <p className="text-xs font-medium text-slate-700 leading-relaxed">{c.content}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -292,23 +321,23 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                                         placeholder="Add a comment..."
                                         value={commentText}
                                         onChange={(e) => setCommentText(e.target.value)}
-                                        className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
+                                        className="flex-1 bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs transition"
                                     />
                                     <button
                                         type="button"
                                         onClick={handleAddComment}
                                         disabled={submitting || !commentText.trim()}
-                                        className="px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 cursor-pointer"
+                                        className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
                                     >
                                         <Send size={14} />
                                     </button>
                                 </div>
                             ) : (
-                                <p className="text-[11px] text-slate-500 italic">Comments are locked while task is in {task.status} status.</p>
+                                <p className="text-xs font-medium text-slate-500 italic">Comments are locked while task is in {task.status} status.</p>
                             )}
                         </div>
 
-                        {error && <p className="text-xs text-rose-600">{error}</p>}
+                        {error && <p className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xl">{error}</p>}
                     </div>
                 )}
             </SideDrawer>

@@ -103,10 +103,14 @@ export function useChangeJobStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, newStatus, reason }) => managerJobService.changeJobStatus(id, newStatus, reason),
+    mutationFn: ({ id, newStatus, new_status, status, reason }) => {
+      const targetStatus = newStatus || new_status || status;
+      return managerJobService.changeJobStatus(id, targetStatus, reason);
+    },
     onSuccess: (data, variables) => {
+      const targetStatus = variables.newStatus || variables.new_status || variables.status;
       queryClient.invalidateQueries({ queryKey: managerJobKeys.all });
-      toast.success(`Job status changed to ${variables.newStatus}`);
+      toast.success(`Job status changed to ${targetStatus}`);
     },
     onError: (err) => {
       toast.error(getErrorMessage(err, 'Status change rejected'));

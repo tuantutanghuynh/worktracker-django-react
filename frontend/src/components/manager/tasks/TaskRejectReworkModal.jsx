@@ -1,33 +1,50 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { FilePlus, UploadCloud, Trash2 } from "lucide-react";
 import BaseModal from "../../common/modal/BaseModal";
 import InputField from "../../common/forms/InputField";
 
-/**
- * TaskRejectReworkModal - Modal từ chối Task và yêu cầu sửa lại kèm tài liệu tham khảo
- * 
- * Props:
- * - isOpen: boolean
- * - onClose: () => void
- * - assigneeName: string
- * - rejectionReason: string
- * - setRejectionReason: (val: string) => void
- * - referenceFile: File | null
- * - setReferenceFile: (file: File | null) => void
- * - onConfirm: () => void
- * - isPending: boolean
- */
+const taskRejectSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Please provide actionable feedback (at least 5 characters)")
+    .max(1000, "Feedback must be less than 1000 characters"),
+});
+
 export default function TaskRejectReworkModal({
   isOpen,
   onClose,
   assigneeName,
-  rejectionReason,
-  setRejectionReason,
   referenceFile,
   setReferenceFile,
   onConfirm,
   isPending = false,
 }) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(taskRejectSchema),
+    defaultValues: {
+      reason: "",
+    },
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      reset({ reason: "" });
+    }
+  }, [isOpen, reset]);
+
+  const handleFormSubmit = (data) => {
+    onConfirm(data.reason);
+  };
+
   return (
     <BaseModal
       isOpen={isOpen}
@@ -46,7 +63,7 @@ export default function TaskRejectReworkModal({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={handleSubmit(handleFormSubmit)}
             disabled={isPending}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition cursor-pointer disabled:opacity-50"
           >
@@ -55,7 +72,7 @@ export default function TaskRejectReworkModal({
         </div>
       }
     >
-      <div className="space-y-3.5 text-xs">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3.5 text-xs">
         <p className="text-slate-600">
           Provide actionable feedback for <strong>{assigneeName}</strong>. The task will transition back to <code>IN_PROGRESS</code>.
         </p>
@@ -63,8 +80,8 @@ export default function TaskRejectReworkModal({
         <InputField
           label="Fix Instructions / Rejection Reasons *"
           placeholder="Explain what needs to be fixed or adjusted in detail..."
-          value={rejectionReason}
-          onChange={(e) => setRejectionReason(e.target.value)}
+          {...register("reason")}
+          error={errors.reason?.message}
           multiline
           rows={3}
         />
@@ -98,26 +115,26 @@ export default function TaskRejectReworkModal({
                 className="text-rose-500 hover:text-rose-700 text-xs font-bold p-1 cursor-pointer"
                 title="Remove file"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <label className="border-2 border-dashed border-slate-200 hover:border-purple-400 p-3 rounded-xl text-center bg-slate-50/50 cursor-pointer transition flex flex-col items-center justify-center gap-1">
-              <UploadCloud className="w-5 h-5 text-purple-600" />
-              <span className="text-[11px] text-slate-600">
-                Click to select reference guide or <strong className="text-purple-600">Browse</strong>
-              </span>
+            <label className="border border-dashed border-slate-300 hover:border-purple-400 rounded-xl p-3 flex items-center justify-center gap-2 bg-slate-50/60 hover:bg-purple-50/30 transition cursor-pointer">
+              <UploadCloud className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600 font-bold text-xs">Choose Reference Guide Document</span>
               <input
                 type="file"
                 className="hidden"
                 onChange={(e) => {
-                  if (e.target.files?.[0]) setReferenceFile(e.target.files[0]);
+                  if (e.target.files && e.target.files[0]) {
+                    setReferenceFile(e.target.files[0]);
+                  }
                 }}
               />
             </label>
           )}
         </div>
-      </div>
+      </form>
     </BaseModal>
   );
 }

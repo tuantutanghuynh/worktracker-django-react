@@ -90,8 +90,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if not content and not attachment_url:
                 return
 
-            # Lưu vào Database
-            msg_obj = await self.save_message(
+            # Lưu vào Database & Tạo Notifications
+            result = await self.save_message(
                 self.room_id,
                 self.user.id,
                 content,
@@ -100,8 +100,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 attachment_size,
             )
 
-            if msg_obj:
-                # Phát sóng tin nhắn tới tất cả client trong phòng
+            if result:
+                msg_obj, notif_payloads = result
+                # 1. Phát sóng tin nhắn tới tất cả client trong phòng
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
@@ -109,6 +110,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         "message": msg_obj,
                     },
                 )
+
+                # 2. Phát sóng Notification tới kênh cá nhân user_{id} của từng thành viên
+                for np in (notif_payloads or []):
+                    await self.channel_layer.group_send(
+                        f"user_{np['target_user_id']}",
+                        {
+                            "type": "notification.message",
+                            "payload": np["payload"],
+                        },
+                    )
             else:
                 # Báo lỗi trực tiếp cho người gửi nếu kênh Job đã bị đóng băng (Archived Read-Only)
                 await self.send(
@@ -164,10 +175,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def save_message(self, room_id, user_id, content, attachment_url, attachment_name, attachment_size):
+        from django.contrib.auth import get_user_model
+        from system.models import Notification
         from .models import ChatRoom, ChatMessage, ChatParticipant
         from .serializers import ChatMessageSerializer
 
-        room = ChatRoom.objects.filter(id=room_id).first()
+        User = get_user_model()
+        sender = User.objects.filter(id=user_id).first()
+        room = ChatRoom.objects.select_related("job").filter(id=room_id).first()
         if not room:
             return None
 
@@ -189,4 +204,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         room.save(update_fields=["updated_at"])
         ChatParticipant.objects.filter(room=room, user_id=user_id).update(last_read_at=timezone.now())
 
-        return ChatMessageSerializer(msg).data
+        notif_payloads = []
+        other_participants = room.participants.exclude(user_id=user_id)
+        for participant in other_participants:
+            notif_payloads.append({
+                "target_user_id": participant.user_id,
+                "payload": {
+                    "type": "chat_badge_sync",
+                    "room_id": room.id,
+                },
+            })
+
+        return ChatMessageSerializer(msg).data, notif_payloads

@@ -27,6 +27,7 @@ class ManagerUserMiniSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     email = serializers.EmailField()
     full_name = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         profile = getattr(obj, "profile", None)
@@ -36,9 +37,16 @@ class ManagerUserMiniSerializer(serializers.Serializer):
 
         return obj.email
 
+    def get_avatar_url(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile and getattr(profile, "avatar_url", None):
+            return profile.avatar_url
+        return None
+
 
 class ManagerJobListSerializer(serializers.ModelSerializer):
     client = ManagerClientMiniSerializer(read_only=True)
+    manager = ManagerUserMiniSerializer(read_only=True)
     task_counts = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     health = serializers.SerializerMethodField()
@@ -51,7 +59,9 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             "id",
             "job_code",  # ➕ BỔ SUNG: Mã dự án (VD: ERP-2024-068)
             "job_name",
+            "description",
             "client",
+            "manager",
             "priority",  # ➕ BỔ SUNG: Mức độ ưu tiên (HIGH, MEDIUM, LOW)
             "status",
             "start_date",
@@ -61,6 +71,8 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             "task_counts",
             "is_overdue",
             "health",
+            "created_at",
+            "updated_at",
         ]
 
     def get_team_size(self, obj):
@@ -104,6 +116,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
                 "id": u.id,
                 "email": u.email,
                 "full_name": getattr(getattr(u, "profile", None), "full_name", "") or u.email,
+                "avatar_url": getattr(getattr(u, "profile", None), "avatar_url", None),
                 "department_name": getattr(getattr(getattr(u, "profile", None), "department", None), "name", "No Department"),
                 "active_tasks_count": active_map.get(u.id, 0),
             }
@@ -285,6 +298,13 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                 }
             )
         job = self.instance
+        # 🛡️ DEFENSIVE GUARD: Khóa cập nhật Job nếu Client bị Admin vô hiệu hóa
+        if job and job.client and not job.client.is_active:
+            raise serializers.ValidationError(
+                f"Cannot update project '{job.job_name}' because client '{job.client.client_name}' is deactivated by Admin. "
+                "The project is frozen and editing is locked."
+            )
+
         new_deadline = attrs.get("deadline")
 
         if job and new_deadline:

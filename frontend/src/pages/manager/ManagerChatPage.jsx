@@ -5,7 +5,8 @@ import ChatContainer from '../../components/common/chat/ChatContainer';
 export default function ManagerChatPage() {
   const [searchParams] = useSearchParams();
   const initialJobId = searchParams.get('job') || searchParams.get('jobId') || null;
-  const initialDirectUserId = searchParams.get('userId') || searchParams.get('user') || null;
+  const initialDirectUserId =
+    searchParams.get('user_id') || searchParams.get('userId') || searchParams.get('user') || null;
   const initialRoomId = searchParams.get('room') || searchParams.get('roomId') || null;
 
   return (

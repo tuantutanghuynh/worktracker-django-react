@@ -166,6 +166,16 @@ def lock_job_period(
             "You can only lock past completed periods."
         )
 
+    # ➕ KIỂM TRA CHỐT CHẶN: Chặn khóa kỳ công trước năm khởi chạy của dự án (trừ khi có logwork thực tế)
+    if job.start_date and int(lock_year) < job.start_date.year:
+        from timesheets.models import LogWork
+        has_logs = LogWork.objects.filter(task__job=job, work_date__year=lock_year, work_date__month=lock_month).exists()
+        if not has_logs:
+            raise TimeLockError(
+                f"CANNOT_LOCK_BEFORE_JOB_START: Project '{job.job_name}' started in {job.start_date.year}. "
+                f"You cannot lock periods prior to project inception ({lock_month}/{lock_year})."
+            )
+
     # ➕ KIỂM TRA RÀNG BUỘC CHỐT SỔ: Chặn khóa sổ nếu còn chấm công PENDING chưa duyệt
     from timesheets.models import LogWork
     pending_count = LogWork.objects.filter(

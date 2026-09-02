@@ -172,13 +172,6 @@ def create_task(*, user, data, request=None):
             }
         )
 
-    if not assignee_id:
-        raise ValidationError(
-            {
-                "assignee_id": "assignee_id is required."
-            }
-        )
-
     if not title:
         raise ValidationError(
             {
@@ -188,9 +181,16 @@ def create_task(*, user, data, request=None):
 
     with transaction.atomic():
         job = get_scoped_object_or_404(
-            scoped_jobs(user).select_for_update(),
+            scoped_jobs(user).select_related("client").select_for_update(),
             pk=job_id,
         )
+
+        # 🛡️ DEFENSIVE GUARD: Khóa tạo Task nếu Client bị Admin vô hiệu hóa
+        if job.client and not job.client.is_active:
+            raise BusinessRuleError(
+                f"Cannot create task because client '{job.client.client_name}' is deactivated by Admin. "
+                "The project is frozen."
+            )
 
         if job.status not in JOB_STATUS_ALLOW_CREATE:
             raise BusinessRuleError("JOB_STATUS_DOES_NOT_ALLOW_TASK_CREATE")
@@ -298,11 +298,18 @@ def update_task(*, user, task, data, request=None):
         locked_task = (
             scoped_tasks(user)
             .select_for_update()
-            .select_related("job", "assignee", "creator")
+            .select_related("job", "job__client", "assignee", "creator")
             .get(pk=task.pk)
         )
 
         assert_task_in_manager_scope(user, locked_task)
+
+        # 🛡️ DEFENSIVE GUARD: Khóa cập nhật Task nếu Client bị Admin vô hiệu hóa
+        if locked_task.job.client and not locked_task.job.client.is_active:
+            raise BusinessRuleError(
+                f"Cannot update task because client '{locked_task.job.client.client_name}' is deactivated by Admin. "
+                "The project is frozen."
+            )
 
         old_values = snapshot(
             locked_task,
@@ -437,11 +444,17 @@ def move_task_kanban(
         locked_task = (
             scoped_tasks(user)
             .select_for_update()
-            .select_related("job", "assignee", "creator")
+            .select_related("job", "job__client", "assignee", "creator")
             .get(pk=task.pk)
         )
 
         assert_task_in_manager_scope(user, locked_task)
+
+        # 🛡️ DEFENSIVE GUARD: Khóa kéo thả Kanban nếu Client bị Admin vô hiệu hóa
+        if locked_task.job.client and not locked_task.job.client.is_active:
+            raise BusinessRuleError(
+                f"Cannot move or reorder task '{locked_task.title}' because client '{locked_task.job.client.client_name}' is deactivated by Admin. The project is frozen."
+            )
 
         target_status = to_status or locked_task.status
 

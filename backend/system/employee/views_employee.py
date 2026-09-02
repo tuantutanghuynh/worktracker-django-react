@@ -61,6 +61,9 @@ class NotificationMarkAllReadView(APIView):
             {"marked_read": updated_count}, status=status.HTTP_200_OK
         )
 
+    def post(self, request):
+        return self.patch(request)
+
 
 # Nhật ký hoạt động CỦA CHÍNH NGƯỜI GỌI — chỉ audit_logs có user=request.user,
 # khác hẳn bản Admin (xem toàn hệ thống) hay Manager (xem cả team quản lý).

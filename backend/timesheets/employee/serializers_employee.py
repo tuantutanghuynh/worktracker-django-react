@@ -53,6 +53,16 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         if task.assignee_id != request.user.id:
             raise serializers.ValidationError("You can only log work on tasks assigned to you.")
+        
+        # 1. Project Lifecycle Check: Chặn log work nếu Job đang ON_HOLD, CANCELLED hoặc COMPLETED
+        from projects.models import Job
+        if task.job and task.job.status in [Job.Status.ON_HOLD, Job.Status.CANCELLED, Job.Status.COMPLETED]:
+            raise serializers.ValidationError(
+                f"Cannot log work on task '{task.title}' because its project '{task.job.job_name}' "
+                f"is currently in '{task.job.status}' status."
+            )
+
+        # 2. Task Status Check: Chặn log work nếu Task đang REVIEWING, COMPLETED hoặc CANCELLED
         if task.status in [Task.Status.REVIEWING, Task.Status.COMPLETED, Task.Status.CANCELLED]:
             raise serializers.ValidationError(
                 f"Cannot log work on task '{task.title}' because it is in '{task.status}' status. "

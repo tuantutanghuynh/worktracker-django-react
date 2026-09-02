@@ -10,36 +10,47 @@ import {
   Clock
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import {
   getActionLabel,
   getFieldLabel,
   isHiddenField,
   formatAuditValue,
+  summarizeLog,
 } from '../../../utils/auditLabels';
 
 /**
  * AuditDiffViewer - Audit Log Snapshot Comparison Component
  * Perfectly aligned 12-column grid layout with automatic date-fns ISO string formatting
  *
- * theme ('dark' | 'light'): visual theme, default 'dark' (original look,
- * unchanged for every existing caller — Admin's AuditLogsPage). Pass
- * 'light' to render on a white/light-card drawer (Employee's My Activity).
+ * Supports polymorphic inputs: Can receive either a single `log` object OR individual props.
+ * theme ('dark' | 'light'): visual theme, default 'dark'.
  */
 export default function AuditDiffViewer({
-  oldValues = {},
-  newValues = {},
-  action = 'UPDATE_RECORD',
-  timestamp,
-  user,
-  severity = 'NORMAL',
-  ipAddress,
-  summary,
+  log,
+  oldValues: propOldValues,
+  newValues: propNewValues,
+  action: propAction,
+  timestamp: propTimestamp,
+  user: propUser,
+  severity: propSeverity,
+  ipAddress: propIpAddress,
+  summary: propSummary,
   theme = 'dark',
   className
 }) {
   const [showUnchanged, setShowUnchanged] = useState(false);
   const isLight = theme === 'light';
+
+  // Normalize data whether passed via `log` object or discrete props
+  const oldValues = log?.old_values !== undefined ? log.old_values : propOldValues || {};
+  const newValues = log?.new_values !== undefined ? log.new_values : propNewValues || {};
+  const action = log?.action || propAction || 'UPDATE_RECORD';
+  const timestamp = log?.created_at || propTimestamp;
+  const rawUser = log?.actor_name || log?.actor_email || propUser;
+  const severity = log?.severity || propSeverity || 'NORMAL';
+  const ipAddress = log?.ip_address || propIpAddress;
+  const summary = (log ? summarizeLog(log) : null) || propSummary;
 
   // Parse JSON string if necessary
   const parseData = (val) => {
@@ -53,8 +64,7 @@ export default function AuditDiffViewer({
   const oldObj = parseData(oldValues);
   const newObj = parseData(newValues);
 
-  // Bỏ các cột thuần kỹ thuật (id, created_at, password...) — Admin nghiệp
-  // vụ không đọc được và cũng không cần đối chiếu.
+  // Bỏ các cột thuần kỹ thuật (id, created_at, password...) — Admin/Manager không cần đối chiếu
   const allKeys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)])).filter(
     (key) => !isHiddenField(key)
   );
@@ -92,8 +102,7 @@ export default function AuditDiffViewer({
   const currentSeverity = severityConfigs[severity] || severityConfigs.NORMAL;
   const SeverityIcon = currentSeverity.icon;
 
-  // Mọi giá trị đi qua formatAuditValue: boolean -> Active/Locked, enum ->
-  // chữ thường hoa đầu, ISO datetime -> giờ + ngày, object -> liệt kê gọn.
+  // Mọi giá trị đi qua formatAuditValue: boolean -> Active/Locked, enum -> chữ thường hoa đầu, ISO datetime -> giờ + ngày
   const renderValue = (key, val) => {
     const formatted = formatAuditValue(key, val);
     if (formatted === null) return <span className={cn('italic', isLight ? 'text-slate-400' : 'text-slate-500')}>Not set</span>;
@@ -101,8 +110,19 @@ export default function AuditDiffViewer({
   };
 
   const formattedDate = timestamp
-    ? format(new Date(timestamp), 'HH:mm - yyyy-MM-dd')
+    ? (() => {
+        try {
+          const d = typeof timestamp === 'string' ? parseISO(timestamp) : new Date(timestamp);
+          return format(d, 'HH:mm:ss - dd/MM/yyyy');
+        } catch {
+          return String(timestamp);
+        }
+      })()
     : 'Recently';
+
+  const userDisplayName = typeof rawUser === 'object'
+    ? rawUser?.full_name || rawUser?.email || 'System User'
+    : rawUser || 'System User';
 
   return (
     <div
@@ -165,7 +185,7 @@ export default function AuditDiffViewer({
             <User className={cn('w-3.5 h-3.5', isLight ? 'text-indigo-500' : 'text-indigo-400')} /> Changed By
           </span>
           <p className={cn('font-bold truncate', isLight ? 'text-slate-900' : 'text-slate-100')}>
-            {user?.full_name || user?.email || 'System User'}
+            {userDisplayName}
           </p>
         </div>
 
@@ -190,7 +210,7 @@ export default function AuditDiffViewer({
 
       {/* Comparison Diff Table (Synchronized 12-Column Grid Header & Body) */}
       <div className={cn('border rounded-xl overflow-hidden', isLight ? 'border-slate-200 bg-white' : 'border-slate-800 bg-slate-950/40')}>
-        {/* Table Header: Exactly matching 12-column grid */}
+        {/* Table Header */}
         <div className={cn(
           'grid grid-cols-1 md:grid-cols-12 gap-3 px-3.5 py-3 border-b text-xs font-bold items-center',
           isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/90 border-slate-800'
@@ -201,7 +221,7 @@ export default function AuditDiffViewer({
           <div className={isLight ? 'md:col-span-3 text-emerald-600' : 'md:col-span-3 text-emerald-400'}>After Change (New)</div>
         </div>
 
-        {/* Table Body: Exactly matching 12-column grid */}
+        {/* Table Body */}
         {filteredItems.length === 0 ? (
           <div className={cn('p-8 text-center text-xs', isLight ? 'text-slate-400' : 'text-slate-500')}>
             No data changes recorded or all fields are identical.
@@ -223,9 +243,6 @@ export default function AuditDiffViewer({
                     unchanged: 'hover:bg-slate-800/40',
                   }[status];
 
-              // Field không đổi thì 2 ô hiện trung tính (không đỏ/gạch
-              // ngang, không xanh) — tô màu "đã xóa / đã thêm" cho giá trị
-              // y hệt nhau khiến người đọc tưởng có thay đổi.
               const isUnchanged = status === 'unchanged';
               const oldCellClass = isLight
                 ? (isUnchanged ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-rose-50 border-rose-200 text-rose-500 line-through')

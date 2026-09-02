@@ -100,6 +100,14 @@ def validate_job_transition(job, new_status, reason):
     """
     Validate transition theo bảng trạng thái Job.
     """
+    # 🛡️ DEFENSIVE GUARD: Nếu Client bị Admin vô hiệu hóa (Inactive), Job bị đóng băng hoàn toàn.
+    # Tuyệt đối không cho phép Manager kích hoạt lại (ACTIVE) hoặc chuyển trạng thái khác ngoài CANCELLED.
+    if job.client and not job.client.is_active and new_status != Job.Status.CANCELLED:
+        raise BusinessRuleError(
+            f"Cannot change status to '{new_status}' because client '{job.client.client_name}' is deactivated by Admin. "
+            "The project is frozen and requires Admin to restore the client first."
+        )
+
     transition_key = (job.status, new_status)
     rule = JOB_TRANSITIONS.get(transition_key)
 
@@ -126,7 +134,7 @@ def manager_change_job_status(*, user, job, new_status, reason=None, request=Non
     - Ghi audit log trong cùng transaction.
     """
     with transaction.atomic():
-        locked_job = Job.objects.select_for_update().get(id=job.id)
+        locked_job = Job.objects.select_related("client").select_for_update().get(id=job.id)
 
         manager_assert_job_owner(user, locked_job)
 

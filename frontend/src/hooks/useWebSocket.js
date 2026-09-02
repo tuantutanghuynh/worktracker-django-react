@@ -2,6 +2,7 @@ import useReactWebSocket, { useWebSocket as useNamedWebSocket } from 'react-use-
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { useAuthStore } from '../stores/authStore';
 
 /**
  * Custom Hook: Real-time WebSocket connection to Django Channels ws/notifications/
@@ -14,11 +15,11 @@ export function useWebSocket() {
   // Tự động nhận diện hàm hook chuẩn từ thư viện react-use-websocket
   const wsHook = typeof useReactWebSocket === 'function' ? useReactWebSocket : useNamedWebSocket;
 
-  const token = localStorage.getItem('access_token');
+  const token = useAuthStore.getState().accessToken;
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsHost = window.location.hostname || 'localhost';
+  const wsHost = window.location.host;
   const socketUrl = user && token && typeof wsHook === 'function' 
-    ? `${wsProtocol}//${wsHost}:8000/ws/notifications/?token=${token}` 
+    ? `${wsProtocol}//${wsHost}/ws/notifications/?token=${token}` 
     : null;
 
   const { lastJsonMessage, readyState } = (typeof wsHook === 'function' ? wsHook : () => ({}))(socketUrl, {

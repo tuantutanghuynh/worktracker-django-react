@@ -107,23 +107,22 @@
         .data-table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 7.5pt;
         }
         .data-table th {
             background-color: #0f172a;
             color: #ffffff;
-            font-size: 7.5pt;
             font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 6px 5px;
             text-align: left;
-            border: 1px solid #0f172a;
+            padding: 5px 6px;
+            font-size: 7.5pt;
+            border: 0.5px solid #0f172a;
         }
         .data-table td {
-            padding: 5px;
-            font-size: 7.5pt;
-            border: 1px solid #cbd5e1;
-            vertical-align: middle;
+            padding: 4.5px 6px;
+            border-bottom: 0.5px solid #e2e8f0;
+            border-left: 0.5px solid #f1f5f9;
+            border-right: 0.5px solid #f1f5f9;
         }
         .row-even {
             background-color: #f8fafc;
@@ -136,16 +135,15 @@
         .code-badge {
             font-family: Courier, monospace;
             font-weight: bold;
-            font-size: 7pt;
             color: #1e40af;
         }
         .badge {
-            display: inline-block;
-            padding: 2px 5px;
-            border-radius: 3px;
+            padding: 1.5px 4px;
+            border-radius: 2px;
             font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
+            display: inline-block;
         }
         .badge-approved { background-color: #dcfce7; color: #15803d; }
         .badge-pending { background-color: #fef3c7; color: #92400e; }
@@ -238,7 +236,7 @@
                 <td class="code-badge">LW-{{ row.id }}</td>
                 <td style="text-align: center; font-family: Courier, monospace;">{{ row.work_date }}</td>
                 <td style="font-weight: bold; color: #0f172a;">
-                    {{ row.employee.full_name|default:row.user.full_name|default:"Staff" }}
+                    {{ row.employee.full_name|default:row.employee.email|default:"Staff" }}
                 </td>
                 <td class="code-badge">{{ row.job.job_code|default:"—" }}</td>
                 <td>{{ row.job.job_name|default:"—" }}</td>

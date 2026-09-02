@@ -3,6 +3,21 @@ import { FileText, CheckCircle2 } from 'lucide-react';
 import BaseModal from './BaseModal';
 import { cn } from '../../../utils/cn';
 
+const VARIANT_STYLES = {
+  danger: {
+    btnConfirm: 'bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-500',
+  },
+  warning: {
+    btnConfirm: 'bg-amber-600 hover:bg-amber-700 text-white focus:ring-amber-500',
+  },
+  primary: {
+    btnConfirm: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
+  },
+  success: {
+    btnConfirm: 'bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500',
+  },
+};
+
 /**
  * PromptReasonModal - Modal Xác nhận KÈM Ô NHẬP LÝ DO (Textarea)
  */
@@ -38,17 +53,7 @@ export default function PromptReasonModal({
     onConfirm(reason.trim());
   };
 
-  const variantStyles = {
-    danger: {
-      btnConfirm: 'bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-500',
-    },
-    warning: {
-      btnConfirm: 'bg-amber-600 hover:bg-amber-700 text-white focus:ring-amber-500',
-    },
-    primary: {
-      btnConfirm: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
-    },
-  }[variant] || variantStyles.danger;
+  const currentVariant = VARIANT_STYLES[variant] || VARIANT_STYLES.danger;
 
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} title={title} description={description}>
@@ -94,17 +99,15 @@ export default function PromptReasonModal({
             disabled={isLoading || !reason.trim()}
             className={cn(
               'px-4 py-2 text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer',
-              variantStyles.btnConfirm
+              currentVariant.btnConfirm
             )}
           >
             {isLoading ? (
-              <span>Processing...</span>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{confirmText}</span>
-              </>
+              <CheckCircle2 className="w-4 h-4" />
             )}
+            <span>{confirmText}</span>
           </button>
         </div>
       </form>

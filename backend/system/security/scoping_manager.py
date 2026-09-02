@@ -130,16 +130,17 @@ def scoped_timelocks(user):
     """
     TimeLock queryset đã được scope.
 
-    Manager chỉ xử lý JOB lock thuộc Job do mình quản lý.
-    GLOBAL lock thuộc Admin, không thuộc nhóm Manager.
+    Manager xử lý JOB lock thuộc Job do mình quản lý
+    đồng thời được phép xem các bản ghi GLOBAL lock của Admin
+    để nắm bắt trạng thái khóa sổ toàn hệ thống.
     """
     if is_admin(user):
         return TimeLock.objects.all()
 
     if is_manager(user):
         return TimeLock.objects.filter(
-            lock_scope=TimeLock.LockScope.JOB,
-            job__manager_id=user.id,
+            Q(lock_scope=TimeLock.LockScope.JOB, job__manager_id=user.id)
+            | Q(lock_scope=TimeLock.LockScope.GLOBAL)
         )
 
     return TimeLock.objects.none()

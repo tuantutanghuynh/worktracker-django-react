@@ -25,6 +25,10 @@ export default function EditLogWorkModal({ isOpen, logWork, onClose, onConfirm, 
             setError('Hours must be greater than 0.')
             return
         }
+        if (h > 8.0) {
+            setError('Single log entry cannot exceed standard 8.0 hours.')
+            return
+        }
         if (!reason.trim()) {
             setError('Reason for editing is required.')
             return
@@ -50,6 +54,7 @@ export default function EditLogWorkModal({ isOpen, logWork, onClose, onConfirm, 
                         type="number"
                         step="0.25"
                         min="0.25"
+                        max="8"
                         value={hoursSpent}
                         onChange={(e) => setHoursSpent(e.target.value)}
                         disabled={isLoading}

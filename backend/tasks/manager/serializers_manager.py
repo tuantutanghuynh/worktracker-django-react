@@ -12,6 +12,7 @@ class ManagerUserMiniSerializer(serializers.Serializer):
     email = serializers.EmailField()
     role = serializers.CharField(source="role.code", read_only=True)
     full_name = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         profile = getattr(obj, "profile", None)
@@ -20,6 +21,12 @@ class ManagerUserMiniSerializer(serializers.Serializer):
             return profile.full_name
 
         return obj.email
+
+    def get_avatar_url(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile and getattr(profile, "avatar_url", None):
+            return profile.avatar_url
+        return None
 
 
 class ManagerJobMiniSerializer(serializers.ModelSerializer):

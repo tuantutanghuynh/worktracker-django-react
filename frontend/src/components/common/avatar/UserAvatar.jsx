@@ -42,29 +42,53 @@ const SIZE_MAP = {
 };
 
 /**
- * UserAvatar - Component hiển thị ảnh đại diện chuẩn toàn hệ thống
+ * UserAvatar - Component hiển thị ảnh đại diện chuẩn toàn hệ thống (Hỗ trợ đa hình Polymorphic)
  */
 export default function UserAvatar({
   user,
   src,
+  avatarUrl,
+  avatar,
   name,
+  fullName,
+  userName,
   size = 'md',
   className,
   showStatus = false,
   isOnline = true,
   alt,
 }) {
-  const avatarRaw = src || user?.avatar_url || user?.avatar;
-  const avatarUrl = resolveAvatarUrl(avatarRaw);
-  const displayName = name || user?.full_name || user?.email || 'User';
+  // Trích xuất linh hoạt avatar URL từ mọi nguồn props
+  const avatarRaw =
+    src ||
+    avatarUrl ||
+    avatar ||
+    user?.avatar_url ||
+    user?.avatar ||
+    user?.profile?.avatar_url ||
+    user?.employee_profile?.avatar_url;
+
+  const resolvedSrc = resolveAvatarUrl(avatarRaw);
+
+  // Trích xuất linh hoạt tên hiển thị
+  const displayName =
+    name ||
+    fullName ||
+    userName ||
+    user?.full_name ||
+    user?.name ||
+    user?.employee_name ||
+    user?.email ||
+    'User';
+
   const initials = getInitials(displayName);
 
   const [hasError, setHasError] = useState(false);
 
-  // Reset error khi URL thay đổi
+  // Reset trạng thái lỗi khi URL thay đổi
   useEffect(() => {
     setHasError(false);
-  }, [avatarUrl]);
+  }, [resolvedSrc]);
 
   const sizeClass = SIZE_MAP[size] || SIZE_MAP.md;
 
@@ -72,16 +96,16 @@ export default function UserAvatar({
     <div className={cn('relative inline-flex shrink-0 select-none', className)}>
       <div
         className={cn(
-          'rounded-full overflow-hidden flex items-center justify-center font-extrabold uppercase shadow-2xs border border-white/80',
+          'rounded-full overflow-hidden flex items-center justify-center font-extrabold uppercase shadow-2xs border border-white/80 shrink-0',
           sizeClass,
-          (!avatarUrl || hasError) &&
+          (!resolvedSrc || hasError) &&
             'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white'
         )}
       >
-        {avatarUrl && !hasError ? (
+        {resolvedSrc && !hasError ? (
           <img
-            key={avatarUrl}
-            src={avatarUrl}
+            key={resolvedSrc}
+            src={resolvedSrc}
             alt={alt || displayName}
             onError={() => setHasError(true)}
             className="w-full h-full object-cover"

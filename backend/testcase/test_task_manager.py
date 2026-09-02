@@ -284,6 +284,7 @@ class TestManagerTaskTransition:
             manager=self.manager,
             client=self.client_db,
             job_name="Job test transition",
+            status="ACTIVE",
         )
 
         self.task_reviewing = baker.make(
@@ -357,10 +358,13 @@ class TestManagerTaskKanbanMove:
             manager=self.manager,
             client=self.client_db,
             job_name="Job Kanban Move",
+            status="ACTIVE",
         )
+        self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
+        self.employee = baker.make("accounts.CustomUser", role=self.role_employee, is_active=True)
 
-        self.task_1 = baker.make("tasks.Task", job=self.job, title="Task 1", status="TODO")
-        self.task_2 = baker.make("tasks.Task", job=self.job, title="Task 2", status="TODO")
+        self.task_1 = baker.make("tasks.Task", job=self.job, assignee=self.employee, title="Task 1", status="TODO")
+        self.task_2 = baker.make("tasks.Task", job=self.job, assignee=self.employee, title="Task 2", status="TODO")
 
     def test_move_task_same_column_reorder(self):
         """Reorder cùng cột (to_status='TODO') -> 200 OK, chỉ đổi order_index."""

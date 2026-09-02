@@ -48,6 +48,7 @@ const AdminJobsPage = lazy(() => import("../pages/admin/JobsPage").then((m) => (
 const AdminAuditLogsPage = lazy(() => import("../pages/admin/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage })))
 const AdminTimesheetControlPage = lazy(() => import("../pages/admin/TimesheetControlPage").then((m) => ({ default: m.TimesheetControlPage })))
 const AdminNotificationsPage = lazy(() => import("../pages/admin/NotificationsPage").then((m) => ({ default: m.NotificationsPage })))
+const AdminSupportDeskPage = lazy(() => import("../pages/admin/AdminSupportDeskPage"))
 
 function PageLoadingSpinner() {
     return (
@@ -137,6 +138,8 @@ export function AppRouter() {
                                 <Route path="jobs" element={<AdminJobsPage />} />
                                 <Route path="audit-logs" element={<AdminAuditLogsPage />} />
                                 <Route path="timesheets" element={<AdminTimesheetControlPage />} />
+                                <Route path="support" element={<AdminSupportDeskPage />} />
+                                <Route path="chat" element={<AdminSupportDeskPage />} />
                                 <Route path="notifications" element={<AdminNotificationsPage />} />
                                 <Route path="profile" element={<ProfilePage />} />
                             </Route>

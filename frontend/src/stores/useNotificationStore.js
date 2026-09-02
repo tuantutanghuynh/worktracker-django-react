@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { toast } from 'sonner';
 import managerReportService from '../services/manager/managerReportService';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notificationApi';
 import { useAuthStore } from './authStore';
+import { queryClient } from '../lib/queryClient';
 
 // Picks the right backend depending on role — Manager's notification
 // routes live under /manager/system/notifications/ and are role-gated;
@@ -153,14 +153,6 @@ export const useNotificationStore = create((set, get) => ({
       const unread = notification.is_read ? state.unreadCount : state.unreadCount + 1;
       return { notifications: updated, unreadCount: unread };
     });
-
-    // Bắn Toast thông báo nổi tức thì góc màn hình
-    if (notification.title) {
-      toast.info(notification.title, {
-        description: notification.content || undefined,
-        duration: 5000,
-      });
-    }
   },
 
   /**
@@ -228,9 +220,26 @@ export const useNotificationStore = create((set, get) => ({
           if (data && data.type === 'pong') return;
 
           // Backend NotificationConsumer sends: { type: "notification", data: payload }
-          const notif = data?.data || data?.notification || (data?.id ? data : null);
-          if (notif && notif.id) {
-            get().addRealtimeNotification(notif);
+          const payload = data?.data || data?.notification || (data?.id ? data : null);
+          if (payload) {
+            // Nếu là sự kiện đồng bộ Badge Chat: cập nhật ngầm danh sách phòng & Badge Sidebar
+            if (payload.type === 'chat_badge_sync') {
+              queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
+              return;
+            }
+
+            // Thông báo hệ thống có ID (Task, Timesheet, Overdue...)
+            if (payload.id && payload.type !== 'chat_message') {
+              get().addRealtimeNotification(payload);
+
+              // Đồng bộ dữ liệu mới nhất tức thì qua React Query
+              queryClient.invalidateQueries({ queryKey: ['notifications'] });
+              queryClient.invalidateQueries({ queryKey: ['manager-notifications'] });
+              queryClient.invalidateQueries({ queryKey: ['employee-notifications'] });
+              queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['manager-tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['manager-dashboard'] });
+            }
           }
         } catch (e) {
           console.error('Failed to parse WebSocket notification message', e);

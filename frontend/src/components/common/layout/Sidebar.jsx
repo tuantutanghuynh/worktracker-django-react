@@ -22,6 +22,7 @@ import {
   FileText,
   Network,
   ScrollText,
+  Headphones,
 } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
 import { useAuth } from '../../../hooks/useAuth';
@@ -32,7 +33,9 @@ import { useManagerJobs } from '../../../hooks/queries/manager/useManagerJobs';
 import { useManagerTasks } from '../../../hooks/queries/manager/useManagerTasks';
 import { useLogWorks } from '../../../hooks/queries/manager/useManagerTimesheets';
 import { useMyTasks } from '../../../hooks/queries/employee/useMyTasks';
+import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '../../../hooks/queries/common/useProfile';
+import { chatService } from '../../../services/common/chatService';
 import UserAvatar from '../avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
 
@@ -55,7 +58,7 @@ const MENU_CONFIG = {
 
       // Nhóm 3: Quản lý Nhân sự & Trao đổi
       { path: '/manager/team', label: 'Team Members', icon: Users, hasDividerTop: true },
-      { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare },
+      { path: '/manager/chat', label: 'Team Chat', icon: MessageSquare, isChatBadge: true },
 
       // Nhóm 4: Báo cáo & Kiểm toán
       { path: '/manager/reports', label: 'Reports', icon: BarChart3, hasDividerTop: true },
@@ -73,7 +76,7 @@ const MENU_CONFIG = {
       { path: '/employee/team', label: 'My Team', icon: Users },
       { path: '/employee/timesheet', label: 'Timesheet', icon: Clock },
       { path: '/employee/my-performance', label: 'My Performance', icon: TrendingUp, hasDividerTop: true },
-      { path: '/employee/chat', label: 'Team Chat', icon: MessageSquare, hasDividerTop: true },
+      { path: '/employee/chat', label: 'Team Chat', icon: MessageSquare, hasDividerTop: true, isChatBadge: true },
       { path: '/employee/audit-logs', label: 'My Activity', icon: FileText, hasDividerTop: true },
       { path: '/employee/notifications', label: 'Notifications', icon: Bell, hasBadge: true },
       { path: '/employee/profile', label: 'Profile', icon: User, hasDividerTop: true },
@@ -112,7 +115,10 @@ const MENU_CONFIG = {
       },
       {
         label: 'Operations',
-        items: [{ path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock }],
+        items: [
+          { path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock },
+          { path: '/admin/support', label: 'Support Desk', icon: Headphones, isChatBadge: true },
+        ],
       },
       {
         label: 'System',
@@ -199,6 +205,21 @@ export default function Sidebar() {
     if (!isEmployee || !Array.isArray(employeeTasks)) return 0;
     return employeeTasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
   }, [isEmployee, employeeTasks]);
+
+  // 🚀 REACT QUERY: Lấy tổng số lượng tin nhắn chưa đọc từ các phòng chat
+  const { data: chatRoomsData } = useQuery({
+    queryKey: ['chat-rooms'],
+    queryFn: () => chatService.getRooms(),
+    refetchInterval: 15000,
+    enabled: Boolean(user),
+  });
+
+  const unreadChatCount = useMemo(() => {
+    if (!chatRoomsData) return 0;
+    const channels = Array.isArray(chatRoomsData.job_channels) ? chatRoomsData.job_channels : [];
+    const dms = Array.isArray(chatRoomsData.direct_messages) ? chatRoomsData.direct_messages : [];
+    return [...channels, ...dms].reduce((sum, r) => sum + (r.unread_count || 0), 0);
+  }, [chatRoomsData]);
 
   // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
   const displayRecentJobs = useMemo(() => {
@@ -348,6 +369,12 @@ export default function Sidebar() {
                   {item.isTimesheetBadge && pendingTimesheetCount > 0 && (
                     <span className="bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs">
                       {pendingTimesheetCount > 99 ? '99+' : pendingTimesheetCount}
+                    </span>
+                  )}
+
+                  {item.isChatBadge && unreadChatCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs animate-pulse">
+                      {unreadChatCount > 99 ? '99+' : unreadChatCount}
                     </span>
                   )}
                 </NavLink>

@@ -6,6 +6,7 @@ import { format, parseISO } from "date-fns";
 import UserAvatar from "../avatar/UserAvatar";
 import { chatService } from "../../../services/common/chatService";
 import { useAuth } from "../../../hooks/useAuth";
+import { useAuthStore } from "../../../stores/authStore";
 import { cn } from "../../../utils/cn";
 
 function formatDateSafe(dateStr, pattern = "HH:mm") {
@@ -84,12 +85,12 @@ export default function FloatingDirectChatWidget({
     const roomId = directRoom?.id || directRoom?.room_id;
     if (!isOpen || !roomId) return;
 
-    const token = localStorage.getItem("access_token");
+    const token = useAuthStore.getState().accessToken;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsHost = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
+    const host = window.location.host;
     const wsUrl = token
-      ? `${protocol}//${wsHost}/ws/chat/${roomId}/?token=${token}`
-      : `${protocol}//${wsHost}/ws/chat/${roomId}/`;
+      ? `${protocol}//${host}/ws/chat/${roomId}/?token=${token}`
+      : `${protocol}//${host}/ws/chat/${roomId}/`;
 
     let socket = null;
     try {
