@@ -176,4 +176,6 @@ class ChangePasswordView(APIView):
             request=request,
         )
 
-        return Response({"detail": "Password changed successfully"}, status=status.HTTP_200_OK)
+        return Response({
+            "detail": "Password changed successfully. Please log in again with your new password.",
+        }, status=status.HTTP_200_OK)

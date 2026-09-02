@@ -75,8 +75,12 @@ export function useUploadAvatar() {
 export function useChangePassword() {
   return useMutation({
     mutationFn: profileService.changePassword,
-    onSuccess: () => {
-      toast.success('Password changed successfully!');
+    onSuccess: (data) => {
+      useAuthStore.getState().logout();
+      toast.success(data?.detail || 'Password changed successfully. Please log in again with your new password.');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 500);
     },
     onError: (err) => {
       console.error('Change password error:', err);

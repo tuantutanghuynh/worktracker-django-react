@@ -1,7 +1,11 @@
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { useNavigate } from "react-router-dom"
+import { Eye, EyeOff } from "lucide-react"
 import { useChangePassword } from "../../hooks/authentication/useChangePassword"
+import { useAuthStore } from "../../stores/authStore"
 
 // Change-password page — used both for a voluntary password change and
 // the forced first-login change gated by must_change_password (FR-04).
@@ -26,10 +30,20 @@ const changePasswordSchema = z.object({
 
 // Renders the change-password form and wires it to useChangePassword().
 export function ChangePasswordPage() {
+    const navigate = useNavigate()
+    const [showOldPassword, setShowOldPassword] = useState(false)
+    const [showNewPassword, setShowNewPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
     const { submitChangePassword, loading, error } = useChangePassword()
     const { register, handleSubmit, formState: { errors } } = useForm({
         resolver: zodResolver(changePasswordSchema),
     })
+
+    function handleBackToLogin() {
+        useAuthStore.getState().logout()
+        navigate("/login", { replace: true })
+    }
 
     function onSubmit(data) {
         submitChangePassword({ old_password: data.old_password, new_password: data.new_password })
@@ -72,31 +86,58 @@ export function ChangePasswordPage() {
                     <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
                         <div className="space-y-1">
                             <label className="text-xs font-semibold text-slate-300">Current Password</label>
-                            <input
-                                type="password"
-                                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                {...register("old_password")}
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showOldPassword ? "text" : "password"}
+                                    className="w-full px-3.5 py-2.5 pr-10 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    {...register("old_password")}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowOldPassword(!showOldPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition focus:outline-none"
+                                >
+                                    {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
                             {errors.old_password && <p className="text-[11px] text-rose-400">{errors.old_password.message}</p>}
                         </div>
 
                         <div className="space-y-1">
                             <label className="text-xs font-semibold text-slate-300">New Password</label>
-                            <input
-                                type="password"
-                                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                {...register("new_password")}
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showNewPassword ? "text" : "password"}
+                                    className="w-full px-3.5 py-2.5 pr-10 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    {...register("new_password")}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewPassword(!showNewPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition focus:outline-none"
+                                >
+                                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
                             {errors.new_password && <p className="text-[11px] text-rose-400">{errors.new_password.message}</p>}
                         </div>
 
                         <div className="space-y-1">
                             <label className="text-xs font-semibold text-slate-300">Confirm New Password</label>
-                            <input
-                                type="password"
-                                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                {...register("confirm_new_password")}
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    className="w-full px-3.5 py-2.5 pr-10 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    {...register("confirm_new_password")}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition focus:outline-none"
+                                >
+                                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
                             {errors.confirm_new_password && <p className="text-[11px] text-rose-400">{errors.confirm_new_password.message}</p>}
                         </div>
 
@@ -111,13 +152,23 @@ export function ChangePasswordPage() {
 
                         {error && <p className="text-[11px] text-rose-400">{error}</p>}
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-blue-600/30 transition disabled:opacity-60"
-                        >
-                            {loading ? "Updating..." : "Update Password"}
-                        </button>
+                        <div className="space-y-2.5 pt-1">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-blue-600/30 transition disabled:opacity-60"
+                            >
+                                {loading ? "Updating..." : "Update Password"}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleBackToLogin}
+                                className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white font-semibold rounded-xl text-xs transition border border-slate-700/60 flex items-center justify-center space-x-1.5"
+                            >
+                                <span>← Back to Login</span>
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
