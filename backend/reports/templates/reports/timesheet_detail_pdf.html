@@ -1,3 +1,7 @@
+{% comment %}
+Template: reports/timesheet_detail_pdf.html
+Description: Executive PDF timesheet report template displaying summary metrics and employee effort log details.
+{% endcomment %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -23,7 +27,7 @@
             line-height: 1.3;
         }
 
-        /* HEADER SECTION */
+        /* Header Styles */
         .header-table {
             width: 100%;
             border-collapse: collapse;
@@ -58,7 +62,7 @@
             text-align: right;
         }
 
-        /* KPI CARDS */
+        /* KPI Card Styles */
         .kpi-table {
             width: 100%;
             border-collapse: separate;
@@ -103,7 +107,7 @@
         .val-amber { color: #b45309; }
         .val-rose { color: #be123c; }
 
-        /* DATA TABLE */
+        /* Data Table Styles */
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -131,7 +135,7 @@
             background-color: #ffffff;
         }
 
-        /* BADGES */
+        /* Status Badges */
         .code-badge {
             font-family: Courier, monospace;
             font-weight: bold;
@@ -160,7 +164,7 @@
 </head>
 <body>
 
-    <!-- RUNNING FOOTER -->
+    <!-- Running Footer -->
     <div id="footer_content">
         <table style="width: 100%; border: none;">
             <tr>
@@ -174,7 +178,7 @@
         </table>
     </div>
 
-    <!-- CORPORATE HEADER -->
+    <!-- Corporate Header -->
     <table class="header-table">
         <tr>
             <td style="width: 55%; border: none;">
@@ -190,7 +194,7 @@
         </tr>
     </table>
 
-    <!-- EXECUTIVE KPI SUMMARY CARDS -->
+    <!-- Executive KPI Summary Cards -->
     <table class="kpi-table">
         <tr>
             <td class="kpi-card kpi-card-blue">
@@ -215,7 +219,7 @@
         </tr>
     </table>
 
-    <!-- DATA TABLE -->
+    <!-- Timesheet Data Table -->
     <table class="data-table">
         <thead>
             <tr>

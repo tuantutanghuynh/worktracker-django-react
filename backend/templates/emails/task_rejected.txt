@@ -1,3 +1,7 @@
+{% comment %}
+Template: emails/task_rejected.txt
+Description: Plain-text fallback for task rework request notification email.
+{% endcomment %}
 {% autoescape off %}Task Rework Requested: {{ task_title }}
 
 Hello {{ assignee_name }}, your manager has reviewed the deliverable for task "{{ task_title }}" and requested adjustments.

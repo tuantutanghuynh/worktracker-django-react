@@ -1,3 +1,7 @@
+{% comment %}
+Template: emails/task_assigned.txt
+Description: Plain-text fallback for task assignment notification email.
+{% endcomment %}
 {% autoescape off %}New Task Assigned: {{ task_title }}
 
 Hello {{ assignee_name }}, you have been assigned to work on a task.

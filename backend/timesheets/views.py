@@ -1,3 +1,6 @@
-from django.shortcuts import render
+"""
+Module: timesheets.views
+Description: Placeholder module for timesheets root views.
+"""
 
-# Create your views here.
+from django.shortcuts import render

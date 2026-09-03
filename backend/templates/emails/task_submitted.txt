@@ -1,3 +1,7 @@
+{% comment %}
+Template: emails/task_submitted.txt
+Description: Plain-text fallback for task review submission notification email.
+{% endcomment %}
 {% autoescape off %}Task Submitted for Review: {{ task_title }}
 
 Hello {{ manager_name }}, a team member has completed a task and submitted it for review.

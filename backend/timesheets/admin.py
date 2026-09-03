@@ -1,3 +1,6 @@
-from django.contrib import admin
+"""
+Module: timesheets.admin
+Description: Django admin configuration for the timesheets module.
+"""
 
-# Register your models here.
+from django.contrib import admin

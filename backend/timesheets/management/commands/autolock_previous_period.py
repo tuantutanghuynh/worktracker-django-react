@@ -1,14 +1,9 @@
 """
-Chay tay viec khoa ky cong tu dong (Quy trinh 2 giai doan: Job ngay 1 & Global ngay 5).
-
-Cung mot logic voi task Celery chay dinh ky. Co lenh nay de:
-  - Demo duoc ma khong can bat Celery beat.
-  - Kiem tra ket qua ngay lap tuc thay vi cho toi 00:05 hom sau.
-  - Cho phep truyen --date de gia lap chay vao ngay bat ky (vi du ngay 1 hoac ngay 5).
-  - Cuu duoc neu beat chet may ngay ma khong ai biet.
+Module: timesheets.management.commands.autolock_previous_period
+Description: Management command to manually execute or simulate two-stage period locking for the elapsed month.
 """
-from datetime import datetime
 
+from datetime import datetime
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -19,91 +14,90 @@ from timesheets.services.auto_lock_service import (
 
 
 class Command(BaseCommand):
+    """Execute or simulate two-stage period locking routine across job and global scopes."""
     help = (
-        "Tu dong khoa ky cong cua thang vua ket thuc theo 2 giai doan: "
-        "Khoa Job (Manager scope tu ngay 1) va Khoa Global (Admin scope tu ngay 5)."
+        "Automatically lock timesheet period of elapsed month in two stages: "
+        "Job scope on Day 1 (Manager scope) and Global scope on Day 5 (Admin scope)."
     )
 
     def add_arguments(self, parser):
+        """Define command-line arguments for dry-run mode and simulated execution dates."""
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Chi bao se khoa ky nao, khong ghi gi vao database.",
+            help="Show which periods would be locked without writing changes to the database.",
         )
         parser.add_argument(
             "--date",
             type=str,
             default=None,
-            help="Gia lap ngay chay (dinh dang YYYY-MM-DD). Mac dinh la hom nay.",
+            help="Simulate execution date in YYYY-MM-DD format (defaults to current date).",
         )
 
     def handle(self, *args, **options):
+        """Execute automated period locking logic with simulated date and output status."""
         simulated_today = None
         if options.get("date"):
             try:
                 simulated_today = datetime.strptime(options["date"], "%Y-%m-%d").date()
             except ValueError:
-                raise CommandError("Dinh dang --date khong hop le. Vui long dung YYYY-MM-DD.")
+                raise CommandError("Invalid --date format. Please use YYYY-MM-DD.")
 
         today = simulated_today or timezone.localdate()
         month, year = get_previous_period(today)
 
         if options["dry_run"]:
             self.stdout.write(
-                f"[dry-run] Gia lap ngay {today}: se xu ly ky {month:02d}/{year}.\n"
-                f"  - Khoa cap Job: ap dung tu ngay 1 (hom nay la ngay {today.day})\n"
-                f"  - Khoa cap Global: ap dung tu ngay 5 (hom nay la ngay {today.day})"
+                f"[dry-run] Simulating date {today}: targeting period {month:02d}/{year}.\n"
+                f"  - Job scope lock: applies from Day 1 (today is day {today.day})\n"
+                f"  - Global scope lock: applies from Day 5 (today is day {today.day})"
             )
             return
 
-        ket_qua = auto_lock_previous_period(today=today)
-        status = ket_qua.get("status")
+        result = auto_lock_previous_period(today=today)
+        status = result.get("status")
 
         if status == "no_admin":
             self.stdout.write(self.style.ERROR(
-                "Khong co Admin dang hoat dong nao de dung ten khoa ky."
+                "No active Administrator account found to sign the period lock action."
             ))
             return
 
         if status == "error":
             self.stdout.write(self.style.ERROR(
-                f"Khoa ky {month:02d}/{year} that bai: {ket_qua.get('reason')}"
+                f"Period lock failed for {month:02d}/{year}: {result.get('reason')}"
             ))
             return
 
-        # Thong tin ket qua chi tiet
-        job_info = ket_qua.get("job_locks", {})
-        global_info = ket_qua.get("global_lock", {})
+        job_info = result.get("job_locks", {})
+        global_info = result.get("global_lock", {})
 
         self.stdout.write(self.style.SUCCESS(
-            f"=== KET QUA TU DONG KHOA KY CONG {month:02d}/{year} (Gia lap: {today}) ==="
+            f"=== AUTOMATED PERIOD LOCK RESULT {month:02d}/{year} (Simulated: {today}) ==="
         ))
 
-        # 1. Job Locks
         self.stdout.write(
-            f"[*] Khoa cap Job (Manager): "
-            f"Da khoa {job_info.get('locked_count', 0)} job(s), "
-            f"da khoa tu truoc: {job_info.get('already_locked_count', 0)}, "
-            f"bo qua (Manager unlock): {job_info.get('skipped_unlocked_count', 0)}."
+            f"[*] Job Scope Lock (Manager): "
+            f"Locked {job_info.get('locked_count', 0)} job(s), "
+            f"already locked: {job_info.get('already_locked_count', 0)}, "
+            f"skipped (Manager unlocked): {job_info.get('skipped_unlocked_count', 0)}."
         )
 
-        # 2. Global Lock
         g_status = global_info.get("status")
         if g_status == "locked":
             self.stdout.write(self.style.SUCCESS(
-                f"[*] Khoa cap Global (Admin): DA KHOA toan he thong (dung ten {global_info.get('actor')})."
+                f"[*] Global Scope Lock (Admin): LOCKED company-wide (actor {global_info.get('actor')})."
             ))
         elif g_status == "already_locked":
             self.stdout.write(
-                f"[*] Khoa cap Global (Admin): Da khoa toan he thong tu truoc."
+                f"[*] Global Scope Lock (Admin): Already locked company-wide."
             )
         elif g_status == "pending_until_day_5":
             self.stdout.write(self.style.WARNING(
-                f"[*] Khoa cap Global (Admin): Chua den ngay 5 (hom nay la ngay {today.day}). "
-                f"Global lock dang de ngo cho Manager review cong."
+                f"[*] Global Scope Lock (Admin): Day 5 has not arrived yet (today is day {today.day}). "
+                f"Global lock remains open for manager review."
             ))
         else:
             self.stdout.write(self.style.ERROR(
-                f"[*] Khoa cap Global (Admin) that bai: {global_info.get('reason')}"
+                f"[*] Global Scope Lock (Admin) failed: {global_info.get('reason')}"
             ))
-

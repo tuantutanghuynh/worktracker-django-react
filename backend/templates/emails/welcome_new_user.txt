@@ -1,3 +1,7 @@
+{% comment %}
+Template: emails/welcome_new_user.txt
+Description: Plain-text fallback for welcome notification email sent to new users.
+{% endcomment %}
 {% autoescape off %}Welcome to {{ app_name }}
 
 An administrator has created an account for you. Use the details below to

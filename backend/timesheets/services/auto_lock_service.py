@@ -1,24 +1,8 @@
 """
-Tự động khoá kỳ công khi sang tháng mới (Quy trình 2 giai đoạn):
-
-1. Giai đoạn 1 - Ngày 1 hàng tháng (Manager / Job Scope):
-   - Tự động khoá cấp JOB cho tất cả các dự án thuộc kỳ công vừa kết thúc.
-   - Mục đích: Chặn nhân viên (Employee) ghi hoặc sửa LogWork của tháng cũ.
-   - Mở cửa sổ ân hạn (grace period) từ Ngày 1 đến hết Ngày 4 cho Manager
-     rà soát, phê duyệt hoặc mở khoá có lý do nếu cần điều chỉnh.
-
-2. Giai đoạn 2 - Ngày 5 hàng tháng (Admin / Global Scope):
-   - Tự động khoá cấp GLOBAL cho toàn bộ hệ thống đối với kỳ công vừa kết thúc.
-   - Mục đích: Hết hạn review của Manager, đóng băng hoàn toàn dữ liệu để
-     bộ phận Kế toán / HR chốt bảng lương (payroll).
-
-Tách phần lõi ra thành hàm thuần (không phụ thuộc Celery) vì ba lý do:
-  - Test gọi thẳng được, không cần dựng worker.
-  - Lệnh quản trị `autolock_previous_period` gọi lại chính hàm này, nên khi
-    demo mà quên bật Celery beat thì vẫn chạy tay được.
-  - Task Celery chỉ còn là lớp vỏ mỏng — chỗ dễ sai nhất (tính tháng trước,
-    chống khoá nhầm tháng hiện tại) nằm ở đây và được test đầy đủ.
+Module: timesheets.services.auto_lock_service
+Description: Service functions for executing scheduled two-phase monthly period locking routines.
 """
+
 import calendar
 import logging
 from datetime import date
@@ -51,17 +35,11 @@ AUTO_LOCK_GLOBAL_REASON = (
     "globally for payroll."
 )
 
-# Giữ alias cũ cho tương thích ngược nếu có module khác tham chiếu
 AUTO_LOCK_REASON = AUTO_LOCK_GLOBAL_REASON
 
 
 def get_previous_period(today=None):
-    """
-    Trả về (tháng, năm) của tháng LIỀN TRƯỚC tháng chứa `today`.
-
-    Tách riêng để test được mốc giao năm — tháng 1 phải lùi về tháng 12 của
-    năm trước, chỗ này rất dễ viết sai thành tháng 0.
-    """
+    """Return month and year tuple of the month preceding the given date."""
     today = today or timezone.localdate()
     if today.month == 1:
         return 12, today.year - 1
@@ -69,13 +47,7 @@ def get_previous_period(today=None):
 
 
 def _get_system_actor():
-    """
-    Chọn tài khoản đứng tên cho lệnh khoá tự động.
-
-    TimeLock.locked_by là NOT NULL nên bắt buộc phải có người. Lấy Admin
-    đang hoạt động có id nhỏ nhất — ổn định giữa các lần chạy, không đổi
-    ngẫu nhiên. Việc đây là lệnh tự động được nói rõ trong lock_reason.
-    """
+    """Retrieve active administrator user account designated for automated system actions."""
     return (
         CustomUser.objects.filter(role__code="ADMIN", is_active=True)
         .order_by("id")
@@ -84,13 +56,7 @@ def _get_system_actor():
 
 
 def _auto_lock_jobs_for_period(month, year, today, actor):
-    """
-    Tự động khoá cấp JOB cho các dự án thuộc kỳ công (month, year).
-
-    Kích hoạt từ Ngày 1 hàng tháng (today.day >= 1).
-    Chỉ khoá các Job đã khởi chạy vào hoặc trước ngày cuối cùng của kỳ công.
-    Tôn trọng việc Manager chủ động unlock trong khoảng thời gian từ ngày 1 đến ngày 4.
-    """
+    """Execute automated job-level time lock enforcement for projects in elapsed period."""
     _, last_day = calendar.monthrange(year, month)
     period_end_date = date(year, month, last_day)
 
@@ -118,12 +84,9 @@ def _auto_lock_jobs_for_period(month, year, today, actor):
                 already_locked_count += 1
                 continue
             elif today.day < 5:
-                # Manager đã chủ động mở khoá trong kỳ ân hạn (ngày 1 - 4)
-                # Hệ thống không khoá đè lại để Manager tiếp tục xử lý.
                 skipped_unlocked_count += 1
                 continue
             else:
-                # Từ ngày 5 trở đi: hết hạn ân hạn, khoá lại toàn bộ
                 old_values = snapshot(existing_lock)
                 existing_lock.is_locked = True
                 existing_lock.locked_by = actor
@@ -160,7 +123,6 @@ def _auto_lock_jobs_for_period(month, year, today, actor):
                     pass
                 continue
 
-        # Tạo mới bản ghi TimeLock cấp JOB
         lock_user = job.manager if (job.manager and job.manager.is_active) else actor
         time_lock = TimeLock.objects.create(
             lock_month=month,
@@ -206,16 +168,11 @@ def _auto_lock_jobs_for_period(month, year, today, actor):
 
 
 def _auto_lock_global_for_period(month, year, today, actor):
-    """
-    Tự động khoá cấp GLOBAL cho toàn hệ thống kỳ công (month, year).
-
-    Chỉ kích hoạt từ Ngày 5 hàng tháng (today.day >= 5) để dành 4 ngày đầu
-    cho Manager review/duyệt công.
-    """
+    """Execute automated global-level time lock enforcement for whole system on Day 5."""
     if today.day < 5:
         logger.info(
-            "[AutoLock] Hom nay la ngay %d/%d, chua den ngay 5. "
-            "Chua khoa GLOBAL ky %02d/%d de Manager tiep tuc review.",
+            "[AutoLock] Day is %d/%d, before Day 5. "
+            "Skipping GLOBAL lock for period %02d/%d to allow manager review.",
             today.day, today.month, month, year,
         )
         return {
@@ -233,7 +190,7 @@ def _auto_lock_global_for_period(month, year, today, actor):
         is_locked=True,
     ).exists()
     if da_khoa:
-        logger.info("[AutoLock] Ky GLOBAL %02d/%d da khoa tu truoc, bo qua.", month, year)
+        logger.info("[AutoLock] GLOBAL period %02d/%d already locked, skipping.", month, year)
         return {"status": "already_locked", "month": month, "year": year}
 
     try:
@@ -244,60 +201,41 @@ def _auto_lock_global_for_period(month, year, today, actor):
             reason=AUTO_LOCK_GLOBAL_REASON,
         )
     except TimeLockError as exc:
-        logger.info("[AutoLock] Ky GLOBAL %02d/%d: %s", month, year, exc)
+        logger.info("[AutoLock] GLOBAL period %02d/%d: %s", month, year, exc)
         return {"status": "already_locked", "month": month, "year": year}
     except Exception as exc:
-        logger.exception("[AutoLock] Khoa GLOBAL ky %02d/%d that bai: %s", month, year, exc)
+        logger.exception("[AutoLock] GLOBAL lock failed for %02d/%d: %s", month, year, exc)
         return {"status": "error", "month": month, "year": year, "reason": str(exc)}
 
     logger.info(
-        "[AutoLock] Da khoa GLOBAL ky %02d/%d, dung ten %s.", month, year, actor.email
+        "[AutoLock] GLOBAL period %02d/%d locked under actor %s.", month, year, actor.email
     )
     return {"status": "locked", "month": month, "year": year, "actor": actor.email}
 
 
 def auto_lock_previous_period(today=None):
-    """
-    Khoá kỳ công của tháng vừa kết thúc theo cơ chế 2 giai đoạn:
-      - Ngày 1: Tự động khoá cấp JOB (Manager scope).
-      - Ngày 5: Tự động khoá cấp GLOBAL (Admin scope).
-
-    Trả về dict mô tả chi tiết:
-      {
-        "status": "locked" | "already_locked" | "no_admin" | "error",
-        "month": month,
-        "year": year,
-        "actor": actor.email,
-        "job_locks": { ... },
-        "global_lock": { ... },
-      }
-    """
+    """Enforce two-stage period locking on elapsed month across job and global scopes."""
     today = today or timezone.localdate()
     month, year = get_previous_period(today)
 
-    # Chốt chặn quan trọng nhất: không bao giờ đụng tới tháng đang diễn ra / tương lai
     if (year, month) >= (today.year, today.month):
         logger.error(
-            "[AutoLock] Tu choi khoa ky %02d/%d vi no khong phai thang da qua "
-            "(hom nay %s).", month, year, today
+            "[AutoLock] Refusing to lock period %02d/%d as it is not a past period "
+            "(today is %s).", month, year, today
         )
         return {"status": "error", "month": month, "year": year, "reason": "not_a_past_period"}
 
     actor = _get_system_actor()
     if actor is None:
         logger.error(
-            "[AutoLock] Khong tim thay Admin dang hoat dong nao de dung ten "
-            "khoa ky %02d/%d.", month, year
+            "[AutoLock] No active Administrator found to execute auto-lock for period %02d/%d.",
+            month, year
         )
         return {"status": "no_admin", "month": month, "year": year}
 
-    # 1. Khóa cấp JOB (từ Ngày 1)
     job_result = _auto_lock_jobs_for_period(month, year, today, actor)
-
-    # 2. Khóa cấp GLOBAL (từ Ngày 5)
     global_result = _auto_lock_global_for_period(month, year, today, actor)
 
-    # Tính status tổng quát
     if today.day >= 5:
         overall_status = global_result.get("status", "error")
     else:
@@ -314,4 +252,3 @@ def auto_lock_previous_period(today=None):
         "job_locks": job_result,
         "global_lock": global_result,
     }
-

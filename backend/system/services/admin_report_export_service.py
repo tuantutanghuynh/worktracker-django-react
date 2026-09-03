@@ -1,15 +1,8 @@
 """
-Excel export helpers shared by every Admin list page.
-
-Each admin ViewSet exposes its own `export` action that hands the ALREADY
-FILTERED queryset here, so an export always contains exactly the rows the
-user is looking at on screen (same filters, same ordering) instead of a
-separate hardcoded dump.
-
-Styling (navy header, zebra rows, autosized columns) is adapted from Long's
-reports/services/manager_report_export_service.py so both exports look like
-the same product.
+Module: system.services.admin_report_export_service
+Description: Excel spreadsheet generation and row formatting utilities for system administration reports.
 """
+
 from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -30,6 +23,7 @@ XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml
 
 
 def write_sheet(sheet, headers, rows):
+    """Write styled headers and zebra-striped rows into openpyxl worksheet."""
     sheet.append(headers)
     for cell in sheet[1]:
         cell.fill = NAVY_HEADER_FILL
@@ -57,7 +51,7 @@ def write_sheet(sheet, headers, rows):
 
 
 def build_xlsx_response(*, sheet_title, headers, rows, filename):
-    """Single-sheet workbook streamed straight back as a download."""
+    """Generate and return an HTTP response streaming an Excel workbook attachment."""
     wb = Workbook()
     sheet = wb.active
     sheet.title = sheet_title
@@ -69,14 +63,11 @@ def build_xlsx_response(*, sheet_title, headers, rows, filename):
     return response
 
 
-# ── Per-resource row mappers ─────────────────────────────────────────────
-# Kept next to each other so the exported columns for every admin table are
-# defined in one place.
-
 CLIENT_HEADERS = ["ID", "Client Name", "Tax Code", "Contact Person", "Contact Email", "Contact Phone", "Status", "Created At"]
 
 
 def client_rows(queryset):
+    """Map client queryset into Excel row values list."""
     return [
         [
             c.id, c.client_name, c.tax_code, c.contact_person or "", c.contact_email or "",
@@ -91,6 +82,7 @@ JOB_HEADERS = ["ID", "Job Code", "Job Name", "Client", "Manager", "Priority", "S
 
 
 def job_rows(queryset):
+    """Map job queryset into Excel row values list."""
     return [
         [
             j.id, j.job_code or "", j.job_name, j.client.client_name, j.manager.email,
@@ -104,6 +96,7 @@ USER_HEADERS = ["ID", "Email", "Full Name", "Role", "Department", "Status"]
 
 
 def user_rows(queryset):
+    """Map user account queryset into Excel row values list."""
     return [
         [
             u.id, u.email,
@@ -120,6 +113,7 @@ DEPARTMENT_HEADERS = ["ID", "Name", "Description", "Manager", "Created At"]
 
 
 def department_rows(queryset):
+    """Map department queryset into Excel row values list."""
     return [
         [
             d.id, d.name, d.description or "",
@@ -134,6 +128,7 @@ AUDIT_LOG_HEADERS = ["ID", "Time", "Actor", "Action", "Module", "Record ID", "Se
 
 
 def audit_log_rows(queryset):
+    """Map audit log queryset into Excel row values list."""
     return [
         [
             a.id,
@@ -150,7 +145,7 @@ TIMESHEET_HEADERS = ["Employee", "Email", "Department", "Month Hours", "Target H
 
 
 def timesheet_rows(rows):
-    """Takes the already-computed dicts from admin_timesheet_service."""
+    """Map pre-aggregated timesheet summary records into Excel row values list."""
     return [
         [
             row["full_name"], row["email"], row["department_name"] or "",

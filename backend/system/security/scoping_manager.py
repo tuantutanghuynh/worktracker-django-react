@@ -1,3 +1,8 @@
+"""
+Module: system.security.scoping_manager
+Description: Data scoping and row-level access control functions across system domains.
+"""
+
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -15,32 +20,28 @@ EMPLOYEE_ROLE_CODE = "EMPLOYEE"
 
 
 def get_user_role_code(user):
-    """
-    Lấy role code an toàn.
-    """
+    """Retrieve the role code string for a given user safely."""
     role = getattr(user, "role", None)
     return getattr(role, "code", None)
 
 
 def is_admin(user):
+    """Check if the user has the Admin role."""
     return get_user_role_code(user) == ADMIN_ROLE_CODE
 
 
 def is_manager(user):
+    """Check if the user has the Manager role."""
     return get_user_role_code(user) == MANAGER_ROLE_CODE
 
 
 def is_employee(user):
+    """Check if the user has the Employee role."""
     return get_user_role_code(user) == EMPLOYEE_ROLE_CODE
 
 
 def manager_job_ids(user):
-    """
-    Danh sách job id thuộc scope của Manager.
-
-    Scope chính thức:
-        jobs.manager_id = current_user.id
-    """
+    """Return flat list of Job IDs managed by the specified manager user."""
     if not is_manager(user):
         return Job.objects.none().values_list("id", flat=True)
 
@@ -50,13 +51,7 @@ def manager_job_ids(user):
 
 
 def scoped_jobs(user):
-    """
-    Job queryset đã được scope.
-
-    Admin: thấy tất cả.
-    Manager: chỉ thấy Job do mình quản lý.
-    Khác: không thấy gì.
-    """
+    """Return Job queryset filtered according to the user's authorization scope."""
     if is_admin(user):
         return Job.objects.all()
 
@@ -67,11 +62,7 @@ def scoped_jobs(user):
 
 
 def scoped_tasks(user):
-    """
-    Task queryset đã được scope.
-
-    Manager thấy task thuộc job do Manager đó quản lý.
-    """
+    """Return Task queryset filtered to jobs managed by the specified user."""
     if is_admin(user):
         return Task.objects.all()
 
@@ -82,9 +73,7 @@ def scoped_tasks(user):
 
 
 def scoped_task_comments(user):
-    """
-    Comment queryset đã được scope theo task -> job -> manager.
-    """
+    """Return TaskComment queryset filtered to tasks within the user's managed jobs."""
     if is_admin(user):
         return TaskComment.objects.all()
 
@@ -97,9 +86,7 @@ def scoped_task_comments(user):
 
 
 def scoped_task_attachments(user):
-    """
-    Attachment queryset đã được scope theo task -> job -> manager.
-    """
+    """Return TaskAttachment queryset filtered to tasks within the user's managed jobs."""
     if is_admin(user):
         return TaskAttachment.objects.all()
 
@@ -112,9 +99,7 @@ def scoped_task_attachments(user):
 
 
 def scoped_logworks(user):
-    """
-    LogWork queryset đã được scope theo log_work -> task -> job -> manager.
-    """
+    """Return LogWork queryset filtered to tasks belonging to the manager's jobs."""
     if is_admin(user):
         return LogWork.objects.all()
 
@@ -127,13 +112,7 @@ def scoped_logworks(user):
 
 
 def scoped_timelocks(user):
-    """
-    TimeLock queryset đã được scope.
-
-    Manager xử lý JOB lock thuộc Job do mình quản lý
-    đồng thời được phép xem các bản ghi GLOBAL lock của Admin
-    để nắm bắt trạng thái khóa sổ toàn hệ thống.
-    """
+    """Return TimeLock queryset including job locks managed by user and global locks."""
     if is_admin(user):
         return TimeLock.objects.all()
 
@@ -147,12 +126,7 @@ def scoped_timelocks(user):
 
 
 def scoped_team_user_ids(user):
-    """
-    Danh sách user id của Employee đang được giao ít nhất 1 task
-    trong các job thuộc Manager.
-
-    Dùng cho Team Directory trong scope.
-    """
+    """Return distinct user IDs of employees assigned to tasks in manager's jobs."""
     if not is_manager(user):
         return Task.objects.none().values_list("assignee_id", flat=True)
 
@@ -164,12 +138,7 @@ def scoped_team_user_ids(user):
 
 
 def employee_job_ids(user):
-    """
-    Danh sách job id mà Employee đang có ít nhất 1 task được giao.
-
-    Dùng cho "My Team" — Employee xem đồng nghiệp cùng dự án.
-    Đối xứng với scoped_team_user_ids() (bản phía Manager).
-    """
+    """Return distinct Job IDs where the employee has at least one assigned task."""
     if not is_employee(user):
         return Task.objects.none().values_list("job_id", flat=True)
 
@@ -181,11 +150,7 @@ def employee_job_ids(user):
 
 
 def scoped_team_profiles(user):
-    """
-    Profile Employee thuộc Team Directory của Manager.
-
-    Chỉ gồm Employee đã từng/có task trong job thuộc Manager.
-    """
+    """Return EmployeeProfile queryset for team members assigned to manager's jobs."""
     if is_admin(user):
         return EmployeeProfile.objects.select_related(
             "user",
@@ -204,15 +169,7 @@ def scoped_team_profiles(user):
 
 
 def assignment_search_employees_queryset(job_id=None):
-    """
-    Queryset dung rieng cho man hinh tim Employee de giao task (Project Team Scope).
-
-    Theo Quy trinh moi:
-    - Khi Manager giao Task trong 1 Job (co job_id):
-      Chi lay nhung Employee da duoc phan bo vao Project Team cua Job do.
-    - Neu Job moi khoi tao hoac khong truyen job_id:
-      Tra ve danh sach Active Employee hop le.
-    """
+    """Return candidate employee queryset filtered for task assignment within project scope."""
     User = get_user_model()
 
     qs = User.objects.filter(
@@ -242,23 +199,12 @@ def assignment_search_employees_queryset(job_id=None):
 
 
 def get_scoped_object_or_404(scoped_queryset, **lookup):
-    """
-    Lấy object bên trong queryset đã scope.
-
-    Nếu record không tồn tại hoặc nằm ngoài scope:
-        trả 404.
-
-    Cách này tránh lộ thông tin rằng record ngoài scope có tồn tại.
-    """
+    """Fetch object from scoped queryset or raise HTTP 404 if out of scope."""
     return get_object_or_404(scoped_queryset, **lookup)
 
 
 def assert_job_in_manager_scope(user, job):
-    """
-    Dùng trong service khi đã có object Job.
-
-    Nếu job không thuộc Manager hiện tại thì raise PermissionError.
-    """
+    """Validate that the job is managed by user or raise PermissionError."""
     if not is_manager(user):
         raise PermissionError("USER_IS_NOT_MANAGER")
 
@@ -267,17 +213,7 @@ def assert_job_in_manager_scope(user, job):
 
 
 def scoped_audit_logs(user):
-    """
-    AuditLog queryset được bảo vệ chặt chẽ theo Scope của Manager:
-    1. Các hành động do chính Manager đó thực hiện (user=user).
-    2. Các hành động của nhân viên trên các đối tượng (Jobs, Tasks, LogWorks, TimeLocks)
-       thuộc Job do Manager đó phụ trách (job.manager_id = user.id).
-
-    CHẶN HOÀN TOÀN:
-    - Không thể xem hành động của Manager khác.
-    - Không thể xem hành động của Admin.
-    - Không thể xem hành động của Employee trên các Job thuộc Manager khác.
-    """
+    """Return AuditLog queryset restricted strictly to manager's accessible scope."""
     if is_admin(user):
         return AuditLog.objects.all()
 
@@ -299,4 +235,4 @@ def scoped_audit_logs(user):
         | (Q(table_name="timelocks") & Q(record_id__in=timelock_ids))
     )
 
-    return AuditLog.objects.filter(scope_condition).distinct()
+    return AuditLog.objects.filter(scope_condition).distinct()

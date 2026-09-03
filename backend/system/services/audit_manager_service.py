@@ -1,35 +1,22 @@
+"""
+Module: system.services.audit_manager_service
+Description: Service functions for capturing object state snapshots and writing immutable audit logs.
+"""
+
 import json
-
 from django.core.serializers.json import DjangoJSONEncoder
-
 from system.models import AuditLog
 
 
 def json_safe(value):
-    """
-    Chuyển dữ liệu Python/Django sang dạng JSON-safe.
-
-    Xử lý được:
-    - date/datetime
-    - Decimal
-    - UUID
-    - các kiểu DjangoJSONEncoder hỗ trợ
-    """
+    """Serialize Python and Django values into JSON-compatible primitives."""
     return json.loads(
         json.dumps(value, cls=DjangoJSONEncoder)
     )
 
 
 def snapshot(instance, fields=None):
-    """
-    Chụp trạng thái hiện tại của model instance.
-
-    Nếu fields=None:
-        chụp toàn bộ concrete fields.
-
-    Nếu field là ForeignKey:
-        lưu dạng <field>_id thay vì serialize object.
-    """
+    """Capture a serializable dictionary snapshot of model instance field values."""
     if instance is None:
         return None
 
@@ -59,12 +46,7 @@ def snapshot(instance, fields=None):
 
 
 def extract_ip_address(request):
-    """
-    Lấy IP từ request.
-
-    ip_address trong AuditLog cho phép null,
-    nên nếu không có request thì trả None.
-    """
+    """Extract client IP address from request headers or remote address."""
     if request is None:
         return None
 
@@ -84,17 +66,10 @@ def log_action(
     old_values=None,
     new_values=None,
     request=None,
-    severity=AuditLog.Severity.NORMAL,  # ➕ BỔ SUNG: Mức độ nghiêm trọng (CRITICAL, WARNING, NORMAL)
-    summary=None,                       # ➕ BỔ SUNG: Dòng tóm tắt hành động
+    severity=AuditLog.Severity.NORMAL,
+    summary=None,
 ):
-    """
-    Ghi audit log.
-
-    Lưu ý:
-    - Hàm này KHÔNG tự mở transaction.atomic().
-    - View/service gọi hàm này phải đặt bên trong cùng transaction
-      với thao tác chính.
-    """
+    """Persist an audit log entry recording database mutations and change diffs."""
     if not action:
         raise ValueError("action is required.")
 
@@ -107,8 +82,8 @@ def log_action(
     return AuditLog.objects.create(
         user=user if getattr(user, "is_authenticated", False) else None,
         action=action,
-        severity=severity,              # ➕ BỔ SUNG: Lưu severity vào DB
-        summary=summary,                # ➕ BỔ SUNG: Lưu summary vào DB
+        severity=severity,
+        summary=summary,
         table_name=table_name,
         record_id=record_id,
         old_values=json_safe(old_values) if old_values is not None else None,

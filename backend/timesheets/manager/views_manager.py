@@ -1,3 +1,8 @@
+"""
+Module: timesheets.manager.views_manager
+Description: Manager-facing API endpoints for reviewing work logs and managing project time locks.
+"""
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed
@@ -31,7 +36,6 @@ from timesheets.services.timelock_manager_service import (
     lock_job_period,
     unlock_job_period,
 )
-
 from system.security.permissions_manager import IsActiveAuthenticated, IsManagerRole, HasPermissionCode
 from system.security.scoping_manager import (
     get_scoped_object_or_404,
@@ -42,26 +46,20 @@ from system.security.scoping_manager import (
 
 
 class ManagerLogWorkPagination(PageNumberPagination):
+    """Custom page number pagination for manager work log lists."""
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 100
 
 
 class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Manager LogWork Review API.
-
-    Scope chính thức:
-        logwork.task.job.manager_id = request.user.id
-    """
-
+    """Viewset providing scoped work log listing, detail inspection, and review workflows for managers."""
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
         HasPermissionCode,
     ]
     pagination_class = ManagerLogWorkPagination
-
     http_method_names = [
         "get",
         "post",
@@ -70,6 +68,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
     ]
 
     def get_permissions(self):
+        """Instantiate and return permissions required for the specific review action."""
         action_permissions = {
             "list": "timesheet:view",
             "retrieve": "timesheet:view",
@@ -82,6 +81,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
         return super().get_permissions()
 
     def get_queryset(self):
+        """Retrieve work logs strictly scoped to projects managed by the authenticated manager."""
         return (
             scoped_logworks(self.request.user)
             .select_related(
@@ -98,27 +98,21 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
     def get_serializer_class(self):
+        """Return specialized serializer class matching current action."""
         if self.action == "list":
             return ManagerLogWorkListSerializer
-
         if self.action == "approve":
             return ManagerLogWorkApproveSerializer
-
         if self.action == "reject":
             return ManagerLogWorkRejectSerializer
-
         if self.action == "correct":
             return ManagerLogWorkCorrectSerializer
-
         if self.action == "void":
             return ManagerLogWorkVoidSerializer
-
         return ManagerLogWorkDetailSerializer
 
     def list(self, request, *args, **kwargs):
-        """
-        GET /api/manager/log-works/
-        """
+        """Return paginated and filtered list of work logs under manager scope."""
         queryset = self.get_queryset()
         queryset = ManagerLogWorkFilter.apply(
             queryset,
@@ -126,7 +120,6 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         page = self.paginate_queryset(queryset)
-
         if page is not None:
             serializer = ManagerLogWorkListSerializer(
                 page,
@@ -138,19 +131,15 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
             queryset,
             many=True,
         )
-
         return Response(
             serializer.data,
             status=status.HTTP_200_OK,
         )
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/manager/log-works/{id}/
-        """
+        """Return detailed information for a single work log entry."""
         logwork = self.get_object()
         serializer = ManagerLogWorkDetailSerializer(logwork)
-
         return Response(
             serializer.data,
             status=status.HTTP_200_OK,
@@ -158,16 +147,8 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
-        """
-        POST /api/manager/log-works/{id}/approve/
-
-        Body:
-            {
-                "note": "optional"
-            }
-        """
+        """Approve a pending work log entry and record review metadata."""
         logwork = self.get_object()
-
         serializer = ManagerLogWorkApproveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -177,9 +158,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
             note=serializer.validated_data.get("note"),
             request=request,
         )
-
         output_serializer = ManagerLogWorkDetailSerializer(updated_logwork)
-
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK,
@@ -187,16 +166,8 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
-        """
-        POST /api/manager/log-works/{id}/reject/
-
-        Body:
-            {
-                "reason": "Sai nội dung log work"
-            }
-        """
+        """Reject a pending work log entry with mandatory reason."""
         logwork = self.get_object()
-
         serializer = ManagerLogWorkRejectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -206,9 +177,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
             reason=serializer.validated_data["reason"],
             request=request,
         )
-
         output_serializer = ManagerLogWorkDetailSerializer(updated_logwork)
-
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK,
@@ -216,18 +185,8 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="correct")
     def correct(self, request, pk=None):
-        """
-        POST /api/manager/log-works/{id}/correct/
-
-        Body:
-            {
-                "hours_spent": "7.50",
-                "description": "Corrected description",
-                "adjustment_reason": "Sai số giờ"
-            }
-        """
+        """Correct hours or description on existing work log entry with reason."""
         logwork = self.get_object()
-
         serializer = ManagerLogWorkCorrectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -239,9 +198,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
             adjustment_reason=serializer.validated_data["adjustment_reason"],
             request=request,
         )
-
         output_serializer = ManagerLogWorkDetailSerializer(updated_logwork)
-
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK,
@@ -249,16 +206,8 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="void")
     def void(self, request, pk=None):
-        """
-        POST /api/manager/log-works/{id}/void/
-
-        Body:
-            {
-                "reason": "Log work bị nhập sai"
-            }
-        """
+        """Void an erroneous work log entry with mandatory explanation."""
         logwork = self.get_object()
-
         serializer = ManagerLogWorkVoidSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -268,9 +217,7 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
             reason=serializer.validated_data["reason"],
             request=request,
         )
-
         output_serializer = ManagerLogWorkDetailSerializer(updated_logwork)
-
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK,
@@ -278,24 +225,13 @@ class ManagerLogWorkViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ManagerTimeLockViewSet(viewsets.ModelViewSet):
-    """
-    Manager JOB TimeLock API.
-
-    Scope chính thức:
-        time_lock.lock_scope = JOB
-        time_lock.job.manager_id = request.user.id
-
-    Manager không xử lý GLOBAL lock.
-    GLOBAL lock thuộc Admin.
-    """
-
+    """Viewset providing job-level time lock creation, inspection, and unlocking for managers."""
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
         HasPermissionCode,
     ]
     pagination_class = ManagerLogWorkPagination
-
     http_method_names = [
         "get",
         "post",
@@ -304,6 +240,7 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
     ]
 
     def get_permissions(self):
+        """Instantiate and return permissions required for time lock actions."""
         action_permissions = {
             "list": "timelock:view",
             "retrieve": "timelock:view",
@@ -314,6 +251,7 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
     
     def get_queryset(self):
+        """Retrieve job-scoped period locks for projects managed by current manager."""
         return (
             scoped_timelocks(self.request.user)
             .select_related(
@@ -327,21 +265,17 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
         )
 
     def get_serializer_class(self):
+        """Return specialized serializer class matching time lock action."""
         if self.action == "create":
             return ManagerTimeLockCreateSerializer
-
         if self.action == "unlock":
             return ManagerTimeLockUnlockSerializer
-
         if self.action == "list":
             return ManagerTimeLockListSerializer
-
         return ManagerTimeLockDetailSerializer
 
     def list(self, request, *args, **kwargs):
-        """
-        GET /api/manager/time-locks/
-        """
+        """Return paginated list of job-scoped period locks."""
         queryset = self.get_queryset()
         queryset = ManagerTimeLockFilter.apply(
             queryset,
@@ -349,7 +283,6 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
         )
 
         page = self.paginate_queryset(queryset)
-
         if page is not None:
             serializer = ManagerTimeLockListSerializer(
                 page,
@@ -361,36 +294,22 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
             queryset,
             many=True,
         )
-
         return Response(
             serializer.data,
             status=status.HTTP_200_OK,
         )
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/manager/time-locks/{id}/
-        """
+        """Return detailed information for a single job period lock."""
         time_lock = self.get_object()
         serializer = ManagerTimeLockDetailSerializer(time_lock)
-
         return Response(
             serializer.data,
             status=status.HTTP_200_OK,
         )
 
     def create(self, request, *args, **kwargs):
-        """
-        POST /api/manager/time-locks/
-
-        Body:
-            {
-                "job_id": 1,
-                "lock_month": 7,
-                "lock_year": 2026,
-                "reason": "Close July timesheet"
-            }
-        """
+        """Lock a monthly period for a project under manager scope."""
         serializer = ManagerTimeLockCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -407,43 +326,24 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
             reason=serializer.validated_data.get("reason"),
             request=request,
         )
-
         output_serializer = ManagerTimeLockDetailSerializer(time_lock)
-
         return Response(
             output_serializer.data,
             status=status.HTTP_201_CREATED,
         )
 
     def partial_update(self, request, *args, **kwargs):
-        """
-        Không dùng PATCH cho TimeLock.
-
-        Unlock phải đi qua endpoint riêng:
-            POST /api/manager/time-locks/{id}/unlock/
-        """
+        """Reject PATCH requests on time lock instances."""
         raise MethodNotAllowed("PATCH")
 
     def destroy(self, request, *args, **kwargs):
-        """
-        Không xóa vật lý TimeLock.
-
-        Unlock chỉ đổi is_locked=False và ghi audit.
-        """
+        """Reject physical deletion of time lock instances."""
         raise MethodNotAllowed("DELETE")
 
     @action(detail=True, methods=["post"], url_path="unlock")
     def unlock(self, request, pk=None):
-        """
-        POST /api/manager/time-locks/{id}/unlock/
-
-        Body:
-            {
-                "reason": "Need correction"
-            }
-        """
+        """Unlock a job-level period lock with mandatory reason."""
         time_lock = self.get_object()
-
         serializer = ManagerTimeLockUnlockSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -453,21 +353,12 @@ class ManagerTimeLockViewSet(viewsets.ModelViewSet):
             reason=serializer.validated_data["reason"],
             request=request,
         )
-
-        output_serializer = ManagerTimeLockDetailSerializer(
-            unlocked_time_lock,
-        )
-
+        output_serializer = ManagerTimeLockDetailSerializer(unlocked_time_lock)
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK,
         )
 
-
-# ============================================================
-# Compatibility aliases
-# Giữ lại để tránh vỡ import nếu nơi khác còn import tên cũ.
-# ============================================================
 
 LogWorkViewSet = ManagerLogWorkViewSet
 TimeLockViewSet = ManagerTimeLockViewSet

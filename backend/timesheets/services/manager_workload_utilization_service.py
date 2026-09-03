@@ -1,15 +1,15 @@
+"""
+Module: timesheets.services.manager_workload_utilization_service
+Description: Service functions for computing company-wide and team workload utilization statistics.
+"""
+
 from datetime import timedelta
 from django.conf import settings
 from django.db.models import Sum
 
 
 def calculate_working_days(start_date, end_date, work_days_per_week=None):
-    """
-    Calculate the number of working days between two dates.
-    Reads default work_days_per_week from Django settings (WORK_DAYS_PER_WEEK).
-    - 5 days/week: Mon-Fri
-    - 6 days/week: Mon-Sat (Default per system spec)
-    """
+    """Calculate the count of working business days between two dates according to week schedule."""
     if hasattr(start_date, "date"):
         start_date = start_date.date()
     if hasattr(end_date, "date"):
@@ -35,10 +35,7 @@ def calculate_working_days(start_date, end_date, work_days_per_week=None):
 
 
 def calculate_employee_utilization(user_id, start_date, end_date):
-    """
-    Calculate the workload utilization rate (%) and workload status for a single employee.
-    Used when fetching individual employee stats.
-    """
+    """Calculate workload utilization percentage and status category for a specific employee."""
     from timesheets.models import LogWork
 
     daily_hours = getattr(settings, "DAILY_WORKING_HOURS", 8)
@@ -82,27 +79,20 @@ def calculate_employee_utilization(user_id, start_date, end_date):
 
 
 def get_team_workload_summary(manager_user, start_date, end_date):
-    """
-    HIGH-PERFORMANCE SUMMARY SERVICE:
-    Summarize workload utilization for all active employees using Bulk Aggregation (Group By).
-    Executes ONLY 2 SQL queries regardless of team size (Resolves N+1 query problem).
-    """
+    """Aggregate company-wide employee workload utilization metrics using grouped database queries."""
     from accounts.models import CustomUser
     from timesheets.models import LogWork
 
-    # 1. Lấy danh sách tất cả nhân viên EMPLOYEE active (Query #1)
     employees = (
         CustomUser.objects.filter(role__code="EMPLOYEE", is_active=True)
         .select_related("profile", "profile__department")
         .order_by("profile__full_name")
     )
 
-    # 2. Tính số giờ tiêu chuẩn tối đa (dùng chung trên RAM cho tất cả nhân viên)
     daily_hours = getattr(settings, "DAILY_WORKING_HOURS", 8)
     working_days = calculate_working_days(start_date, end_date)
     max_capacity_hours = working_days * daily_hours
 
-    # 3. HIGH PERFORMANCE: Gom nhóm tính tổng giờ của TẤT CẢ nhân viên trong 1 câu SQL duy nhất (Query #2)
     logs_summary = (
         LogWork.objects.filter(
             work_date__range=(start_date, end_date),
@@ -114,25 +104,20 @@ def get_team_workload_summary(manager_user, start_date, end_date):
         .annotate(total_hours=Sum("hours_spent"))
     )
 
-    # Chuyển kết quả SQL thành Dictionary dạng Lookup Table trên RAM: {user_id: total_hours}
     user_hours_map = {item["user_id"]: float(item["total_hours"] or 0.0) for item in logs_summary}
 
-    # 4. Tổng hợp dữ liệu trên RAM
     total_team_logged_hours = 0.0
     overloaded_count = 0
     employee_stats_list = []
 
     for emp in employees:
-        # Lấy tổng giờ từ Map trên RAM (nếu không có thì mặc định là 0.0)
         logged_hours = user_hours_map.get(emp.id, 0.0)
         
-        # Tính % Utilization
         if max_capacity_hours > 0:
             rate = round((logged_hours / max_capacity_hours) * 100, 1)
         else:
             rate = 0.0
 
-        # Phân loại trạng thái
         if rate < 70.0:
             status = "Normal"
         elif rate < 90.0:
@@ -140,7 +125,6 @@ def get_team_workload_summary(manager_user, start_date, end_date):
         else:
             status = "Overloaded"
 
-        # Đếm thống kê
         total_team_logged_hours += logged_hours
         if status == "Overloaded":
             overloaded_count += 1

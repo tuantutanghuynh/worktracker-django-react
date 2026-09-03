@@ -1,35 +1,33 @@
-from decimal import Decimal
+"""
+Module: timesheets.services.daily_total_manager_service
+Description: Service functions for calculating, validating, and updating employee daily cumulative work hours.
+"""
 
+from decimal import Decimal
 from django.db.models import Sum
 from rest_framework.exceptions import APIException
 
 from timesheets.models import DailyUserTimesheet, LogWork
 
-
 MAX_DAILY_HOURS = Decimal("8.00")
 
 
 class DailyTotalError(APIException):
+    """Exception raised when daily logged hours exceed allowed standard thresholds."""
     status_code = 400
     default_detail = "Daily total hours rule violation."
     default_code = "daily_total_error"
 
 
 def normalize_hours(value):
+    """Convert numerical or string value into a standard Decimal instance."""
     if value is None:
         return Decimal("0.00")
-
     return Decimal(str(value))
 
 
 def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
-    """
-    Tính tổng giờ làm của 1 user trong 1 ngày.
-    Quy ước:
-    - VOIDED và REJECTED không tính vào tổng giờ (giải phóng quota để nhân viên log lại task khác).
-    - PENDING / APPROVED được tính vào tổng giờ.
-    """
-
+    """Calculate cumulative logged hours for a user on a given date excluding voided and rejected entries."""
     queryset = LogWork.objects.filter(
         user_id=user_id,
         work_date=work_date,
@@ -50,7 +48,6 @@ def calculate_user_day_total(user_id, work_date, exclude_logwork_id=None):
     return normalize_hours(total)
 
 
-
 def assert_daily_total_not_exceed_8(
     *,
     user_id,
@@ -58,9 +55,7 @@ def assert_daily_total_not_exceed_8(
     new_hours,
     exclude_logwork_id=None,
 ):
-    """
-    Dùng khi tạo/sửa LogWork. Đảm bảo tổng giờ trong ngày <= 8.0h.
-    """
+    """Validate that adding new hours will not cause daily total to exceed standard 8-hour limit."""
     current_total = calculate_user_day_total(
         user_id=user_id,
         work_date=work_date,
@@ -78,15 +73,12 @@ def assert_daily_total_not_exceed_8(
 
     return final_total
 
+
 assert_daily_total_not_exceed_24 = assert_daily_total_not_exceed_8
 
 
 def rebuild_daily_user_timesheet(user_id, work_date):
-    """
-    Đồng bộ lại bảng DailyUserTimesheet sau khi approve/reject/correct/void.
-
-    DailyUserTimesheet là bảng tổng hợp theo ngày.
-    """
+    """Recalculate and update the daily user timesheet summary record for a specific date."""
     total_hours = calculate_user_day_total(
         user_id=user_id,
         work_date=work_date,

@@ -1,14 +1,15 @@
-from django.contrib.auth import get_user_model
+"""
+Module: system.services.notification_manager_service
+Description: Service functions for persisting, broadcasting, and enqueuing system notifications.
+"""
 
+from django.contrib.auth import get_user_model
 from system.models import Notification
 from tasks.models import TaskFollower
 
 
 def normalize_user_id(user_or_id):
-    """
-    Nhận user object hoặc user id.
-    Trả về user id.
-    """
+    """Normalize user model instance or integer into a user ID integer."""
     if user_or_id is None:
         return None
 
@@ -19,9 +20,7 @@ def normalize_user_id(user_or_id):
 
 
 def unique_user_ids(users):
-    """
-    Loại trùng user id và bỏ giá trị None.
-    """
+    """Filter distinct non-null user IDs from a collection of users or IDs."""
     result = []
 
     for item in users:
@@ -34,6 +33,7 @@ def unique_user_ids(users):
 
 
 def validate_event_type(event_type):
+    """Validate that the event type string exists in Notification.EventType choices."""
     valid_event_types = {
         value
         for value, label in Notification.EventType.choices
@@ -44,6 +44,7 @@ def validate_event_type(event_type):
 
 
 def validate_channel(channel):
+    """Validate that the delivery channel string exists in Notification.ChannelType choices."""
     valid_channels = {
         value
         for value, label in Notification.ChannelType.choices
@@ -54,14 +55,7 @@ def validate_channel(channel):
 
 
 def push_realtime_best_effort(notifications):
-    """
-    Push Notification real-time qua Django Channels.
-
-    Mỗi user được group riêng: "user_{user_id}".
-    NotificationConsumer sẽ forward payload xuống client.
-
-    Hàm này không được raise lỗi làm hỏng transaction chính.
-    """
+    """Broadcast notification payloads across Django Channels WebSocket groups on best-effort basis."""
     try:
         from asgiref.sync import async_to_sync
         from channels.layers import get_channel_layer
@@ -94,12 +88,7 @@ def push_realtime_best_effort(notifications):
 
 
 def enqueue_email_best_effort(notifications):
-    """
-    Đẩy task gửi email vào Celery Queue.
-
-    Mỗi Notification được enqueue riêng lẻ.
-    Hàm này không được raise lỗi làm hỏng transaction chính.
-    """
+    """Enqueue asynchronous email delivery tasks for notification instances into Celery."""
     try:
         from system.tasks import send_notification_email_task
 
@@ -121,14 +110,7 @@ def notify(
     related_url=None,
     channel=Notification.ChannelType.SYSTEM_ONLY,
 ):
-    """
-    Tạo notification cho danh sách recipients.
-
-    Quy tắc:
-    - Persist DB trước.
-    - Realtime/email là best-effort.
-    - Không tự rollback thao tác nghiệp vụ nếu realtime/email lỗi.
-    """
+    """Create notification records, push to WebSocket channels, and optionally enqueue emails."""
     validate_event_type(event_type)
     validate_channel(channel)
 
@@ -163,18 +145,7 @@ def notify(
 
 
 def resolve_task_recipients(task, exclude_user=None):
-    """
-    Xác định người nhận notification cho task event.
-
-    Gồm:
-    - assignee
-    - creator
-    - manager của job
-    - followers của task
-
-    exclude_user:
-    - dùng để không gửi thông báo cho chính người vừa thực hiện hành động.
-    """
+    """Resolve distinct active user recipients involved with a task excluding the triggering actor."""
     exclude_user_id = normalize_user_id(exclude_user)
 
     user_ids = []

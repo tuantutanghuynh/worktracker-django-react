@@ -1,25 +1,15 @@
+"""
+Module: timesheets.services.manager_employee_utilization_service
+Description: Service functions for calculating employee workload utilization rates and smart pressure metrics.
+"""
+
 from datetime import timedelta
 from django.conf import settings
 from django.db.models import Sum
 
 
 def calculate_smart_workload_pressure(user):
-    """
-    Tinh toan Ap luc cong viec thoi gian thuc (Smart Workload Pressure - SWP):
-    1. Quet toan bo Task dang mo (TODO, IN_PROGRESS, REVIEWING).
-    2. Quy doi Priority thanh gio uoc tinh chuan:
-       - HIGH: 8.0 gio (1 ngay cong)
-       - MEDIUM: 4.0 gio (nua ngay cong)
-       - LOW: 1.5 gio (cong viec phu)
-    3. Tinh khung thoi gian lam viec thuc te:
-       - Tim Max Deadline cua cac task.
-       - Tinh so ngay lam viec tu Hom nay den Max Deadline (toi thieu 6 ngay lam viec de phan bo Backlog).
-    4. Tinh ap luc gio lam moi ngay: daily_required_hours = total_effort_hours / horizon_working_days
-    5. Phan loai trang thai:
-       - < 4.0h/ngay: AVAILABLE (Ranh / San sang nhan them viec)
-       - 4.0h - 8.0h/ngay: BALANCED (Vua tai / On dinh)
-       - > 8.0h/ngay: OVERLOADED (Qua tai thuc te)
-    """
+    """Calculate real-time smart workload pressure by evaluating open task priorities and deadlines."""
     from tasks.models import Task
     from projects.models import Job
     from django.utils import timezone
@@ -46,11 +36,8 @@ def calculate_smart_workload_pressure(user):
     }
 
     total_effort_hours = sum(PRIORITY_HOURS.get(task.priority, 4.0) for task in active_tasks)
-
-    # Tim deadline xa nhat cua cac task dang mo
     max_deadline = max(task.deadline for task in active_tasks)
 
-    # Tinh so ngay lam viec tu Hom nay den Max Deadline (toi thieu 6 ngay)
     end_horizon = max(max_deadline, today + timedelta(days=6))
     horizon_working_days = calculate_working_days(today, end_horizon)
     horizon_working_days = max(1, horizon_working_days)
@@ -81,12 +68,7 @@ def calculate_smart_workload_pressure(user):
 
 
 def calculate_working_days(start_date, end_date, work_days_per_week=None):
-    """
-    Calculate the number of working days between two dates.
-    Reads default work_days_per_week from Django settings (WORK_DAYS_PER_WEEK).
-    - 5 days/week: Mon-Fri
-    - 6 days/week: Mon-Sat (Default per system spec)
-    """
+    """Calculate the number of business working days between two dates based on weekly schedule."""
     if hasattr(start_date, "date"):
         start_date = start_date.date()
     if hasattr(end_date, "date"):
@@ -112,10 +94,7 @@ def calculate_working_days(start_date, end_date, work_days_per_week=None):
 
 
 def calculate_employee_utilization(user_id, start_date, end_date):
-    """
-    Calculate the workload utilization rate (%) and workload status for a single employee.
-    Used when fetching individual employee stats.
-    """
+    """Calculate the workload utilization percentage and status label for a single employee."""
     from timesheets.models import LogWork
 
     daily_hours = getattr(settings, "DAILY_WORKING_HOURS", 8)
@@ -157,14 +136,9 @@ def calculate_employee_utilization(user_id, start_date, end_date):
 
 
 def get_team_workload_summary(manager_user, start_date, end_date):
-    """
-    HIGH-PERFORMANCE SUMMARY SERVICE:
-    Summarize workload utilization for all active employees using Bulk Aggregation (Group By).
-    Executes ONLY 2 SQL queries regardless of team size (Resolves N+1 query problem).
-    """
+    """Summarize workload utilization across manager's active team using bulk grouped queries."""
     from accounts.models import CustomUser
     from timesheets.models import LogWork
-
     from system.security.scoping_manager import scoped_team_user_ids
 
     team_user_ids = scoped_team_user_ids(manager_user)
@@ -176,12 +150,10 @@ def get_team_workload_summary(manager_user, start_date, end_date):
         .order_by("profile__full_name")
     )
 
-    # 2. Tính số giờ tiêu chuẩn tối đa (dùng chung trên RAM cho tất cả nhân viên)
     daily_hours = getattr(settings, "DAILY_WORKING_HOURS", 8)
     working_days = calculate_working_days(start_date, end_date)
     max_capacity_hours = working_days * daily_hours
 
-    # 3. HIGH PERFORMANCE: Gom nhóm tính tổng giờ của TẤT CẢ nhân viên trong 1 câu SQL duy nhất (Query #2)
     logs_summary = (
         LogWork.objects.filter(
             user_id__in=team_user_ids,
@@ -194,27 +166,22 @@ def get_team_workload_summary(manager_user, start_date, end_date):
         .annotate(total_hours=Sum("hours_spent"))
     )
 
-    # Chuyển kết quả SQL thành Dictionary dạng Lookup Table trên RAM: {user_id: total_hours}
     user_hours_map = {
         item["user_id"]: float(item["total_hours"] or 0.0) for item in logs_summary
     }
 
-    # 4. Tổng hợp dữ liệu trên RAM
     total_team_logged_hours = 0.0
     overloaded_count = 0
     employee_stats_list = []
 
     for emp in employees:
-        # Lấy tổng giờ từ Map trên RAM (nếu không có thì mặc định là 0.0)
         logged_hours = user_hours_map.get(emp.id, 0.0)
 
-        # Tính % Utilization
         if max_capacity_hours > 0:
             rate = round((logged_hours / max_capacity_hours) * 100, 1)
         else:
             rate = 0.0
 
-        # Phân loại trạng thái
         if rate < 70.0:
             status = "Normal"
         elif rate < 90.0:
@@ -222,7 +189,6 @@ def get_team_workload_summary(manager_user, start_date, end_date):
         else:
             status = "Overloaded"
 
-        # Đếm thống kê
         total_team_logged_hours += logged_hours
         if status == "Overloaded":
             overloaded_count += 1

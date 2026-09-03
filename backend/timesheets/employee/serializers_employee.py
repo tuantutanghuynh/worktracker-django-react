@@ -1,45 +1,36 @@
-from decimal import Decimal
+"""
+Module: timesheets.employee.serializers_employee
+Description: Serializer definitions for employee work log submission, validation, and historical logging.
+"""
 
+from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from system.services.audit_manager_service import log_action, snapshot
-
 from timesheets.models import LogWork, DailyUserTimesheet, TimeLock
 from tasks.models import Task
 from timesheets.services.daily_total_manager_service import MAX_DAILY_HOURS
 
-# This file holds the EMPLOYEE-only serializers for the timesheets app:
-# EmployeeLogWorkSerializer validates and creates a log_work entry, applying
-# 3 independent checks — Data Isolation (task must be assigned to the
-# caller), Defensive layer 1 (Time Lock, 403 if the period is closed), and
-# Defensive layer 2 (24h daily cap via Pessimistic Locking, 400 if
-# exceeded).
 
-
-# Creates a log_work entry for the current user, enforcing Time Lock + 24h
-# Cap inside create() (see file header) — not just format validation.
 class EmployeeLogWorkSerializer(serializers.ModelSerializer):
+    """Serialize and validate new work log submissions enforcing isolation, time lock, and daily cap."""
+
     class Meta:
         model = LogWork
         fields = ["id", "task", "work_date", "hours_spent", "description"]
         read_only_fields = ["id"]
 
-    # Rejects hours_spent <= 0.
     def validate_hours_spent(self, value):
+        """Ensure logged work hours are strictly greater than zero."""
         if value <= 0:
             raise serializers.ValidationError("hours_spent must be greater than 0.")
         return value
 
-    # Chấm công là ghi nhận việc ĐÃ LÀM — chưa tới ngày thì chưa có gì để
-    # ghi. Trước đây backend nhận mọi ngày, đã thử tạo được log cho ngày cách
-    # hôm nay 60 ngày và nhận 201 Created. Dữ liệu đó làm sai lệch mọi báo
-    # cáo tổng giờ, và từng khiến trung bình giờ/ngày vọt lên 10.4h.
-    #
-    # Cho phép log ngày hôm nay; chỉ chặn từ ngày mai trở đi.
     def validate_work_date(self, value):
+        """Reject work log submissions dated in the future."""
         today = timezone.localdate()
         if value > today:
             raise serializers.ValidationError(
@@ -48,13 +39,12 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             )
         return value
 
-    # Data Isolation & State Locking: rejects a task that isn't assigned to the caller or is locked.
     def validate_task(self, task):
+        """Ensure task is assigned to the submitting employee and parent job is active."""
         request = self.context["request"]
         if task.assignee_id != request.user.id:
             raise serializers.ValidationError("You can only log work on tasks assigned to you.")
         
-        # 1. Project Lifecycle Check: Chặn log work nếu Job đang ON_HOLD, CANCELLED hoặc COMPLETED
         from projects.models import Job
         if task.job and task.job.status in [Job.Status.ON_HOLD, Job.Status.CANCELLED, Job.Status.COMPLETED]:
             raise serializers.ValidationError(
@@ -62,7 +52,6 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                 f"is currently in '{task.job.status}' status."
             )
 
-        # 2. Task Status Check: Chặn log work nếu Task đang REVIEWING, COMPLETED hoặc CANCELLED
         if task.status in [Task.Status.REVIEWING, Task.Status.COMPLETED, Task.Status.CANCELLED]:
             raise serializers.ValidationError(
                 f"Cannot log work on task '{task.title}' because it is in '{task.status}' status. "
@@ -70,19 +59,13 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
             )
         return task
 
-    # Runs Time Lock check (defensive layer 1), then 24h Cap + Pessimistic
-    # Locking (defensive layer 2) inside one transaction before creating
-    # the log_work row. PermissionDenied (403) for Time Lock vs
-    # ValidationError (400) for the 24h cap — different error classes on
-    # purpose, since one is an administrative block and the other is bad
-    # input the caller can fix by resubmitting.
     def create(self, validated_data): 
+        """Create work log entry with pessimistic locking on daily timesheet and period lock checks."""
         user = self.context["request"].user
         work_date = validated_data["work_date"]
         hours_spent = validated_data["hours_spent"]
 
         with transaction.atomic():
-            # Defensive layer 1 — Time Lock check (GLOBAL trước, rồi JOB)
             global_lock = TimeLock.objects.filter(
                 lock_month=work_date.month,
                 lock_year=work_date.year,
@@ -107,10 +90,6 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                     "Contact your manager to unlock it."
                 )
 
-            # Defensive layer 2 — 24h Cap + Race Condition
-            # select_for_update() trước get_or_create() để: nếu row đã tồn tại, get() nội bộ
-            # khóa nó luôn trong cùng 1 query; nếu chưa tồn tại, get_or_create() tự lo
-            # savepoint + retry khi 2 request cùng tạo mới (xem Django query.py get_or_create()).
             timesheet, _ = DailyUserTimesheet.objects.select_for_update().get_or_create(
                 user=user, work_date=work_date, defaults={"total_hours": Decimal("0")}
             )
@@ -126,12 +105,10 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
                     }
                 )
 
-
             timesheet.total_hours = new_total
             timesheet.save()
 
             validated_data["user"] = user
-    
             log_work = super().create(validated_data)
 
             log_action(
@@ -148,9 +125,9 @@ class EmployeeLogWorkSerializer(serializers.ModelSerializer):
 
             return log_work
 
-# Task rút gọn — chỉ đủ thông tin để hiển thị 1 dòng trong bảng Timesheet
-# (không cần full EmployeeTaskListSerializer, tránh over-fetch).
+
 class EmployeeLogWorkTaskMiniSerializer(serializers.ModelSerializer):
+    """Serialize minimal task details for embedded display in employee work log rows."""
     job_name = serializers.CharField(source="job.job_name", read_only=True)
 
     class Meta:
@@ -158,9 +135,8 @@ class EmployeeLogWorkTaskMiniSerializer(serializers.ModelSerializer):
         fields = ["id", "title", "job_name"]
 
 
-# Liệt kê log work của chính user — dùng cho trang Timesheet (bảng chính),
-# khác EmployeeLogWorkSerializer (dùng để TẠO, không có nested task).
 class EmployeeLogWorkListSerializer(serializers.ModelSerializer):
+    """Serialize employee work log history items for personal timesheet list views."""
     task = EmployeeLogWorkTaskMiniSerializer(read_only=True)
 
     class Meta:

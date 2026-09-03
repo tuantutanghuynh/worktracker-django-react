@@ -1,5 +1,8 @@
-# Đảm bảo Celery app được load khi Django khởi động.
-# Điều này cần thiết để @shared_task hoạt động đúng.
+"""
+Module: worktracker_core.__init__
+Description: Package initialization module exposing Celery application instance for shared task execution.
+"""
+
 from .celery import app as celery_app
 
 __all__ = ("celery_app",)

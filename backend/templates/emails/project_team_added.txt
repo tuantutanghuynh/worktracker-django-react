@@ -1,3 +1,7 @@
+{% comment %}
+Template: emails/project_team_added.txt
+Description: Plain-text fallback for project team membership notification email.
+{% endcomment %}
 {% autoescape off %}Welcome to Project: {{ job_name }}
 
 Hello {{ member_name }}, you have been added as a member of project "{{ job_name }}".

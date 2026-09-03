@@ -1,7 +1,6 @@
 {% comment %}
-Layout dùng chung cho mọi email của hệ thống.
-Vì sao viết CSS inline thay vì dùng <style>: Gmail, Outlook và phần lớn client email đều cắt bỏ thẻ <style>.
-Template con chỉ cần override block content.
+Template: emails/base_email.html
+Description: Base HTML layout for all system transactional emails using inline styling.
 {% endcomment %}
 <!DOCTYPE html>
 <html lang="en">
@@ -27,7 +26,7 @@ Template con chỉ cần override block content.
             </td>
           </tr>
 
-          <!-- Nội dung -->
+          <!-- Main Content -->
           <tr>
             <td style="padding:32px;">
               {% block content %}{% endblock %}

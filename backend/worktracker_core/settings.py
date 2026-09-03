@@ -1,20 +1,12 @@
-# ┌─────────────────────────────────────────────────────────────────────┐
-# │  SHARED FILE — File cấu hình trung tâm, MỌI branch đều đụng         │
-# │                                                                      │
-# │  ĐIỂM CONFLICT KHI MERGE:                                            │
-# │  1. INSTALLED_APPS → Long thêm 'reports', Tú thêm 'timesheets'      │
-# │     → Uncomment từng app sau khi merge từng nhánh                    │
-# │  2. DEFAULT_AUTHENTICATION_CLASSES → Tú có WorkTrackerJWTAuth        │
-# │     → Đổi sau khi merge Tú (xem TODO bên dưới)                      │
-# │  3. SIMPLE_JWT → Kiểm tra Long/Tú có chỉnh ACCESS_TOKEN_LIFETIME ?   │
-# │  4. Redis DB allocation → Đã chuẩn hóa (DB0-3), giữ nguyên          │
-# │  5. Django version → Team dùng 6.0.6, mình dùng 5.2.15              │
-# │     → Cần họp nhóm để thống nhất trước khi nâng cấp                 │
-# └─────────────────────────────────────────────────────────────────────┘
+"""
+Module: worktracker_core.settings
+Description: Django project configuration settings including database, authentication, caching, and Celery.
+"""
+
 import os
 from datetime import timedelta
-from celery.schedules import crontab
 from pathlib import Path
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,17 +19,16 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "True").lower() in ["true", "1", "t"]
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
-
-
 INSTALLED_APPS = [
-    'daphne',                              # ASGI server — PHẢI đặt TRƯỚC staticfiles
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # --- THƯ VIỆN ---
+
+    # Third-party libraries
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -46,7 +37,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'django_celery_results',
     'channels',
-    # --- APP DỰ ÁN ---
+
+    # Project applications
     'accounts',
     'projects',
     'tasks',
@@ -72,7 +64,7 @@ ROOT_URLCONF = 'worktracker_core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates",],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -87,7 +79,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'worktracker_core.wsgi.application'
 ASGI_APPLICATION = 'worktracker_core.asgi.application'
 
-# ── DATABASE ──────────────────────────────────────────────────────────────────
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -106,13 +97,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ── LOCALISATION ──────────────────────────────────────────────────────────────
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Ho_Chi_Minh'
 USE_I18N = True
 USE_TZ = True
-
-# ── STATIC & MEDIA ────────────────────────────────────────────────────────────
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
@@ -131,22 +119,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    # Chong do mat khau: gioi han so lan goi cac endpoint khong can dang
-    # nhap. ScopedRateThrottle chi ap dung cho view nao khai bao
-    # throttle_scope, nen cac API con lai khong bi anh huong.
-    #
-    # Voi request chua dang nhap, DRF dem theo dia chi IP. Bo dem luu trong
-    # cache 'default' (Redis) — Redis phai chay, nhung he thong von da phu
-    # thuoc Redis de xac thuc JWT nen khong phat sinh phu thuoc moi.
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        # Nguoi that go sai mat khau vai lan la binh thuong; 10 lan/phut du
-        # rong cho ho nhung chan duoc script do hang nghin lan.
         'login': os.environ.get('THROTTLE_LOGIN', '10/min'),
-        # Quen mat khau gui email that nen siet chat hon, tranh bi lam dung
-        # de spam hom thu nguoi khac.
         'password_reset': os.environ.get('THROTTLE_PASSWORD_RESET', '5/min'),
     },
 }
@@ -161,7 +138,7 @@ SIMPLE_JWT = {
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'WorkTracker API',
-    'DESCRIPTION': 'Tài liệu API chính thức cho hệ thống WorkTracker (Admin / Manager / Employee).',
+    'DESCRIPTION': 'Official API documentation for WorkTracker system (Admin / Manager / Employee).',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'SECURITY': [{'bearerAuth': []}],
@@ -176,10 +153,6 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-
-# Dev: in email ra console thay vì gửi thật. Đổi sang SMTP khi deploy production.
-# ── EMAIL ─────────────────────────────────────────────────────────────────────
-
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
     'django.core.mail.backends.smtp.EmailBackend' if os.environ.get('EMAIL_HOST_USER') else 'django.core.mail.backends.console.EmailBackend'
@@ -191,8 +164,6 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@worktracker.com')
 
-
-# ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
@@ -202,10 +173,6 @@ CORS_ALLOWED_ORIGINS = [
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
-# Redis & Cache Configuration
-# Mac dinh 127.0.0.1 chu KHONG phai "localhost": tren Windows, "localhost"
-# phan giai ra IPv6 (::1) truoc, ma Redis chi lang nghe tren IPv4 -> moi
-# lan ket noi phai cho timeout IPv6 ~2 giay roi moi fallback sang IPv4.
 REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 
@@ -226,10 +193,6 @@ CACHES = {
     }
 }
 
-# ============================================================
-# DJANGO CHANNELS — Channel Layer dùng Redis DB=4
-# Phân tách khỏi Cache (DB=1) và Celery (DB=2, 3)
-# ============================================================
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -252,13 +215,8 @@ CHANNEL_LAYERS = {
 
 WORK_DAYS_PER_WEEK = int(os.environ.get("WORK_DAYS_PER_WEEK", 6))
 DAILY_WORKING_HOURS = int(os.environ.get("DAILY_WORKING_HOURS", 8))
-# Nguong canh bao cua trang Timesheet Control: log duoi bao nhieu phan tram
-# gio du kien thi gan trang thai WARNING. Truoc day so 0.8 nam cung trong
-# code, khong ai chinh duoc va khong co trong tai lieu dac ta.
 TIMESHEET_WARNING_THRESHOLD = float(os.environ.get("TIMESHEET_WARNING_THRESHOLD", 0.8))
 
-
-# ── CELERY ────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL        = f'redis://{REDIS_HOST}:{REDIS_PORT}/2'
 CELERY_RESULT_BACKEND    = 'django-db'
 CELERY_CACHE_BACKEND     = 'django-cache'
@@ -269,23 +227,9 @@ CELERY_TIMEZONE          = TIME_ZONE
 CELERY_ENABLE_UTC        = False
 CELERY_TASK_TRACK_STARTED = True
 
-# Lich chay dinh ky (Celery beat).
-#
-# Dung beat_schedule tinh trong settings, KHONG dung django-celery-beat:
-# dat lich trong DB doi them mot app + migration, ma du an chi co dung mot
-# tac vu dinh ky. Doi lich thi sua file nay roi khoi dong lai beat.
-#
-# Chay moi ngay luc 00:05 chu khong phai 00:00: tranh dung dinh moc doi ngay,
-# va de he thong on dinh vai phut truoc khi ghi du lieu.
-#
-# Chay HANG NGAY chu khong phai chi ngay 1: neu may chu tat dung ngay mung 1
-# thi thang do khong bao gio duoc khoa. Chay moi ngay thi cac lan sau chi
-# ghi nhan "da khoa roi" va bo qua — task duoc thiet ke idempotent.
 CELERY_BEAT_SCHEDULE = {
     "auto-lock-previous-timesheet-period": {
         "task": "timesheets.auto_lock_previous_period",
         "schedule": crontab(hour=0, minute=5),
     },
 }
-
-

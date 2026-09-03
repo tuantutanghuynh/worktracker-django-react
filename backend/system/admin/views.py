@@ -1,17 +1,15 @@
-from django.db import transaction
-from django.db.models import Q
+"""
+Module: system.admin.views
+Description: Administration views for system audit log querying, dashboard KPIs, and data quality alerts.
+"""
+
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.core.cache import cache
-
-DASHBOARD_CACHE_KEY = 'admin:dashboard'
-DASHBOARD_CACHE_TTL = 30  # seconds — dashboard data cũ tối đa 30 giây
-
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
-
-from django.db.models import Sum
 
 from accounts.models import CustomUser, Department
 from accounts.permissions import HasPermission
@@ -21,7 +19,6 @@ from projects.models import Client, Job
 from timesheets.models import LogWork
 from ..models import AuditLog
 from .serializers import AuditLogSerializer
-from django.http import HttpResponse
 from ..utils import log_audit_event
 from ..services.admin_report_export_service import (
     build_xlsx_response,
@@ -29,22 +26,26 @@ from ..services.admin_report_export_service import (
     audit_log_rows,
 )
 
+DASHBOARD_CACHE_KEY = 'admin:dashboard'
+DASHBOARD_CACHE_TTL = 30
+
+
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """Viewset providing paginated audit log inspection, filtering, metrics, and Excel export."""
     serializer_class = AuditLogSerializer
     pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'user__email', 'action', 'table_name', 'record_id', 'severity']
 
     def get_permissions(self):
+        """Instantiate and return the list of permissions required for the action."""
         if self.action == 'export':
             return [IsAdminRole(), HasPermission('audit:export')]
         return [IsAdminRole(), HasPermission('audit:view')]
 
-    # GET /api/admin/audit-logs/export/ — same filter params as the list
-    # endpoint (?actor=, ?actor_role=, ?action=, ?table_name=, ?severity=,
-    # ?date_from=, ?date_to=, ?record_id=, ?keyword=, ?ordering=).
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
+        """Export filtered audit logs to a formatted Excel workbook."""
         queryset = self.filter_queryset(self.get_queryset())
         log_audit_event(
             actor=request.user,
@@ -62,6 +63,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
     def get_queryset(self):
+        """Build and return filtered audit log queryset based on query parameters."""
         queryset = AuditLog.objects.all().order_by('-created_at')
 
         actor = self.request.query_params.get('actor')
@@ -94,8 +96,6 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(severity=severity)
 
         if keyword := self.request.query_params.get('keyword'):
-            # 'create' phải khớp cả dòng action=CREATE, không chỉ tìm chữ
-            # "create" nằm lẫn đâu đó trong nội dung old/new_values.
             queryset = queryset.filter(
                 Q(old_values__icontains=keyword)
                 | Q(new_values__icontains=keyword)
@@ -105,11 +105,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
-    # Powers the Action/Table filter dropdowns on the frontend with the
-    # values actually present in the table, instead of a hardcoded list
-    # that would drift as new action types get added across the app.
     @action(detail=False, methods=["get"], url_path="filters")
     def filter_options(self, request):
+        """Return distinct action types and table names for frontend filter dropdowns."""
         return Response({
             'actions': list(
                 AuditLog.objects.order_by('action').values_list('action', flat=True).distinct()
@@ -119,11 +117,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             ),
         })
 
-    # Powers the 5 KPI cards at the top of the Audit Logs page. Scoped to
-    # today + whichever role tab is active (?actor_role=), same scoping as
-    # the table itself, so the cards always describe what's on screen.
     @action(detail=False, methods=["get"], url_path="summary")
     def summary_stats(self, request):
+        """Return summary KPI statistics for audit log events occurring today."""
         today = timezone.now().date()
         qs = AuditLog.objects.filter(created_at__date=today)
 
@@ -144,11 +140,14 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class DashboardView(APIView):
+    """Compute and return cached system-wide KPI metrics and recent security event feeds."""
 
     def get_permissions(self):
+        """Instantiate and return permissions required for dashboard viewing."""
         return [IsAdminRole(), HasPermission('audit:view')]
 
     def get(self, request):
+        """Return cached or computed dashboard metrics summary."""
         cached = cache.get(DASHBOARD_CACHE_KEY)
         if cached:
             return Response(cached)
@@ -177,16 +176,10 @@ class DashboardView(APIView):
             'total':    Client.objects.count(),
         }
 
-        # All-time, company-wide — mirrors Manager Dashboard's "Team Work
-        # Hours" / "Pending Timesheets" cards, scoped globally instead of to
-        # one manager's team.
         logged_work = LogWork.objects.exclude(review_status=LogWork.ReviewStatus.VOIDED)
         total_work_hours = float(logged_work.aggregate(total=Sum('hours_spent'))['total'] or 0)
         pending_timesheets = logged_work.filter(review_status=LogWork.ReviewStatus.PENDING).count()
 
-        # IAM/security activity — table_name kept explicit alongside action
-        # so this stays correct even if the same action name is ever reused
-        # against a different table_name elsewhere.
         audit_today = AuditLog.objects.filter(created_at__date=today)
         audit_summary_today = {
             'account_created':  audit_today.filter(action='CREATE', table_name='users').count(),
@@ -195,9 +188,6 @@ class DashboardView(APIView):
             'password_reset':   audit_today.filter(action='RESET_PASSWORD', table_name='users').count(),
         }
 
-        # Quick-glance feed of the most recent sensitive IAM actions — mirrors
-        # the severity now set on ROLE_CHANGED/LOCK_ACCOUNT/UNLOCK_ACCOUNT/
-        # RESET_PASSWORD in accounts/admin/views.py.
         recent_security_events = AuditLog.objects.select_related('user').filter(
             severity__in=[AuditLog.Severity.CRITICAL, AuditLog.Severity.WARNING]
         ).order_by('-created_at')[:9]
@@ -219,18 +209,16 @@ class DashboardView(APIView):
         cache.set(DASHBOARD_CACHE_KEY, data, timeout=DASHBOARD_CACHE_TTL)
         return Response(data)
 
+
 class DataQualityAlertsView(APIView):
-    """
-    Synthetic, not-persisted alerts computed live from current DB state —
-    unlike AuditLog-triggered notifications, these have no "read/unread"
-    concept: they simply stop appearing once the underlying field is fixed,
-    with no stale row to clean up afterwards.
-    """
+    """Identify real-time data discrepancies across departments, employees, and clients."""
 
     def get_permissions(self):
+        """Instantiate and return permissions required for data quality alert viewing."""
         return [IsAdminRole(), HasPermission('audit:view')]
 
     def get(self, request):
+        """Return synthesized list of active data quality discrepancies."""
         alerts = []
 
         for dept in Department.objects.filter(manager__isnull=True):
@@ -265,12 +253,3 @@ class DataQualityAlertsView(APIView):
             })
 
         return Response(alerts)
-
-
-# The old single /api/admin/reports/ endpoint (one 4-sheet dump of
-# everything, ignoring whatever the user had filtered on screen) was
-# replaced by a per-resource `export` action on each admin ViewSet — see
-# ClientViewSet.export, JobViewSet.export, UserViewSet.export,
-# DepartmentViewSet.export, AuditLogViewSet.export and
-# AdminTimesheetExportView. Each reuses that list endpoint's own filters so
-# the file always matches the table the user is looking at.

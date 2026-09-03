@@ -1,12 +1,17 @@
+"""
+Module: timesheets.manager.filters_manager
+Description: Custom query filters and parameter parsers for manager-scoped work logs and period locks.
+"""
+
 from django.db.models import Q
 from django.utils.dateparse import parse_date
-
 from rest_framework.exceptions import ValidationError
 
 from timesheets.models import LogWork, TimeLock
 
 
 def parse_int_param(value, field_name):
+    """Safely parse integer parameter or raise ValidationError with field context."""
     if value is None or value == "":
         return None
 
@@ -21,6 +26,7 @@ def parse_int_param(value, field_name):
 
 
 def parse_bool_param(value, field_name):
+    """Safely parse boolean query parameter from string representation."""
     if value is None:
         return None
 
@@ -40,13 +46,7 @@ def parse_bool_param(value, field_name):
 
 
 class ManagerLogWorkFilter:
-    """
-    Filter LogWork cho Manager.
-
-    Lưu ý:
-    - Queryset truyền vào phải là scoped_logworks(request.user).
-    - Không dùng trực tiếp LogWork.objects.all() cho Manager.
-    """
+    """Applies scoping, status, project, task, user, and date filters to work log querysets."""
 
     VALID_ORDER_FIELDS = {
         "work_date",
@@ -58,6 +58,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def apply(cls, queryset, params):
+        """Apply all configured filter methods and ordering to work log queryset."""
         queryset = cls.filter_review_status(queryset, params)
         queryset = cls.filter_job(queryset, params)
         queryset = cls.filter_task(queryset, params)
@@ -70,6 +71,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def filter_review_status(cls, queryset, params):
+        """Filter queryset by single review status or comma-separated list of statuses."""
         review_status = params.get("review_status") or params.get("status")
         review_status_in = params.get("review_status__in") or params.get("status__in")
 
@@ -114,6 +116,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def filter_job(cls, queryset, params):
+        """Filter work logs by associated job ID."""
         job_id = parse_int_param(
             params.get("job_id"),
             "job_id",
@@ -126,6 +129,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def filter_task(cls, queryset, params):
+        """Filter work logs by associated task ID."""
         task_id = parse_int_param(
             params.get("task_id"),
             "task_id",
@@ -138,6 +142,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def filter_user(cls, queryset, params):
+        """Filter work logs by submitting user ID."""
         user_id = parse_int_param(
             params.get("user_id"),
             "user_id",
@@ -150,6 +155,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def filter_work_date_range(cls, queryset, params):
+        """Filter work logs between optional start and end date bounds."""
         work_date_from = params.get("work_date_from")
         work_date_to = params.get("work_date_to")
 
@@ -181,6 +187,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def filter_search(cls, queryset, params):
+        """Search work logs by keyword across description, task title, email, and author name."""
         search = params.get("search")
 
         if not search:
@@ -200,6 +207,7 @@ class ManagerLogWorkFilter:
 
     @classmethod
     def apply_ordering(cls, queryset, params):
+        """Apply requested sort field or fallback to default date descending."""
         ordering = params.get("ordering")
 
         if not ordering:
@@ -222,13 +230,7 @@ class ManagerLogWorkFilter:
 
 
 class ManagerTimeLockFilter:
-    """
-    Filter TimeLock cho Manager.
-
-    Lưu ý:
-    - Queryset truyền vào phải là scoped_timelocks(request.user).
-    - Manager chỉ thấy JOB lock thuộc Job của mình.
-    """
+    """Applies job, period, lock status, and sorting filters to manager-scoped time locks."""
 
     VALID_ORDER_FIELDS = {
         "lock_month",
@@ -241,6 +243,7 @@ class ManagerTimeLockFilter:
 
     @classmethod
     def apply(cls, queryset, params):
+        """Apply all configured filter methods and ordering to time-lock queryset."""
         queryset = cls.filter_job(queryset, params)
         queryset = cls.filter_month_year(queryset, params)
         queryset = cls.filter_is_locked(queryset, params)
@@ -251,6 +254,7 @@ class ManagerTimeLockFilter:
 
     @classmethod
     def filter_job(cls, queryset, params):
+        """Filter period locks by associated job ID."""
         job_id = parse_int_param(
             params.get("job_id"),
             "job_id",
@@ -263,6 +267,7 @@ class ManagerTimeLockFilter:
 
     @classmethod
     def filter_month_year(cls, queryset, params):
+        """Filter period locks by month and year integers."""
         lock_month = parse_int_param(
             params.get("lock_month"),
             "lock_month",
@@ -289,6 +294,7 @@ class ManagerTimeLockFilter:
 
     @classmethod
     def filter_is_locked(cls, queryset, params):
+        """Filter period locks by active boolean lock state."""
         is_locked = parse_bool_param(
             params.get("is_locked"),
             "is_locked",
@@ -301,6 +307,7 @@ class ManagerTimeLockFilter:
 
     @classmethod
     def filter_lock_scope(cls, queryset, params):
+        """Filter period locks by lock scope choice."""
         lock_scope = params.get("lock_scope")
 
         if not lock_scope:
@@ -322,6 +329,7 @@ class ManagerTimeLockFilter:
 
     @classmethod
     def apply_ordering(cls, queryset, params):
+        """Apply requested sort field or fallback to descending year and month."""
         ordering = params.get("ordering")
 
         if not ordering:

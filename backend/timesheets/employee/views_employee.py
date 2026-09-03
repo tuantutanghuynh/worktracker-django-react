@@ -1,3 +1,8 @@
+"""
+Module: timesheets.employee.views_employee
+Description: Employee-facing API views for creating, editing, voiding, and listing personal work log entries.
+"""
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -13,15 +18,14 @@ from timesheets.services.daily_total_manager_service import rebuild_daily_user_t
 from timesheets.services.timelock_manager_service import assert_period_open_for_job
 from timesheets.models import LogWork
 
-# This file holds the EMPLOYEE-only views for the timesheets app.
 
-
-# Creates a log_work entry for a task assigned to the calling Employee.
 class EmployeeLogWorkView(APIView):
+    """Create a new work log entry for a task assigned to the authenticated employee."""
     permission_classes = [HasPermission]
     required_permission = "timesheet:create"
 
     def post(self, request):
+        """Validate payload and persist work log entry."""
         serializer = EmployeeLogWorkSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         log_work = serializer.save()
@@ -29,14 +33,13 @@ class EmployeeLogWorkView(APIView):
         return Response(EmployeeLogWorkSerializer(log_work).data, status=status.HTTP_201_CREATED)
 
 
-# Voids the caller's own log_work (soft-delete). Only PENDING entries can be
-# voided — once a Manager has reviewed it, only the Manager-side review
-# service can change its status.
 class EmployeeVoidLogWorkView(APIView):
+    """Soft-delete a pending work log entry created by the authenticated employee."""
     permission_classes = [HasPermission]
     required_permission = "timesheet:void"
 
     def patch(self, request, log_work_id):
+        """Mark pending work log as VOIDED with required reason."""
         reason = request.data.get("reason", "").strip()
         if not reason:
             raise ValidationError({"reason": "This field is required."})
@@ -54,10 +57,6 @@ class EmployeeVoidLogWorkView(APIView):
             if log_work.task.job.status != "ACTIVE":
                 raise ValidationError(f"Cannot void log work because its project is frozen or on hold ({log_work.task.job.status}).")
 
-            # Time Lock check — kỳ công đã khoá thì không được void, kể cả
-            # log đang PENDING. Dùng lại assert_period_open_for_job() dùng
-            # chung (đã có sẵn cho Manager review/correct/void), không tự
-            # viết lại logic GLOBAL/JOB lần nữa.
             assert_period_open_for_job(
                 job_id=log_work.task.job_id,
                 work_date=log_work.work_date,
@@ -94,16 +93,14 @@ class EmployeeVoidLogWorkView(APIView):
 
         return Response(EmployeeLogWorkSerializer(log_work).data, status=status.HTTP_200_OK)
 
-# Sửa trực tiếp giờ/mô tả trên log_work đang PENDING của chính mình —
-# thay Void cho lỗi nhỏ (gõ nhầm giờ), Void vẫn giữ cho lỗi nặng hơn.
-# Mirror đúng cấu trúc EmployeeVoidLogWorkView, không tái dùng
-# correct_logwork() của Manager (hàm đó check quyền sở hữu job, sai
-# actor cho Employee) — chỉ tái dùng các hàm chung ở tầng dưới.
+
 class EmployeeEditLogWorkView(APIView):
+    """Edit hours or description on a pending work log entry created by the authenticated employee."""
     permission_classes = [HasPermission]
     required_permission = "timesheet:edit"
 
     def patch(self, request, log_work_id):
+        """Update fields on pending work log with reason."""
         reason = request.data.get("adjustment_reason", "").strip()
         if not reason:
             raise ValidationError({"adjustment_reason": "This field is required."})
@@ -171,15 +168,14 @@ class EmployeeEditLogWorkView(APIView):
 
         return Response(EmployeeLogWorkSerializer(log_work).data, status=status.HTTP_200_OK)
 
-# Returns the calling user's own log_work history, newest first — powers
-# the Timesheet page's list table. No filtering/pagination at this layer
-# (dataset per user is small); FilterToolbar filters client-side, same
-# approach as NotificationListView.
+
 class EmployeeMyLogWorkListView(APIView):
+    """Retrieve chronologically ordered work log history created by the authenticated employee."""
     permission_classes = [HasPermission]
     required_permission = "timesheet:view"
 
     def get(self, request):
+        """Return full list of personal work logs ordered by work date descending."""
         log_works = (
             LogWork.objects.filter(user=request.user)
             .select_related("task", "task__job")

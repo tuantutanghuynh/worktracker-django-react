@@ -1,3 +1,8 @@
+"""
+Module: timesheets.services.logwork_review_manager_service
+Description: Service functions for manager approval, rejection, correction, and voiding of work logs.
+"""
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
@@ -7,7 +12,6 @@ from system.models import Notification
 from system.security.scoping_manager import scoped_logworks
 from system.services.audit_manager_service import snapshot, log_action
 from system.services.notification_manager_service import notify
-
 from timesheets.services.daily_total_manager_service import (
     assert_daily_total_not_exceed_8,
     rebuild_daily_user_timesheet,
@@ -18,20 +22,20 @@ from timesheets.services.timelock_manager_service import (
 
 
 class LogWorkReviewError(APIException):
+    """Exception raised when a work log transition violates workflow rules."""
     status_code = 400
     default_detail = "LogWork review rule violation."
     default_code = "logwork_review_error"
 
 
 def assert_logwork_in_manager_scope(user, logwork):
-    """
-    Manager chỉ xử lý LogWork thuộc Task thuộc Job của mình.
-    """
+    """Validate that the work log belongs to a job managed by the user."""
     if logwork.task.job.manager_id != user.id:
         raise PermissionDenied("LOGWORK_OUT_OF_MANAGER_SCOPE")
 
 
 def get_locked_scoped_logwork(user, logwork_id):
+    """Retrieve work log by ID with a database row lock within manager scope."""
     return (
         scoped_logworks(user)
         .select_for_update(of=("self",))
@@ -53,11 +57,7 @@ def approve_logwork(
     note=None,
     request=None,
 ):
-    """
-    Manager approve LogWork.
-
-    Chỉ cho approve khi kỳ công chưa bị lock.
-    """
+    """Transition work log status to APPROVED, recalculate daily totals, and log audit event."""
     with transaction.atomic():
         locked_logwork = get_locked_scoped_logwork(
             user=user,
@@ -146,11 +146,7 @@ def reject_logwork(
     reason,
     request=None,
 ):
-    """
-    Manager reject LogWork.
-
-    Reject bắt buộc có lý do.
-    """
+    """Transition work log status to REJECTED with mandatory reason and notify submitter."""
     if not reason or not str(reason).strip():
         raise ValidationError(
             {
@@ -250,15 +246,7 @@ def correct_logwork(
     adjustment_reason=None,
     request=None,
 ):
-    """
-    Manager chỉnh LogWork.
-
-    Có thể chỉnh:
-    - hours_spent
-    - description
-
-    Bắt buộc có adjustment_reason.
-    """
+    """Adjust hours or description on existing work log with adjustment reason and audit logging."""
     if not adjustment_reason or not str(adjustment_reason).strip():
         raise ValidationError(
             {
@@ -356,11 +344,7 @@ def void_logwork(
     reason,
     request=None,
 ):
-    """
-    Manager void LogWork sai.
-
-    VOIDED nghĩa là log không còn được tính vào tổng giờ.
-    """
+    """Mark work log entry as VOIDED, remove hours from daily totals, and notify submitter."""
     if not reason or not str(reason).strip():
         raise ValidationError(
             {

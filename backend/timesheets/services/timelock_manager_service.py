@@ -1,3 +1,8 @@
+"""
+Module: timesheets.services.timelock_manager_service
+Description: Service functions for managing global and job-level period locking, unlocking, and status validation.
+"""
+
 import calendar
 from datetime import date
 from django.db import transaction
@@ -12,24 +17,25 @@ from system.services.notification_manager_service import notify
 
 
 class TimeLockError(APIException):
+    """Exception raised when a time-lock action violates period validation rules."""
     status_code = 400
     default_detail = "Time lock rule violation."
     default_code = "time_lock_error"
 
 
 def get_period_from_date(work_date):
+    """Extract month and year integers from a date instance."""
     return work_date.month, work_date.year
 
 
 def assert_job_in_manager_scope(user, job):
-    """
-    Manager chỉ được lock/unlock Job do chính mình quản lý.
-    """
+    """Validate that the job is managed by the user or raise PermissionDenied."""
     if job.manager_id != user.id:
         raise PermissionDenied("JOB_OUT_OF_MANAGER_SCOPE")
 
 
 def validate_month_year(lock_month, lock_year):
+    """Validate that month is between 1 and 12 and year is valid."""
     if lock_month is None:
         raise ValidationError(
             {
@@ -60,6 +66,7 @@ def validate_month_year(lock_month, lock_year):
 
 
 def is_global_period_locked(lock_month, lock_year):
+    """Check if the specified monthly period is locked globally by an administrator."""
     return TimeLock.objects.filter(
         lock_scope=TimeLock.LockScope.GLOBAL,
         job__isnull=True,
@@ -70,10 +77,7 @@ def is_global_period_locked(lock_month, lock_year):
 
 
 def is_job_period_locked(job_id, lock_month, lock_year, today=None):
-    """
-    Kiểm tra xem kỳ công của Job có bị khóa hay không.
-    Kỳ công chỉ bị khóa khi có bản ghi TimeLock trong CSDL với is_locked=True.
-    """
+    """Check if the specified monthly period is locked for a specific job."""
     job_lock = (
         TimeLock.objects.filter(
             lock_scope=TimeLock.LockScope.JOB,
@@ -92,11 +96,7 @@ def is_job_period_locked(job_id, lock_month, lock_year, today=None):
 
 
 def is_period_locked(job_id, lock_month, lock_year, today=None):
-    """
-    Một kỳ bị khóa nếu:
-    - Admin đã GLOBAL lock kỳ đó
-    - hoặc Manager đã JOB lock kỳ đó (hoặc bị Tự động Khóa theo thời gian máy chủ)
-    """
+    """Determine if a monthly period is locked under either global or job scope."""
     return (
         is_global_period_locked(lock_month, lock_year)
         or is_job_period_locked(job_id, lock_month, lock_year, today=today)
@@ -104,9 +104,7 @@ def is_period_locked(job_id, lock_month, lock_year, today=None):
 
 
 def assert_period_open_for_job(job_id, work_date):
-    """
-    Dùng trước khi Manager review/correct/void LogWork hoặc Employee log work.
-    """
+    """Validate that the monthly period for a given date and job is open for edits."""
     lock_month, lock_year = get_period_from_date(work_date)
 
     if is_global_period_locked(lock_month, lock_year):
@@ -117,11 +115,7 @@ def assert_period_open_for_job(job_id, work_date):
 
 
 def get_job_timesheet_recipient_ids(job):
-    """
-    Người nhận notification lock/unlock:
-    - Manager của Job
-    - Các assignee từng có task trong Job
-    """
+    """Retrieve distinct user IDs of assignees and manager associated with a job."""
     assignee_ids = (
         Task.objects.filter(
             job=job,
@@ -146,16 +140,10 @@ def lock_job_period(
     reason=None,
     request=None,
 ):
-    """
-    Manager lock kỳ công theo Job.
-
-    Scope:
-        TimeLock.LockScope.JOB
-    """
+    """Lock a completed monthly timesheet period for a specific project within manager scope."""
     assert_job_in_manager_scope(user, job)
     validate_month_year(lock_month, lock_year)
 
-    # ➕ KIỂM TRA CHỐT CHẶN: Chỉ cho phép khóa kỳ công ĐÃ KẾT THÚC (không khóa tháng đang diễn ra / tương lai)
     _, last_day = calendar.monthrange(int(lock_year), int(lock_month))
     period_end_date = date(int(lock_year), int(lock_month), last_day)
     today = timezone.now().date()
@@ -166,7 +154,6 @@ def lock_job_period(
             "You can only lock past completed periods."
         )
 
-    # ➕ KIỂM TRA CHỐT CHẶN: Chặn khóa kỳ công trước năm khởi chạy của dự án (trừ khi có logwork thực tế)
     if job.start_date and int(lock_year) < job.start_date.year:
         from timesheets.models import LogWork
         has_logs = LogWork.objects.filter(task__job=job, work_date__year=lock_year, work_date__month=lock_month).exists()
@@ -176,7 +163,6 @@ def lock_job_period(
                 f"You cannot lock periods prior to project inception ({lock_month}/{lock_year})."
             )
 
-    # ➕ KIỂM TRA RÀNG BUỘC CHỐT SỔ: Chặn khóa sổ nếu còn chấm công PENDING chưa duyệt
     from timesheets.models import LogWork
     pending_count = LogWork.objects.filter(
         task__job=job,
@@ -269,11 +255,7 @@ def lock_job_period(
 
 
 def get_global_timesheet_recipient_ids(exclude_user=None):
-    """
-    Người nhận notification khi Admin GLOBAL lock/unlock — mọi ADMIN và
-    MANAGER đang active, vì đây là hành động ảnh hưởng công việc của toàn
-    bộ Manager (Employee sẽ chỉ thấy khi họ cố log/sửa giờ và bị chặn).
-    """
+    """Retrieve distinct user IDs for all active administrators and managers."""
     from accounts.models import CustomUser
 
     recipient_ids = list(
@@ -293,24 +275,9 @@ def lock_global_period(
     reason=None,
     request=None,
 ):
-    """
-    Admin lock kỳ công toàn hệ thống.
-
-    Scope:
-        TimeLock.LockScope.GLOBAL (job=None) — chặn edit LogWork ở MỌI
-        job trong tháng/năm đó, không chỉ 1 job như lock_job_period().
-    """
+    """Lock a completed monthly timesheet period company-wide across all projects."""
     validate_month_year(lock_month, lock_year)
 
-    # ➕ CHỐT CHẶN: chỉ khoá được kỳ ĐÃ KẾT THÚC.
-    #
-    # Trước đây chốt này chỉ có ở lock_job_period() (phía Manager), còn
-    # Admin thì khoá được cả tháng đang diễn ra — mà GLOBAL lock chặn ghi
-    # LogWork ở MỌI job, nên một cú bấm nhầm làm toàn công ty không chấm
-    # công được cho tới khi có người mở khoá.
-    #
-    # Dùng lại đúng mã lỗi CANNOT_LOCK_ACTIVE_PERIOD đã khai báo sẵn trong
-    # từ điển lỗi của frontend.
     _, last_day = calendar.monthrange(int(lock_year), int(lock_month))
     period_end_date = date(int(lock_year), int(lock_month), last_day)
     today = timezone.now().date()
@@ -408,11 +375,7 @@ def unlock_global_period(
     reason,
     request=None,
 ):
-    """
-    Admin unlock kỳ công toàn hệ thống.
-
-    Chỉ unlock được GLOBAL lock — dùng unlock_job_period() cho JOB lock.
-    """
+    """Unlock a previously locked global period requiring a non-empty reason string."""
     if not reason or not str(reason).strip():
         raise ValidationError(
             {
@@ -481,11 +444,7 @@ def unlock_job_period(
     reason,
     request=None,
 ):
-    """
-    Manager unlock kỳ công theo Job.
-
-    Chỉ unlock được JOB lock thuộc Job do Manager đó quản lý.
-    """
+    """Unlock a previously locked job-level period within manager scope requiring reason."""
     if not reason or not str(reason).strip():
         raise ValidationError(
             {

@@ -1,3 +1,8 @@
+"""
+Module: system.security.permissions_manager
+Description: Custom DRF permission classes enforcing role-based and permission-code-based authorization.
+"""
+
 from django.core.cache import cache
 from rest_framework.permissions import BasePermission
 
@@ -8,25 +13,17 @@ MANAGER_ROLE_CODE = "MANAGER"
 ADMIN_ROLE_CODE = "ADMIN"
 
 ROLE_PERMISSION_CACHE_KEY = "role_permissions:{role_id}"
-ROLE_PERMISSION_CACHE_TIMEOUT = 300  # 5 phút
+ROLE_PERMISSION_CACHE_TIMEOUT = 300
 
 
 def get_user_role_code(user):
-    """
-    Lấy role code an toàn.
-    Trả về None nếu user chưa có role.
-    """
+    """Retrieve the role code string for a given user instance safely."""
     role = getattr(user, "role", None)
     return getattr(role, "code", None)
 
 
 def get_permission_codes_for_role(role_id):
-    """
-    Lấy danh sách permission code của role.
-
-    Có cache để giảm số lần query role_permissions.
-    Khi Admin cập nhật permission cho role, phía Admin nên xóa cache key này.
-    """
+    """Retrieve and cache active permission codes assigned to a role ID."""
     cache_key = ROLE_PERMISSION_CACHE_KEY.format(role_id=role_id)
     cached_codes = cache.get(cache_key)
 
@@ -44,17 +41,12 @@ def get_permission_codes_for_role(role_id):
 
 
 class IsActiveAuthenticated(BasePermission):
-    """
-    Yêu cầu:
-    - User đã đăng nhập.
-    - Tài khoản còn active.
-    """
-
+    """Allow access exclusively to authenticated and active users."""
     message = "User is not authenticated or account is inactive."
 
     def has_permission(self, request, view):
+        """Check if request user is authenticated and active."""
         user = getattr(request, "user", None)
-
         return bool(
             user
             and user.is_authenticated
@@ -63,60 +55,38 @@ class IsActiveAuthenticated(BasePermission):
 
 
 class IsManagerRole(BasePermission):
-    """
-    Chỉ cho phép user có role MANAGER.
-    """
-
+    """Allow access exclusively to users with the Manager role."""
     message = "Only Manager role is allowed."
 
     def has_permission(self, request, view):
+        """Check if request user is authenticated and assigned the Manager role."""
         user = getattr(request, "user", None)
-
         if not user or not user.is_authenticated:
             return False
-
         return get_user_role_code(user) == MANAGER_ROLE_CODE
 
 
 class IsAdminRole(BasePermission):
-    """
-    Chỉ cho phép user có role ADMIN.
-
-    Dùng cho toàn bộ ViewSet trong accounts/admin/, projects/admin/,
-    system/admin/ — các endpoint này trả về dữ liệu KHÔNG scoped (toàn bộ
-    Client/Job/User/AuditLog trong hệ thống), khác với endpoint riêng của
-    Manager/Employee vốn tự scope theo user. Chỉ check permission code
-    (HasPermission) là không đủ vì một permission code như "client:view"
-    hay "report:export" có thể được seed cho cả MANAGER — nếu thiếu check
-    role ở đây, một tài khoản Manager có permission đó sẽ gọi thẳng được
-    endpoint admin/ và thấy dữ liệu toàn hệ thống, bỏ qua scoping riêng.
-    """
-
+    """Allow access exclusively to users with the Admin role."""
     message = "Only Admin role is allowed."
 
     def has_permission(self, request, view):
+        """Check if request user is authenticated and assigned the Admin role."""
         user = getattr(request, "user", None)
-
         if not user or not user.is_authenticated:
             return False
-
         return get_user_role_code(user) == ADMIN_ROLE_CODE
 
 
 class IsAdminOrManagerRole(BasePermission):
-    """
-    Dùng cho một số endpoint cho phép cả Admin và Manager.
-    Giai đoạn Manager chủ yếu dùng IsManagerRole.
-    """
-
+    """Allow access to users possessing either Admin or Manager roles."""
     message = "Only Admin or Manager role is allowed."
 
     def has_permission(self, request, view):
+        """Check if request user has either Admin or Manager role."""
         user = getattr(request, "user", None)
-
         if not user or not user.is_authenticated:
             return False
-
         return get_user_role_code(user) in {
             ADMIN_ROLE_CODE,
             MANAGER_ROLE_CODE,
@@ -124,22 +94,11 @@ class IsAdminOrManagerRole(BasePermission):
 
 
 class HasPermissionCode(BasePermission):
-    """
-    Kiểm tra action-level permission theo RolePermission.
-
-    View phải khai báo:
-        required_permission = "TASK_APPROVE"
-
-    Hoặc nếu một endpoint chấp nhận nhiều permission:
-        required_permission = ["TASK_APPROVE", "TASK_REJECT"]
-
-    Nếu view không khai báo required_permission thì deny.
-    Cách này tránh lỗi quên khai báo permission nhưng endpoint vẫn mở.
-    """
-
+    """Check action-level permission codes against assigned role permissions."""
     message = "User does not have required permission."
 
     def has_permission(self, request, view):
+        """Verify that user role contains required permission codes declared on view."""
         user = getattr(request, "user", None)
 
         if not user or not user.is_authenticated or not user.is_active:

@@ -1,5 +1,9 @@
-from django.urls import path
+"""
+Module: timesheets.employee.urls_employee
+Description: URL route definitions for employee work log creation, editing, voiding, and personal log retrieval.
+"""
 
+from django.urls import path
 from timesheets.employee.views_employee import (
     EmployeeLogWorkView,
     EmployeeVoidLogWorkView,
