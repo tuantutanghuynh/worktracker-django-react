@@ -1,8 +1,16 @@
+"""
+Module: tasks.employee.serializers_employee
+Description: Serializers for employee task lists, detail views, work logs, status updates, comments, and attachments.
+"""
+
 from rest_framework import serializers
 from tasks.models import Task, TaskAttachment, TaskComment
 from timesheets.models import LogWork
 
+
 class EmployeeTaskAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for task attachment records uploaded or viewed by employees."""
+
     uploaded_by_name = serializers.CharField(source='user.profile.full_name', read_only=True)
 
     class Meta:
@@ -12,6 +20,8 @@ class EmployeeTaskAttachmentSerializer(serializers.ModelSerializer):
 
 
 class EmployeeTaskCommentSerializer(serializers.ModelSerializer):
+    """Serializer for discussion comments on employee-assigned tasks."""
+
     author_name = serializers.CharField(source='user.profile.full_name', read_only=True)
     author_email = serializers.CharField(source='user.email', read_only=True)
 
@@ -22,7 +32,8 @@ class EmployeeTaskCommentSerializer(serializers.ModelSerializer):
 
 
 class EmployeeTaskListSerializer(serializers.ModelSerializer):
-    """Dùng cho Bảng Kanban & Danh sách My Tasks của Nhân viên"""
+    """Serializer for employee Kanban board cards and personal task lists."""
+
     job_code = serializers.CharField(source='job.job_code', read_only=True)
     job_name = serializers.CharField(source='job.job_name', read_only=True)
     job_status = serializers.CharField(source='job.status', read_only=True)
@@ -39,15 +50,19 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
             'manager_name', 'created_at', 'updated_at', 'completed_at'
         ]
 
-        
+
 class EmployeeTaskLogWorkSerializer(serializers.ModelSerializer):
+    """Serializer displaying associated work logs on employee task."""
+
     class Meta:
         model = LogWork
         fields = ['id', 'work_date', 'hours_spent', 'description', 'review_status', 'adjustment_reason']
         read_only_fields = fields
 
+
 class EmployeeTaskDetailSerializer(serializers.ModelSerializer):
-    """Dùng khi nhấp xem chi tiết 1 Task"""
+    """Detailed serializer for employee single-task modal view including attachments, comments, and work logs."""
+
     job_code = serializers.CharField(source='job.job_code', read_only=True)
     job_name = serializers.CharField(source='job.job_name', read_only=True)
     job_status = serializers.CharField(source='job.status', read_only=True)
@@ -70,18 +85,17 @@ class EmployeeTaskDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-
 class EmployeeTaskStatusUpdateSerializer(serializers.Serializer):
-    """Xử lý cập nhật trạng thái khi kéo thả thẻ trên Kanban hoặc thu hồi task"""
+    """Serializer validating status transition requests submitted by employee."""
+
     status = serializers.ChoiceField(choices=['TODO', 'IN_PROGRESS', 'REVIEWING'])
     order_index = serializers.CharField(required=False, allow_blank=True)
     reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_status(self, value):
+        """Disallow direct completion marking by employees without manager review."""
         if value == 'COMPLETED':
             raise serializers.ValidationError(
                 "Employees cannot directly mark tasks as COMPLETED. Please submit the task as REVIEWING for Manager QA inspection."
             )
         return value
-    
-

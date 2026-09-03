@@ -1,6 +1,6 @@
 """
-Service tính toán chuỗi sắp xếp Lexicographical (LexoRank) cho Bảng Kanban.
-Đảm bảo đồng bộ tuyệt đối 100% giữa Python, SQLite, PostgreSQL và JavaScript.
+Module: tasks.services.order_index_manager_service
+Description: Service computing lexicographical order ranks for Kanban board drag-and-drop operations.
 """
 
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -12,10 +12,12 @@ MIDDLE_CHAR = ALPHABET[BASE // 2]
 
 
 class OrderIndexError(ValueError):
+    """Exception indicating invalid characters or indices during lexicographical ordering calculations."""
     pass
 
 
 def _char_to_index(char):
+    """Return numeric integer index of character within base alphabet."""
     try:
         return ALPHABET.index(char.lower())
     except ValueError:
@@ -23,6 +25,7 @@ def _char_to_index(char):
 
 
 def _index_to_char(index):
+    """Return character corresponding to numeric alphabet index."""
     if index < 0 or index >= BASE:
         raise OrderIndexError(f"Invalid order_index index: {index}")
 
@@ -30,35 +33,21 @@ def _index_to_char(index):
 
 
 def initial_key():
-    """
-    Key mặc định cho task đầu tiên trong một cột Kanban.
-    """
+    """Return initial default middle key for first task in Kanban column."""
     return MIDDLE_CHAR
 
 
 def key_between(prev_key=None, next_key=None):
-    """
-    Sinh một chuỗi nằm giữa prev_key và next_key theo thứ tự từ điển.
-
-    Trường hợp xử lý an toàn (Fail-Safe):
-    - prev_key=None, next_key=None: task đầu tiên trong cột.
-    - prev_key có, next_key=None: thêm cuối cột.
-    - prev_key=None, next_key có: thêm đầu cột.
-    - cả hai có: thêm giữa hai task.
-    - NẾU DỮ LIỆU BỊ TRÙNG (prev_key == next_key): Tự động sinh key mới nằm sau prev_key.
-    - NẾU VỊ TRÍ BỊ ĐẢO (prev_key > next_key): Tự động đảo lại để tính khoảng giữa mượt mà.
-    """
+    """Generate lexicographical sort key string positioned between previous and next keys."""
     if prev_key is not None:
         prev_key = str(prev_key)
 
     if next_key is not None:
         next_key = str(next_key)
 
-    # 🛡️ XỬ LÝ AN TOÀN NẾU 2 KEY BẰNG NHAU (DUPLICATE DB KEYS)
     if prev_key and next_key and prev_key == next_key:
         return key_between(prev_key, None)
 
-    # 🛡️ XỬ LÝ AN TOÀN NẾU THỨ TỰ BỊ ĐẢO
     if prev_key and next_key and prev_key > next_key:
         prev_key, next_key = next_key, prev_key
 

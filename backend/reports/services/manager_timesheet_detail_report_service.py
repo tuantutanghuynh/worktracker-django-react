@@ -1,3 +1,8 @@
+"""
+Module: reports.services.manager_timesheet_detail_report_service
+Description: Service compiling detailed timesheet work logs, review summaries, and lock status checks for managers.
+"""
+
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -7,6 +12,7 @@ from system.security.scoping_manager import scoped_logworks
 
 
 def decimal_to_float(value):
+    """Convert Decimal values to float or return zero for None."""
     if value is None:
         return 0.0
 
@@ -17,6 +23,7 @@ def decimal_to_float(value):
 
 
 def user_display_name(user):
+    """Return user full name from profile or fallback to email."""
     if user is None:
         return None
 
@@ -29,6 +36,7 @@ def user_display_name(user):
 
 
 def apply_timesheet_detail_filters(queryset, filters):
+    """Apply query filters across dates, employees, departments, jobs, tasks, and review statuses."""
     work_date_from = filters.get("work_date_from")
     work_date_to = filters.get("work_date_to")
     employee_id = filters.get("employee_id")
@@ -74,12 +82,7 @@ def apply_timesheet_detail_filters(queryset, filters):
 
 
 def collect_period_keys(logworks):
-    """
-    Lấy bộ khóa:
-        (job_id, month, year)
-
-    Dùng để kiểm tra locked/unlocked cho từng LogWork.
-    """
+    """Extract distinct tuples of job ID, month, and year from work log entries."""
     keys = set()
 
     for logwork in logworks:
@@ -95,14 +98,7 @@ def collect_period_keys(logworks):
 
 
 def build_locked_period_map(period_keys):
-    """
-    Trả về map:
-        (job_id, month, year) -> True/False
-
-    Một kỳ bị xem là locked nếu:
-    - Có GLOBAL lock tháng/năm.
-    - Hoặc có JOB lock đúng job/tháng/năm.
-    """
+    """Map period keys to boolean indicators based on global and job-level time locks."""
     if not period_keys:
         return {}
 
@@ -160,6 +156,7 @@ def build_locked_period_map(period_keys):
 
 
 def apply_locked_period_filter(logworks, locked_period_status):
+    """Filter work log entries based on their period lock status."""
     if not locked_period_status:
         return logworks
 
@@ -187,6 +184,7 @@ def apply_locked_period_filter(logworks, locked_period_status):
 
 
 def build_review_status_summary(logworks):
+    """Count work logs grouped by approval review status."""
     summary = {
         status_value: 0
         for status_value, status_label in LogWork.ReviewStatus.choices
@@ -199,6 +197,7 @@ def build_review_status_summary(logworks):
 
 
 def build_employee_summary(logworks):
+    """Aggregate total logged hours and entry counts per employee."""
     data = {}
 
     for logwork in logworks:
@@ -233,6 +232,7 @@ def build_employee_summary(logworks):
 
 
 def build_job_summary(logworks):
+    """Aggregate total logged hours and entry counts per project job."""
     data = {}
 
     for logwork in logworks:
@@ -242,7 +242,7 @@ def build_job_summary(logworks):
         if job_id not in data:
             data[job_id] = {
                 "job_id": job_id,
-                "job_code": job.job_code,  # ➕ BỔ SUNG: job_code
+                "job_code": job.job_code,
                 "job_name": job.job_name,
                 "total_logs": 0,
                 "total_hours": Decimal("0.00"),
@@ -257,7 +257,7 @@ def build_job_summary(logworks):
         result.append(
             {
                 "job_id": row["job_id"],
-                "job_code": row["job_code"], # ➕ BỔ SUNG: job_code
+                "job_code": row["job_code"],
                 "job_name": row["job_name"],
                 "total_logs": row["total_logs"],
                 "total_hours": decimal_to_float(row["total_hours"]),
@@ -268,6 +268,7 @@ def build_job_summary(logworks):
 
 
 def serialize_logwork_row(logwork, locked_map):
+    """Serialize individual work log item with parent task, employee, and review details."""
     job = logwork.task.job
     period_key = (
         job.id,
@@ -310,7 +311,7 @@ def serialize_logwork_row(logwork, locked_map):
         },
         "job": {
             "id": job.id,
-            "job_code": job.job_code,    # ➕ BỔ SUNG: Mã Job (VD: ERP-2024-068)
+            "job_code": job.job_code,
             "job_name": job.job_name,
             "status": job.status,
             "deadline": job.deadline,
@@ -329,14 +330,7 @@ def serialize_logwork_row(logwork, locked_map):
 
 
 def build_timesheet_detail_report(*, user, filters):
-    """
-    Manager Timesheet Detail Report.
-
-    Scope bắt buộc:
-        logwork.task.job.manager_id = request.user.id
-
-    Report này chỉ đọc dữ liệu, không ghi dữ liệu nghiệp vụ.
-    """
+    """Generate detailed timesheet audit report dataset within manager scope."""
     base_queryset = (
         scoped_logworks(user)
         .select_related(

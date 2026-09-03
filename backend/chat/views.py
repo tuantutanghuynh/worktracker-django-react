@@ -1,4 +1,10 @@
+"""
+Module: chat.views
+Description: ViewSet managing chat rooms, message retrieval, message posting, direct chats, file attachments, and user directories.
+"""
+
 import os
+import html
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.storage import default_storage
@@ -23,10 +29,7 @@ from .serializers import (
 
 User = get_user_model()
 
-
-import html
-
-# Danh mục định dạng file an toàn và cấm độc hại
+# Allowable and prohibited file attachment extension sets
 ALLOWED_ATTACHMENT_EXTENSIONS = {
     "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip", "rar", "7z",
     "png", "jpg", "jpeg", "webp", "gif", "svg", "csv"
@@ -37,15 +40,10 @@ BLOCKED_ATTACHMENT_EXTENSIONS = {
 
 
 def sync_user_job_channels(user):
-    """
-    Tự động đồng bộ các Kênh Dự Án mà user có quyền tham gia:
-    - Nếu là Manager của Job -> Tự động vào Kênh Job đó.
-    - Nếu là Assignee của Task thuộc Job -> Tự động vào Kênh Job đó.
-    """
+    """Synchronize project job chat channels and participant memberships for the authenticated user."""
     if not user.is_authenticated:
         return
 
-    # Lấy tất cả Jobs mà user quản lý hoặc có task được giao
     managed_jobs = Job.objects.filter(manager=user)
     assigned_job_ids = Task.objects.filter(assignee=user).values_list("job_id", flat=True).distinct()
     assigned_jobs = Job.objects.filter(id__in=assigned_job_ids)
@@ -63,21 +61,7 @@ def sync_user_job_channels(user):
 
 
 def get_chat_allowed_user_ids(user):
-    """
-    Phạm vi nhân sự được phép nhắn tin 1-1 (Data Scoping):
-    - ADMIN: Thấy tất cả user active.
-    - MANAGER:
-        * Admin (hỗ trợ kỹ thuật / vận hành)
-        * Nhân viên do Manager này trực tiếp phụ trách (profile.manager_id = user.id)
-        * Nhân viên đang làm task trong các Job do Manager này quản lý
-        * Các Manager khác trong công ty (trao đổi ngang cấp)
-    - EMPLOYEE:
-        * Admin (hỗ trợ kỹ thuật / vận hành)
-        * Manager trực tiếp (profile.manager_id)
-        * Manager của các Job mà Employee này có task
-        * Đồng nghiệp cùng Manager trực tiếp
-        * Đồng nghiệp cùng tham gia các Job mà Employee này có task
-    """
+    """Determine set of user IDs permitted for 1-on-1 direct messaging based on role scoping."""
     if not user.is_authenticated:
         return set()
 
@@ -86,15 +70,12 @@ def get_chat_allowed_user_ids(user):
         return set(User.objects.exclude(id=user.id).filter(is_active=True).values_list("id", flat=True))
 
     if role_code == "MANAGER":
-        # 1. Nhân viên do Manager này trực tiếp phụ trách
         managed_emp_ids = set(
             EmployeeProfile.objects.filter(manager_id=user.id).values_list("user_id", flat=True)
         )
-        # 2. Nhân viên có task trong Job thuộc Manager này
         project_emp_ids = set(
             Task.objects.filter(job__manager_id=user.id).exclude(assignee__isnull=True).values_list("assignee_id", flat=True)
         )
-        # 3. Admin và các Manager khác
         leadership_ids = set(
             User.objects.filter(role__code__in=["ADMIN", "MANAGER"], is_active=True)
             .exclude(id=user.id)
@@ -103,28 +84,23 @@ def get_chat_allowed_user_ids(user):
         return (managed_emp_ids | project_emp_ids | leadership_ids) - {user.id}
 
     if role_code == "EMPLOYEE":
-        # 1. Admin
         admin_ids = set(
             User.objects.filter(role__code="ADMIN", is_active=True).values_list("id", flat=True)
         )
-        # 2. Manager trực tiếp
         direct_mgr_id = getattr(getattr(user, "profile", None), "manager_id", None)
         manager_ids = {direct_mgr_id} if direct_mgr_id else set()
 
-        # 3. Manager của các Job mà Employee này có task
         job_mgr_ids = set(
             Task.objects.filter(assignee=user).exclude(job__manager__isnull=True).values_list("job__manager_id", flat=True)
         )
         manager_ids |= job_mgr_ids
 
-        # 4. Đồng nghiệp cùng Manager trực tiếp
         teammate_ids = set()
         if direct_mgr_id:
             teammate_ids |= set(
                 EmployeeProfile.objects.filter(manager_id=direct_mgr_id).values_list("user_id", flat=True)
             )
 
-        # 5. Đồng nghiệp cùng tham gia các Job mà Employee này có task
         my_job_ids = Task.objects.filter(assignee=user).values_list("job_id", flat=True).distinct()
         teammate_ids |= set(
             Task.objects.filter(job_id__in=my_job_ids).exclude(assignee__isnull=True).values_list("assignee_id", flat=True)
@@ -136,15 +112,17 @@ def get_chat_allowed_user_ids(user):
 
 
 class ChatRoomViewSet(viewsets.ModelViewSet):
+    """ViewSet managing chat room retrieval, message threads, direct creation, and attachments."""
+
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ChatRoomListSerializer
 
     def get_queryset(self):
+        """Retrieve accessible chat rooms and sync job channels for authenticated user."""
         user = self.request.user
         sync_user_job_channels(user)
         user_role = (user.role.code if getattr(user, "role", None) else "").upper()
 
-        # Nếu là ADMIN: được xem toàn bộ các phòng Direct / Support gửi tới Ban Quản Trị
         if user_role == "ADMIN" or getattr(user, "is_superuser", False):
             return (
                 ChatRoom.objects.filter(
@@ -178,10 +156,10 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
+        """Return categorized chat rooms separated into job channels and direct messages."""
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         
-        # Phân loại thành 2 nhóm: job_channels và direct_messages
         job_channels = []
         direct_messages = []
 
@@ -199,16 +177,12 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def messages(self, request, pk=None):
-        """
-        Lấy danh sách tin nhắn của phòng chat và tự động đánh dấu đã đọc.
-        """
+        """Fetch latest message history for room and update last-read timestamp."""
         room = self.get_object()
         user = request.user
 
-        # Cập nhật last_read_at
         ChatParticipant.objects.filter(room=room, user=user).update(last_read_at=timezone.now())
 
-        # Lấy tối đa 100 tin nhắn gần nhất
         messages_qs = room.messages.select_related("sender", "sender__role").order_by("created_at")[:100]
         serializer = ChatMessageSerializer(messages_qs, many=True, context={"request": request})
 
@@ -222,17 +196,13 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def send_message(self, request, pk=None):
-        """
-        Gửi tin nhắn qua REST API (hỗ trợ cả text và file đính kèm) kèm 5 quy tắc Validate dữ liệu an toàn.
-        """
+        """Create new message via REST API and broadcast to room channel layer."""
         room = self.get_object()
         user = request.user
 
-        # 1. Validate trạng thái tài khoản người gửi
         if not user.is_active:
             return Response({"detail": "Your account is deactivated. Cannot send message."}, status=status.HTTP_403_FORBIDDEN)
 
-        # 2. Validate kênh dự án đã hoàn thành / đóng (Read-only)
         if room.room_type == ChatRoom.RoomType.JOB and room.job:
             if room.job.status in ["COMPLETED", "CANCELLED"]:
                 return Response(
@@ -240,7 +210,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # 3. Validate tài khoản người nhận trong Chat 1-1 (Nếu người nhận bị khóa)
         if room.room_type == ChatRoom.RoomType.DIRECT:
             other_p = room.participants.exclude(user=user).select_related("user").first()
             if other_p and other_p.user and not other_p.user.is_active:
@@ -250,7 +219,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                 )
 
         raw_content = request.data.get("content", "")
-        # 4. Validate độ dài tin nhắn (Tối đa 4,000 ký tự) và chống XSS
         if len(raw_content) > 4000:
             return Response(
                 {"detail": "Message content exceeds maximum allowed length of 4,000 characters."},
@@ -265,7 +233,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         if not content and not attachment_url:
             return Response({"detail": "Message content or attachment is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Lưu tin nhắn vào Database
         message = ChatMessage.objects.create(
             room=room,
             sender=user,
@@ -275,21 +242,15 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
             attachment_size=attachment_size,
         )
 
-        # Cập nhật updated_at của phòng và last_read_at của người gửi
         room.updated_at = timezone.now()
         room.save(update_fields=["updated_at"])
         ChatParticipant.objects.filter(room=room, user=user).update(last_read_at=timezone.now())
 
-        # Serialize tin nhắn để trả về và broadcast
-
-        # Serialize tin nhắn để trả về và broadcast
         msg_data = ChatMessageSerializer(message, context={"request": request}).data
 
-        # Phát sóng Realtime qua Redis Channel Layer
         channel_layer = get_channel_layer()
         if channel_layer:
             try:
-                # 1. Phát sóng tới phòng chat hiện tại
                 async_to_sync(channel_layer.group_send)(
                     f"chat_room_{room.id}",
                     {
@@ -298,7 +259,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                     },
                 )
 
-                # 2. Gửi tín hiệu đồng bộ Badge Sidebar nhẹ tới kênh cá nhân của từng thành viên
                 other_participants = room.participants.exclude(user=user)
                 for participant in other_participants:
                     async_to_sync(channel_layer.group_send)(
@@ -318,9 +278,7 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def start_direct(self, request):
-        """
-        Mở hoặc khởi tạo phòng chat 1-1 với một nhân viên cụ thể.
-        """
+        """Initialize or retrieve an existing 1-on-1 direct conversation with target user."""
         target_user_id = request.data.get("target_user_id")
         if not target_user_id:
             return Response({"detail": "target_user_id is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -334,7 +292,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         if current_user.id == target_user.id:
             return Response({"detail": "Cannot create direct chat with yourself."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Kiểm tra phân quyền phạm vi chat (Data Scoping)
         allowed_ids = get_chat_allowed_user_ids(current_user)
         if target_user.id not in allowed_ids:
             return Response(
@@ -342,7 +299,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Tìm phòng 1-1 đã tồn tại giữa 2 người
         existing_rooms = ChatRoom.objects.filter(
             room_type=ChatRoom.RoomType.DIRECT,
             participants__user=current_user,
@@ -351,7 +307,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         if existing_rooms.exists():
             room = existing_rooms.first()
         else:
-            # Tạo phòng mới
             room = ChatRoom.objects.create(
                 room_type=ChatRoom.RoomType.DIRECT,
                 name=f"DM: {current_user.email} & {target_user.email}",
@@ -364,18 +319,14 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def upload_attachment(self, request):
-        """
-        Tải file đính kèm lên Server nội bộ an toàn (Giới hạn 20MB & kiểm duyệt định dạng file).
-        """
+        """Upload and validate chat file attachment against size and security extensions."""
         file_obj = request.FILES.get("file")
         if not file_obj:
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Kiểm tra dung lượng tối đa 20MB
         if file_obj.size > 20 * 1024 * 1024:
             return Response({"detail": "File size exceeds 20MB limit."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Kiểm duyệt định dạng đuôi file
         filename = file_obj.name or ""
         ext = filename.split(".")[-1].lower() if "." in filename else ""
 
@@ -391,7 +342,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Lưu file vào media/chat_attachments/
         upload_dir = os.path.join("chat_attachments", str(request.user.id))
         saved_path = default_storage.save(os.path.join(upload_dir, file_obj.name), file_obj)
         file_url = settings.MEDIA_URL + saved_path
@@ -404,9 +354,7 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def directory(self, request):
-        """
-        Danh sách nhân sự được phép chat 1-1 theo phạm vi phân quyền (Scoping).
-        """
+        """List active personnel eligible for 1-on-1 messaging within user's scoping permissions."""
         allowed_ids = get_chat_allowed_user_ids(request.user)
         users = (
             User.objects.filter(id__in=allowed_ids, is_active=True)

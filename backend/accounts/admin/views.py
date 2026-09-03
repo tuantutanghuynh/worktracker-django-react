@@ -1,3 +1,8 @@
+"""
+Module: accounts.admin.views
+Description: Admin viewsets for user lifecycle management, role queries, and department administration.
+"""
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
@@ -37,13 +42,8 @@ from system.services.admin_report_export_service import (
 )
 
 
-# Sends an in-app notification to every OTHER admin when one admin performs
-# a sensitive IAM action (role change, lock/unlock, reset password) — so
-# admins stay aware of each other's changes without having to poll the
-# Audit Logs page. Deliberately scoped to the same actions already flagged
-# severity=WARNING/CRITICAL (see the log_audit_event calls below), not every
-# CRUD write, to avoid flooding the bell with routine edits.
 def notify_other_admins(actor, title, content=None, related_url=None):
+    """Send in-app notification to all other active administrators for sensitive IAM actions."""
     other_admins = CustomUser.objects.filter(role__code="ADMIN").exclude(id=actor.id)
     notify(
         recipients=other_admins,
@@ -54,18 +54,8 @@ def notify_other_admins(actor, title, content=None, related_url=None):
     )
 
 
-# ── CHỐT CHẶN KHOÁ MÌNH / KHOÁ ADMIN CUỐI CÙNG ────────────────────────────
-#
-# Không có hai hàm này thì hệ thống tự khoá được chính nó: Admin bấm Lock lên
-# tài khoản của mình, hoặc hạ role mình xuống EMPLOYEE, là không còn ai vào
-# được trang quản trị — phải sửa thẳng vào database mới cứu được. Đây là chốt
-# chặn tiêu chuẩn của Django admin, GitLab, Atlassian.
-#
-# Chặn ở tầng view chứ không phải serializer vì cả 4 đường đều phải qua đây:
-# lock(), unlock(), perform_destroy() (DELETE) và perform_update() (đổi role).
-
 def assert_not_self(actor, target, what):
-    """Cấm Admin thao tác lên chính tài khoản đang đăng nhập."""
+    """Prevent administrators from performing destructive or lock actions on their own account."""
     if actor.id == target.id:
         raise ValidationError(
             f"You cannot {what} your own account. "
@@ -74,12 +64,7 @@ def assert_not_self(actor, target, what):
 
 
 def assert_not_last_admin(target, what):
-    """
-    Cấm hạ role hoặc khoá Admin đang hoạt động cuối cùng.
-
-    Khác với assert_not_self ở chỗ nó chặn cả khi Admin KHÁC thao tác — hai
-    Admin khoá lẫn nhau vẫn dẫn tới không còn ai quản trị.
-    """
+    """Prevent locking or demoting the last remaining active administrator account."""
     target_is_admin = getattr(target.role, "code", None) == "ADMIN"
     if not target_is_admin or not target.is_active:
         return
@@ -96,14 +81,15 @@ def assert_not_last_admin(target, what):
 
 
 class UserViewSet(viewsets.ModelViewSet):
+    """ViewSet managing user account lifecycle, role assignment, and administrative locks."""
+
     serializer_class = UserSerializer
     pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['email', 'role__code', 'is_active', 'profile__department__name', 'profile__manager__email']
 
     def get_queryset(self):
-        # Explicit default order for stable pagination — CustomUser has no
-        # created_at field, so id is the simplest always-present tiebreaker.
+        """Retrieve paginated and filtered list of user accounts."""
         qs = CustomUser.objects.select_related(
             "role", "profile", "profile__department", "profile__manager"
         ).order_by("id")
@@ -114,9 +100,6 @@ class UserViewSet(viewsets.ModelViewSet):
             qs = qs.filter(role__code=role)
         if department := params.get("department"):
             qs = qs.filter(profile__department_id=department)
-        # ?manager=<id> lọc theo Manager phụ trách; ?manager=none lấy những
-        # nhân viên chưa được gán ai — đây là bộ lọc Admin cần để dọn nốt số
-        # còn sót sau backfill, nếu không họ sẽ vô hình với mọi Manager.
         if manager := params.get("manager"):
             if manager.lower() == "none":
                 qs = qs.filter(role__code="EMPLOYEE", profile__manager__isnull=True)
@@ -127,6 +110,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return qs
 
     def get_permissions(self):
+        """Return permission classes configured for specific user management actions."""
         if self.action == "create":
             return [IsAdminRole(), HasPermission("user:create")]
         if self.action in ("list", "retrieve"):
@@ -135,22 +119,19 @@ class UserViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission("user:reset_password")]
         if self.action == "export":
             return [IsAdminRole(), HasPermission("user:view")]
-        # destroy is grouped with lock/unlock, not update: perform_destroy
-        # below doesn't actually delete the row, it deactivates the account
-        # exactly like lock() does (see its docstring comment).
         if self.action in ("lock", "unlock", "destroy"):
             return [IsAdminRole(), HasPermission("user:lock")]
         return [IsAdminRole(), HasPermission("user:update")]
 
     def get_serializer_class(self):
+        """Return dedicated creation serializer for POST requests or default serializer."""
         if self.action == "create":
             return UserCreateSerializer
         return UserSerializer
 
-    # GET /api/auth/users/export/ — same ?email=/?role=/?department=/
-    # ?is_active=/?ordering= params as the list endpoint.
     @action(detail=False, methods=["get"], url_path="export")
     def export(self, request):
+        """Export filtered user list to an Excel spreadsheet."""
         queryset = self.filter_queryset(self.get_queryset())
         log_audit_event(
             actor=request.user,
@@ -167,17 +148,9 @@ class UserViewSet(viewsets.ModelViewSet):
             filename="worktracker_users.xlsx",
         )
 
-    # Gửi thư chào mừng ngay sau khi tạo tài khoản.
-    #
-    # Đặt SAU transaction.on_commit chứ không gọi thẳng: nếu vẫn còn trong
-    # transaction mà email gửi đi rồi transaction bị rollback, người dùng
-    # nhận được thư cho một tài khoản không tồn tại. on_commit đảm bảo chỉ
-    # gửi khi bản ghi đã thực sự nằm trong database.
-    #
-    # Mật khẩu tạm lấy từ validated_data TRƯỚC khi save(), vì
-    # UserCreateSerializer.create() pop nó ra khỏi dict.
     @transaction.atomic
     def perform_create(self, serializer):
+        """Persist new user account and dispatch welcome email on transaction commit."""
         raw_password = serializer.validated_data.get("password")
         instance = serializer.save()
 
@@ -185,18 +158,12 @@ class UserViewSet(viewsets.ModelViewSet):
             lambda: send_welcome_email(instance, temp_password=raw_password)
         )
 
-    # Forces any already-issued token to re-authenticate the moment the
-    # role actually changes — without this, a demoted admin's existing
-    # session keeps rendering the Admin UI (client-side `user.role` is only
-    # refreshed at login) even though every write action already 403s on
-    # the backend, since HasPermission re-checks role live from the DB.
     @transaction.atomic
     def perform_update(self, serializer):
+        """Update user record, enforce admin safeguards, and invalidate tokens on role change."""
         old_role_id = serializer.instance.role_id
         old_role_code = getattr(serializer.instance.role, "code", None)
 
-        # Chỉ chặn khi thao tác THỰC SỰ đổi role — sửa email của chính mình
-        # vẫn phải cho phép.
         new_role = serializer.validated_data.get("role")
         if new_role is not None and new_role.id != old_role_id:
             assert_not_self(self.request.user, serializer.instance, "change the role of")
@@ -208,14 +175,6 @@ class UserViewSet(viewsets.ModelViewSet):
         if instance.role_id != old_role_id:
             require_reauth(instance.id)
 
-            # Hạ một Manager xuống role khác thì tuyến báo cáo trỏ tới họ
-            # không còn hợp lệ. Gỡ toàn bộ nhân viên trực thuộc về "chưa gán"
-            # thay vì để họ trỏ tới một tài khoản không còn là Manager —
-            # trạng thái đó lặng lẽ hỏng: nhân viên vô hình với mọi Manager mà
-            # không có dấu hiệu gì báo cho Admin biết.
-            #
-            # Sau khi gỡ, họ nổi lên trong bộ lọc "Chưa gán Manager" ở trang
-            # User List để Admin gán lại.
             new_role_code = getattr(instance.role, "code", None)
             if old_role_code == "MANAGER" and new_role_code != "MANAGER":
                 orphaned = list(
@@ -262,12 +221,9 @@ class UserViewSet(viewsets.ModelViewSet):
                 related_url=f"/admin/users/search?edit={instance.id}",
             )
 
-    # DRF's standard DELETE verb — deliberately doesn't remove the row (same
-    # effect as lock(), just reachable through the generic REST endpoint
-    # instead of the dedicated /lock/ action). Logged as LOCK_ACCOUNT, not
-    # DELETE, so Audit Logs reflects what actually happened to the record.
     @transaction.atomic
     def perform_destroy(self, instance):
+        """Soft-deactivate account on destroy action and record audit log."""
         assert_not_self(self.request.user, instance, "delete")
         assert_not_last_admin(instance, "delete")
 
@@ -294,6 +250,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     @action(detail=True, methods=["patch"], url_path="lock")
     def lock(self, request, pk=None):
+        """Deactivate account and update cache status."""
         user = self.get_object()
         assert_not_self(request.user, user, "lock")
         assert_not_last_admin(user, "lock")
@@ -323,6 +280,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     @action(detail=True, methods=["patch"], url_path="unlock")
     def unlock(self, request, pk=None):
+        """Reactivate account and refresh cache status."""
         user = self.get_object()
         user.is_active = True
         user.save()
@@ -347,6 +305,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     @action(detail=True, methods=["patch"], url_path="reset-password")
     def reset_password(self, request, pk=None):
+        """Directly set new user password by admin with mandatory change flag."""
         user = self.get_object()
         new_password = request.data.get("new_password")
         if not new_password:
@@ -383,19 +342,9 @@ class UserViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     @action(detail=True, methods=["patch"], url_path="assign-department")
     def assign_department(self, request, pk=None):
+        """Assign employee to a specific department and record audit update."""
         user = self.get_object()
         department_id = request.data.get("department")
-
-        # old_dept_id = user.profile.department_id if hasattr(user, 'profile') else None
-        # profile, _ = EmployeeProfile.objects.get_or_create(user=user)
-        # profile.department_id = department_id
-        # profile.save()
-
-        # Code mới đã sửa : 
-        # hasattr(user, 'profile') không bắt được lỗi DoesNotExist trong Django
-        # chỉ bắt được lỗi AttributeErrort nên khi ném lỗi DoesNotExist sẽ lỗi HTTP 500 Internal Server Error.
-        # full_name trong models not null nên khi tạo profile mới mà không có full_name 
-        # sẽ ném lỗi IntegrityError => HTTP 500 Internal Server Error.
 
         try:
             old_dept_id = user.profile.department_id
@@ -418,20 +367,16 @@ class UserViewSet(viewsets.ModelViewSet):
         )
         return Response({"detail": "Department assigned."}, status=status.HTTP_200_OK)
 
-    # Gán Manager phụ trách cho một Employee. Đây là tuyến báo cáo cố định:
-    # Manager chỉ nhìn thấy và chỉ giao việc được cho nhân viên của mình, nên
-    # thao tác này quyết định phạm vi quản lý — vì vậy ghi audit ở mức WARNING
-    # chứ không phải INFO như đổi phòng ban.
     @transaction.atomic
     @action(detail=True, methods=["patch"], url_path="assign-manager")
     def assign_manager(self, request, pk=None):
+        """Assign employee reporting manager and record audit log."""
         user = self.get_object()
         manager_id = request.data.get("manager")
 
         if user.role and user.role.code != "EMPLOYEE":
             raise ValidationError("Only EMPLOYEE accounts can have an assigned Manager.")
 
-        # manager_id = None nghĩa là gỡ Manager (đưa về "Chưa gán"), hợp lệ.
         if manager_id is not None:
             manager = CustomUser.objects.filter(id=manager_id).select_related("role").first()
             if manager is None:
@@ -441,8 +386,6 @@ class UserViewSet(viewsets.ModelViewSet):
             if not manager.role or manager.role.code != "MANAGER":
                 raise ValidationError("The assigned user must have the MANAGER role.")
 
-        # Cùng cái bẫy đã xử lý ở assign_department: hasattr() không bắt được
-        # DoesNotExist, và full_name là NOT NULL nên phải có defaults.
         try:
             old_manager_id = user.profile.manager_id
         except EmployeeProfile.DoesNotExist:
@@ -467,21 +410,26 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class RoleViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only viewset listing available system roles for admin interfaces."""
+
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
 
     def get_permissions(self):
+        """Return required permissions for role queries."""
         return [IsAdminRole(), HasPermission("user:view")]
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
+    """ViewSet managing organizational departments and employee group assignments."""
+
     serializer_class = DepartmentSerializer
     pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['name', 'description', 'manager__email']
 
     def get_queryset(self):
-        # See UserViewSet.get_queryset() — explicit order needed for stable pagination.
+        """Retrieve ordered and search-filtered department list."""
         qs = Department.objects.select_related("manager").order_by("-created_at")
         if search := self.request.query_params.get("search"):
             qs = qs.filter(
@@ -490,6 +438,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         return qs
 
     def get_permissions(self):
+        """Configure permissions per department action."""
         if self.action == "create":
             return [IsAdminRole(), HasPermission("department:create")]
         if self.action in ("list", "retrieve"):
@@ -500,9 +449,9 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission("department:view")]
         return [IsAdminRole(), HasPermission("department:update")]
 
-    # GET /api/auth/departments/export/ — same ?search=/?ordering= as list.
     @action(detail=False, methods=["get"], url_path="export")
     def export(self, request):
+        """Export department list to an Excel spreadsheet."""
         queryset = self.filter_queryset(self.get_queryset())
         log_audit_event(
             actor=request.user,
@@ -521,6 +470,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        """Save new department record and write audit log."""
         instance = serializer.save()
         log_audit_event(
             actor=self.request.user,
@@ -533,6 +483,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        """Update department record and record old versus new values in audit log."""
         old_values = DepartmentSerializer(self.get_object()).data
         instance = serializer.save()
         log_audit_event(
@@ -547,13 +498,10 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_destroy(self, instance):
+        """Delete department if no employees are assigned, logging the audit event."""
         old_values = DepartmentSerializer(instance).data
         record_id = instance.id
 
-        # EmployeeProfile.department is on_delete=RESTRICT (accounts/models.py)
-        # — deleting a department that still has employees assigned raises
-        # this instead of silently cascading, so surface it as a proper 400
-        # instead of letting it bubble up as an unhandled 500.
         try:
             instance.delete()
         except RestrictedError:

@@ -1,3 +1,8 @@
+"""
+Module: reports.services.manager_report_export_service
+Description: Service generating styled Excel spreadsheets and PDF exports for manager reports.
+"""
+
 from io import BytesIO
 from datetime import datetime
 from django.template.loader import render_to_string
@@ -21,12 +26,14 @@ from system.services.audit_manager_service import log_action
 
 
 class ReportExportError(APIException):
+    """Exception indicating failure during report generation or export processing."""
     status_code = 400
     default_detail = "Report export failed."
     default_code = "report_export_error"
 
 
 def safe_value(value):
+    """Safely format strings and datetime objects for tabular cell insertion."""
     if value is None:
         return ""
     if hasattr(value, "strftime"):
@@ -37,12 +44,14 @@ def safe_value(value):
 
 
 def build_filename(report_type, file_format):
+    """Generate timestamped filename for exported report document."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     extension = file_format.lower()
     return f"WorkTracker_{report_type.upper()}_{timestamp}.{extension}"
 
 
 def get_report_data(*, user, filters):
+    """Dispatch report data calculation based on requested report type."""
     report_type = filters.get("report_type")
 
     if report_type == "TASK_SUMMARY":
@@ -60,21 +69,17 @@ def get_report_data(*, user, filters):
     raise ReportExportError("UNSUPPORTED_REPORT_TYPE")
 
 
-# ============================================================
-# EXCEL STYLING PALETTES & HELPERS
-# ============================================================
+# Excel styling fills and typography presets
 NAVY_HEADER_FILL = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
 SUB_HEADER_FILL = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
 ZEBRA_FILL = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
 WHITE_FILL = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
 
-# KPI Card Fills
 KPI_BLUE_FILL = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
 KPI_GREEN_FILL = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
 KPI_AMBER_FILL = PatternFill(start_color="FFFBEB", end_color="FFFBEB", fill_type="solid")
 KPI_ROSE_FILL = PatternFill(start_color="FFF1F2", end_color="FFF1F2", fill_type="solid")
 
-# Status Fills
 STATUS_GREEN_FILL = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
 STATUS_BLUE_FILL = PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid")
 STATUS_PURPLE_FILL = PatternFill(start_color="F3E8FF", end_color="F3E8FF", fill_type="solid")
@@ -109,6 +114,7 @@ ALIGN_RIGHT = Alignment(horizontal="right", vertical="center")
 
 
 def style_table_header(row_cells):
+    """Apply navy header formatting and border styling to a row of cells."""
     for cell in row_cells:
         cell.fill = NAVY_HEADER_FILL
         cell.font = HEADER_FONT
@@ -117,6 +123,7 @@ def style_table_header(row_cells):
 
 
 def apply_zebra_and_borders(sheet, start_row, max_row, max_col):
+    """Apply alternating row striping and light borders across worksheet range."""
     for r in range(start_row, max_row + 1):
         is_even = (r % 2 == 0)
         row_fill = ZEBRA_FILL if is_even else WHITE_FILL
@@ -128,6 +135,7 @@ def apply_zebra_and_borders(sheet, start_row, max_row, max_col):
 
 
 def autosize_worksheet_columns(workbook):
+    """Adjust worksheet column widths based on maximum string content lengths."""
     for sheet in workbook.worksheets:
         for col in sheet.columns:
             max_length = 0
@@ -142,20 +150,15 @@ def autosize_worksheet_columns(workbook):
                             max_length = len(line)
 
             adjusted_width = max(max_length + 3, 11)
-            # Giới hạn tối đa 45 để bảng không bị quá bè
             sheet.column_dimensions[col_letter].width = min(adjusted_width, 45)
 
 
-# ============================================================
-# 1. TASK SUMMARY EXCEL BUILDER
-# ============================================================
 def write_task_summary_sheet(workbook, report_data):
-    # --- TAB 1: SUMMARY & ANALYTICS DASHBOARD ---
+    """Construct executive dashboard and detailed task register sheets in workbook."""
     sum_sheet = workbook.active
     sum_sheet.title = "Executive Summary"
     sum_sheet.views.sheetView[0].showGridLines = True
 
-    # 1. Top Corporate Banner
     sum_sheet.merge_cells("A1:H2")
     banner_cell = sum_sheet["A1"]
     banner_cell.value = "WORKTRACKER PRO  •  EXECUTIVE TASK DELIVERY REPORT"
@@ -170,7 +173,6 @@ def write_task_summary_sheet(workbook, report_data):
     sub_banner.font = SUBTITLE_FONT
     sub_banner.alignment = ALIGN_CENTER
 
-    # 2. KPI Cards (Row 5 - 6)
     kpis = [
         ("TOTAL TASKS", report_data["summary"]["total_tasks"], KPI_BLUE_FILL, "1D4ED8", "A", "B"),
         ("COMPLETED TASKS", report_data["summary"]["status_summary"].get("COMPLETED", 0), KPI_GREEN_FILL, "047857", "C", "D"),
@@ -196,12 +198,10 @@ def write_task_summary_sheet(workbook, report_data):
         c_val.alignment = ALIGN_CENTER
         c_val.border = THIN_BORDER
 
-        # Border for merged pair
         for row in range(5, 7):
             for col_idx in [get_column_letter(sum_sheet[f"{col_end}5"].column)]:
                 sum_sheet[f"{col_idx}{row}"].border = THIN_BORDER
 
-    # 3. Status Breakdown Table (Row 8 - 14)
     sum_sheet["A8"] = "Task Status Breakdown"
     sum_sheet.merge_cells("A8:C8")
     sum_sheet["A8"].fill = SUB_HEADER_FILL
@@ -234,7 +234,6 @@ def write_task_summary_sheet(workbook, report_data):
 
     apply_zebra_and_borders(sum_sheet, 10, curr_row - 1, 3)
 
-    # 4. Native Excel Chart (Bar Chart)
     chart = BarChart()
     chart.type = "col"
     chart.style = 10
@@ -252,7 +251,6 @@ def write_task_summary_sheet(workbook, report_data):
 
     sum_sheet.add_chart(chart, "E8")
 
-    # --- TAB 2: DETAILED TASK REGISTER ---
     data_sheet = workbook.create_sheet("Task Details")
     data_sheet.views.sheetView[0].showGridLines = True
 
@@ -294,12 +292,10 @@ def write_task_summary_sheet(workbook, report_data):
             ]
         )
 
-        # Style individual cells
         data_sheet.cell(row=row_idx, column=1).font = CODE_FONT
         data_sheet.cell(row=row_idx, column=1).alignment = ALIGN_CENTER
         data_sheet.cell(row=row_idx, column=2).font = BOLD_FONT
 
-        # Status badge colors
         st_cell = data_sheet.cell(row=row_idx, column=7)
         st_cell.alignment = ALIGN_CENTER
         if st == "COMPLETED":
@@ -320,16 +316,12 @@ def write_task_summary_sheet(workbook, report_data):
     data_sheet.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{row_idx - 1}"
 
 
-# ============================================================
-# 2. TIMESHEET DETAIL EXCEL BUILDER
-# ============================================================
 def write_timesheet_detail_sheet(workbook, report_data):
-    # --- TAB 1: EXECUTIVE SUMMARY & CHARTS ---
+    """Construct executive summary and detailed timesheet audit register sheets in workbook."""
     sum_sheet = workbook.active
     sum_sheet.title = "Executive Summary"
     sum_sheet.views.sheetView[0].showGridLines = True
 
-    # 1. Top Corporate Banner
     sum_sheet.merge_cells("A1:H2")
     banner_cell = sum_sheet["A1"]
     banner_cell.value = "WORKTRACKER PRO  •  TIMESHEET & EFFORT AUDIT REPORT"
@@ -344,7 +336,6 @@ def write_timesheet_detail_sheet(workbook, report_data):
     sub_banner.font = SUBTITLE_FONT
     sub_banner.alignment = ALIGN_CENTER
 
-    # 2. KPI Cards (Row 5 - 6)
     kpis = [
         ("TOTAL LOGS", report_data["summary"]["total_logs"], KPI_BLUE_FILL, "1D4ED8", "A", "B"),
         ("TOTAL HOURS", f"{report_data['summary']['total_hours']} hrs", KPI_GREEN_FILL, "047857", "C", "D"),
@@ -374,7 +365,6 @@ def write_timesheet_detail_sheet(workbook, report_data):
             for col_idx in [get_column_letter(sum_sheet[f"{col_end}5"].column)]:
                 sum_sheet[f"{col_idx}{row}"].border = THIN_BORDER
 
-    # 3. Effort Distribution by Project (Row 8 - 15)
     sum_sheet["A8"] = "Effort by Project"
     sum_sheet.merge_cells("A8:C8")
     sum_sheet["A8"].fill = SUB_HEADER_FILL
@@ -404,7 +394,6 @@ def write_timesheet_detail_sheet(workbook, report_data):
     if curr_row > 10:
         apply_zebra_and_borders(sum_sheet, 10, curr_row - 1, 3)
 
-        # Embedded Pie Chart for Project Effort
         pie = PieChart()
         pie.title = "Hours by Project"
         labels = Reference(sum_sheet, min_col=1, min_row=10, max_row=curr_row - 1)
@@ -416,7 +405,6 @@ def write_timesheet_detail_sheet(workbook, report_data):
         pie.width = 14
         sum_sheet.add_chart(pie, "E8")
 
-    # --- TAB 2: DETAILED TIMESHEET REGISTER ---
     data_sheet = workbook.create_sheet("Timesheet Details")
     data_sheet.views.sheetView[0].showGridLines = True
 
@@ -477,18 +465,15 @@ def write_timesheet_detail_sheet(workbook, report_data):
             ]
         )
 
-        # Style cells
         data_sheet.cell(row=row_idx, column=1).font = CODE_FONT
         data_sheet.cell(row=row_idx, column=1).alignment = ALIGN_CENTER
         data_sheet.cell(row=row_idx, column=2).alignment = ALIGN_CENTER
 
-        # Hours format
         h_cell = data_sheet.cell(row=row_idx, column=9)
         h_cell.font = BOLD_FONT
         h_cell.alignment = ALIGN_RIGHT
         h_cell.number_format = "#,##0.0"
 
-        # Review status styling
         rv_cell = data_sheet.cell(row=row_idx, column=11)
         rv_cell.alignment = ALIGN_CENTER
         if rv_status == "APPROVED":
@@ -505,10 +490,8 @@ def write_timesheet_detail_sheet(workbook, report_data):
     data_sheet.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{row_idx - 1}"
 
 
-# ============================================================
-# EXPORT DISPATCHER
-# ============================================================
 def export_xlsx(*, report_type, report_data):
+    """Generate Excel workbook byte string for requested report dataset."""
     workbook = Workbook()
 
     if report_type == "TASK_SUMMARY":
@@ -526,6 +509,7 @@ def export_xlsx(*, report_type, report_data):
 
 
 def export_pdf(*, report_type, report_data):
+    """Render HTML template and compile into PDF byte string."""
     if report_type == "TASK_SUMMARY":
         template_path = "reports/task_summary_pdf.html"
     elif report_type in ["TIMESHEET_DETAIL", "TIMESHEET_EFFORT"]:
@@ -549,6 +533,7 @@ def export_pdf(*, report_type, report_data):
 
 
 def export_manager_report(*, user, filters, request=None):
+    """Process report export dispatch, generate binary content, and log audit event."""
     report_type = filters.get("report_type")
     file_format = filters.get("file_format")
 

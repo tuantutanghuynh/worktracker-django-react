@@ -1,12 +1,15 @@
+"""
+Module: accounts.models
+Description: Defines core data models for IAM, RBAC, users, departments, and employee profiles.
+"""
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
 
-# ============================================================
-# BẢNG 1: role
-# Danh mục vai trò: ADMIN, MANAGER, EMPLOYEE
-# ============================================================
 class Role(models.Model):
+    """Represents a system role such as ADMIN, MANAGER, or EMPLOYEE."""
+
     code = models.CharField(
         max_length=50,
         unique=True,
@@ -24,14 +27,13 @@ class Role(models.Model):
         db_table = "roles"
 
     def __str__(self):
+        """Returns the role display name."""
         return self.name
 
 
-# ============================================================
-# BẢNG 2: permissions
-# Danh mục quyền hành động trong hệ thống
-# ============================================================
 class Permission(models.Model):
+    """Represents an actionable system permission code."""
+
     code = models.CharField(
         max_length=100,
         unique=True,
@@ -43,14 +45,13 @@ class Permission(models.Model):
         db_table = "permissions"
 
     def __str__(self):
+        """Returns the permission code."""
         return self.code
 
 
-# ============================================================
-# BẢNG 3: role_permissions
-# Bảng trung gian giữa Role và Permission
-# ============================================================
 class RolePermission(models.Model):
+    """Intermediary mapping table linking roles to their granted permissions."""
+
     role = models.ForeignKey(
         Role,
         on_delete=models.CASCADE,
@@ -72,15 +73,15 @@ class RolePermission(models.Model):
         ]
 
     def __str__(self):
+        """Returns a string representation of role-permission pair."""
         return f"{self.role.code} - {self.permission.code}"
 
 
-# ============================================================
-# Custom User Manager
-# Cần có vì hệ thống dùng email để đăng nhập thay vì username
-# ============================================================
 class CustomUserManager(BaseUserManager):
+    """Custom manager supporting email-based authentication instead of usernames."""
+
     def create_user(self, email, password=None, **extra_fields):
+        """Create and return a standard user with a normalized email address."""
         if not email:
             raise ValueError("Email is required.")
 
@@ -96,6 +97,7 @@ class CustomUserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
+        """Create and return a superuser with admin staff privileges and an assigned role."""
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
@@ -106,9 +108,7 @@ class CustomUserManager(BaseUserManager):
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True.")
 
-        # Theo tài liệu, user phải có role.
-        # Nếu tạo superuser bằng lệnh createsuperuser, hệ thống sẽ hỏi role.
-        # Nếu tạo bằng code mà không truyền role, báo lỗi rõ ràng.
+        # Require a valid role assignment when creating superuser
         if extra_fields.get("role") is None and extra_fields.get("role_id") is None:
             raise ValueError(
                 "Superuser must have a role. Create ADMIN role first and pass role or role_id."
@@ -117,13 +117,9 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-# ============================================================
-# BẢNG 4: users
-# Tài khoản người dùng
-# Chỉ lưu thông tin authentication và authorization cốt lõi
-# Profile cá nhân lưu ở employee_profiles
-# ============================================================
 class CustomUser(AbstractUser):
+    """Custom user model using email as the unique identifier for authentication."""
+
     username = None
     first_name = None
     last_name = None
@@ -137,35 +133,35 @@ class CustomUser(AbstractUser):
         Role, on_delete=models.RESTRICT, related_name="users", null=True
     )
 
-    # AbstractUser đã có is_active, nhưng khai báo lại để thêm db_index
+    # Re-declare is_active to add database indexing
     is_active = models.BooleanField(
         default=True,
         db_index=True,
     )
 
+    # Flag forcing password reset upon first login or admin credential reset
     must_change_password = models.BooleanField(
         default=True
-    )  # Cờ buộc đổi mật khẩu lần đầu đăng nhập hoặc sau khi reset
+    )
     
     objects = CustomUserManager()
 
     USERNAME_FIELD = "email"
 
-    # Vì role là ForeignKey bắt buộc, createsuperuser sẽ yêu cầu nhập role id.
+    # Require role input when provisioning superusers via management command
     REQUIRED_FIELDS = ["role"]
 
     class Meta:
         db_table = "users"
 
     def __str__(self):
+        """Returns the user email."""
         return self.email
 
 
-# ============================================================
-# BẢNG 5: password_resets
-# Token quên mật khẩu
-# ============================================================
 class PasswordReset(models.Model):
+    """Stores one-time verification tokens for self-service password resets."""
+
     email = models.EmailField(
         max_length=155,
         db_index=True,
@@ -183,19 +179,14 @@ class PasswordReset(models.Model):
         db_table = "password_resets"
 
     def __str__(self):
+        """Returns the reset token associated email."""
         return self.email
 
 
-# ============================================================
-# BẢNG 6: departments
-# Phòng ban / đội nhóm
-#
-# Lưu ý quan trọng:
-# departments.manager_id chỉ là thông tin tổ chức / directory.
-# Không dùng field này để tính Manager access scope.
-# Manager scope phải dựa vào jobs.manager_id.
-# ============================================================
 class Department(models.Model):
+    """Represents an organizational department or team unit."""
+
+    # Organizational directory manager reference (not used for job scope calculations)
     manager = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
@@ -217,15 +208,13 @@ class Department(models.Model):
         db_table = "departments"
 
     def __str__(self):
+        """Returns the department name."""
         return self.name
 
 
-# ============================================================
-# BẢNG 7: employee_profiles
-# Hồ sơ cá nhân của user
-# Tách khỏi users để users chỉ giữ authentication data
-# ============================================================
 class EmployeeProfile(models.Model):
+    """Stores extended personal and operational profile details for an account."""
+
     user = models.OneToOneField(
         CustomUser,
         on_delete=models.CASCADE,
@@ -245,16 +234,7 @@ class EmployeeProfile(models.Model):
         blank=True,
         related_name="employees",
     )
-    # Tuyến báo cáo cố định: Employee này thuộc quyền Manager nào.
-    #
-    # Tách riêng khỏi `department` một cách có chủ đích. Department là đơn vị
-    # HÀNH CHÍNH (chấm công, lương thưởng); manager là tuyến QUẢN LÝ công
-    # việc. Gộp hai thứ vào một field thì mỗi lần đổi Manager cho một người
-    # lại buộc phải chuyển phòng ban của họ, kéo theo sai lệch chấm công.
-    #
-    # SET_NULL chứ không RESTRICT: khoá tài khoản một Manager là việc bình
-    # thường, không được để nó chặn đứng thao tác của Admin. Nhân viên rơi
-    # về NULL sẽ hiện trong bộ lọc "Chưa gán" để Admin gán lại.
+    # Direct supervisory manager assignment (separated from administrative department)
     manager = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
@@ -275,4 +255,5 @@ class EmployeeProfile(models.Model):
         db_table = "employee_profiles"
 
     def __str__(self):
+        """Returns the full name of the employee."""
         return self.full_name

@@ -144,20 +144,16 @@ export default function TaskOverviewTab({
       />
 
       <div>
-        <label className="block font-semibold text-slate-700 mb-1">Assign to Employee</label>
-        <select
+        <SelectDropdown
+          label="Assign to Employee"
           value={editFormData.assignee_id}
-          onChange={(e) => setEditFormData({ ...editFormData, assignee_id: e.target.value })}
-          required
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">-- Select an employee * --</option>
-          {employeeOptions.map((emp) => (
-            <option key={emp.value} value={emp.value}>
-              {emp.label}
-            </option>
-          ))}
-        </select>
+          onChange={(val) => setEditFormData({ ...editFormData, assignee_id: val })}
+          options={employeeOptions}
+          placeholder="-- Search and select an employee * --"
+          searchable={true}
+          required={true}
+          theme="light"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -1,3 +1,8 @@
+"""
+Module: accounts.manager.urls_manager
+Description: URL routing configuration for manager-scoped department lookups and employee workloads.
+"""
+
 from django.urls import path
 
 from accounts.manager.views_manager import (
@@ -6,13 +11,11 @@ from accounts.manager.views_manager import (
 )
 
 urlpatterns = [
-    # GET /api/manager/accounts/departments/
     path(
         "accounts/departments/",
         ManagerDepartmentListView.as_view(),
         name="manager-department-list",
     ),
-    # GET /api/manager/accounts/employees/
     path(
         "accounts/employees/",
         ManagerTeamEmployeeListView.as_view(),

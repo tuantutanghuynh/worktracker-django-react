@@ -1,3 +1,8 @@
+"""
+Module: projects.admin.views
+Description: Administrative viewsets for client partner management and master project job lifecycles.
+"""
+
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
@@ -21,23 +26,21 @@ from system.services.admin_report_export_service import (
 
 
 class ClientViewSet(viewsets.ModelViewSet):
+    """ViewSet managing client organizations, soft-deletion, and report exports."""
+
     serializer_class = ClientSerializer
     pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['client_name', 'tax_code', 'contact_email', 'is_active', 'created_at']
 
     def get_queryset(self):
-        # Explicit default order — required for pagination to be stable
-        # across pages (Postgres doesn't guarantee row order without one),
-        # overridden by OrderingFilter whenever ?ordering= is passed.
+        """Retrieve filtered and ordered client records."""
         qs = Client.objects.order_by('-created_at')
-        params=self.request.query_params
+        params = self.request.query_params
         if name := params.get('name'):
             qs = qs.filter(client_name__icontains=name)
         if (is_active := params.get('is_active')) not in (None, ''):
             qs = qs.filter(is_active=is_active.lower() == 'true')
-        # Single quick-search box on the frontend — ORs across the 3 fields
-        # shown in the Clients table, unlike ?name= which only matches one.
         if search := params.get('search'):
             qs = qs.filter(
                 Q(client_name__icontains=search) |
@@ -47,6 +50,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         return qs
 
     def get_permissions(self):
+        """Return permission classes configured for client actions."""
         if self.action == 'create':
             return [IsAdminRole(), HasPermission('client:create')]
         if self.action == 'destroy':
@@ -57,10 +61,9 @@ class ClientViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission('client:view')]
         return [IsAdminRole(), HasPermission('client:update')]
 
-    # GET /api/admin/clients/export/ — same ?name=/?is_active=/?search=/?ordering=
-    # params as the list endpoint, so the file matches what's on screen.
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
+        """Export filtered client list to an Excel spreadsheet."""
         queryset = self.filter_queryset(self.get_queryset())
         log_audit_event(
             actor=request.user,
@@ -79,6 +82,7 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        """Save new client record and record audit log."""
         instance = serializer.save()
         log_audit_event(
             actor=self.request.user,
@@ -91,6 +95,7 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        """Update client record and log audit comparison."""
         old_values = ClientSerializer(self.get_object()).data
         instance = serializer.save()
         log_audit_event(
@@ -105,11 +110,11 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_destroy(self, instance):
+        """Soft-deactivate client and automatically place active associated jobs on hold."""
         old_values = ClientSerializer(instance).data
         instance.is_active = False
         instance.save()
 
-        # Tu dong chuyen cac Job dang chay cua Client nay sang ON_HOLD
         active_jobs = Job.objects.filter(client=instance, status__in=[Job.Status.PLANNING, Job.Status.ACTIVE])
         for job in active_jobs:
             old_job_data = JobSerializer(job).data
@@ -137,6 +142,7 @@ class ClientViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     @action(detail=True, methods=['patch'], url_path='restore')
     def restore(self, request, pk=None):
+        """Restore soft-deactivated client to active status."""
         client = self.get_object()
         if client.is_active:
             from rest_framework.exceptions import ValidationError
@@ -157,19 +163,19 @@ class ClientViewSet(viewsets.ModelViewSet):
 
 
 class JobViewSet(viewsets.ModelViewSet):
+    """ViewSet managing master project jobs, manager assignments, and lock acquisition."""
+
     queryset = Job.objects.all()
     serializer_class = JobSerializer
     pagination_class = AdminPageNumberPagination
     filter_backends = [filters.OrderingFilter]
-    # __ lookups let OrderingFilter sort by a related row's field (e.g. the
-    # client's name) even though Job only stores client_id/manager_id.
     ordering_fields = [
         'job_name', 'client__client_name', 'manager__email',
         'status', 'priority', 'deadline', 'start_date',
     ]
 
     def get_queryset(self):
-        # See ClientViewSet.get_queryset() — same reason for an explicit default order.
+        """Retrieve filtered job list with client and manager relations."""
         qs = Job.objects.select_related('client', 'manager').order_by('-created_at')
         if search := self.request.query_params.get('search'):
             qs = qs.filter(
@@ -180,6 +186,7 @@ class JobViewSet(viewsets.ModelViewSet):
         return qs
 
     def get_permissions(self):
+        """Return permission classes configured for job actions."""
         if self.action == 'create':
             return [IsAdminRole(), HasPermission('job:create')]
         if self.action == 'destroy':
@@ -190,9 +197,9 @@ class JobViewSet(viewsets.ModelViewSet):
             return [IsAdminRole(), HasPermission('job:view')]
         return [IsAdminRole(), HasPermission('job:update')]
 
-    # GET /api/admin/jobs/export/ — same ?search=/?ordering= params as list.
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
+        """Export filtered job list to an Excel spreadsheet."""
         queryset = self.filter_queryset(self.get_queryset())
         log_audit_event(
             actor=request.user,
@@ -211,6 +218,7 @@ class JobViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        """Create new job instance and record audit log."""
         instance = serializer.save()
         log_audit_event(
             actor=self.request.user,
@@ -223,6 +231,7 @@ class JobViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        """Update job instance and record audit log."""
         old_values = JobSerializer(self.get_object()).data
         instance = serializer.save()
         log_audit_event(
@@ -237,6 +246,7 @@ class JobViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_destroy(self, instance):
+        """Transition job status to CANCELLED upon deletion and log audit event."""
         old_values = JobSerializer(instance).data
         instance.status = 'CANCELLED'
         instance.save()
@@ -251,11 +261,12 @@ class JobViewSet(viewsets.ModelViewSet):
         
     @action(detail=True, methods=['post'], url_path='acquire-lock')
     def acquire_lock(self, request, pk=None):
+        """Acquire concurrent edit lock on job record via Redis cache."""
         key = f'job_lock:{pk}'
         existing = cache.get(key)
         if existing and existing != request.user.id:
             return Response(
-                {'detail': 'Job đang được sửa bởi người khác.'},
+                {'detail': 'Job sedang được sửa bởi người khác.'},
                 status=status.HTTP_423_LOCKED,
             )
         cache.set(key, request.user.id, timeout=300)
@@ -263,6 +274,7 @@ class JobViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['delete'], url_path='release-lock')
     def release_lock(self, request, pk=None):
+        """Release concurrent edit lock on job record in Redis cache."""
         key = f'job_lock:{pk}'
         cache.delete(key)
         return Response({'detail': 'Lock released.'}, status=status.HTTP_200_OK)

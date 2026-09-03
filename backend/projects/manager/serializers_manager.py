@@ -1,3 +1,8 @@
+"""
+Module: projects.manager.serializers_manager
+Description: Manager serializers for job lists, detail views, creation, updates, and status transitions.
+"""
+
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -7,37 +12,41 @@ from tasks.models import Task
 
 
 class ManagerClientMiniSerializer(serializers.ModelSerializer):
+    """Compact client serializer providing core identity and contact details."""
+
     class Meta:
         model = Client
         fields = [
             "id",
             "client_name",
-            "tax_code",  # ➕ BỔ SUNG: Mã số thuế
-            "contact_person",  # ➕ BỔ SUNG: Người liên hệ
-            "contact_email",  # ➕ BỔ SUNG: Email liên hệ
-            "contact_phone",  # ➕ BỔ SUNG: SĐT liên hệ
-            "address",  # ➕ BỔ SUNG: Địa chỉ trụ sở
-            "industry",  # Lĩnh vực hoạt động
-            "notes",  # ➕ BỔ SUNG: Ghi chú nội bộ
-            "is_active",  # ➕ BỔ SUNG: Trạng thái hoạt động
+            "tax_code",
+            "contact_person",
+            "contact_email",
+            "contact_phone",
+            "address",
+            "industry",
+            "notes",
+            "is_active",
         ]
 
 
 class ManagerUserMiniSerializer(serializers.Serializer):
+    """Compact user serializer providing basic profile name and avatar data."""
+
     id = serializers.IntegerField()
     email = serializers.EmailField()
     full_name = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
+        """Return full name from profile or fallback to email address."""
         profile = getattr(obj, "profile", None)
-
         if profile and profile.full_name:
             return profile.full_name
-
         return obj.email
 
     def get_avatar_url(self, obj):
+        """Return avatar URL from user profile if available."""
         profile = getattr(obj, "profile", None)
         if profile and getattr(profile, "avatar_url", None):
             return profile.avatar_url
@@ -45,6 +54,8 @@ class ManagerUserMiniSerializer(serializers.Serializer):
 
 
 class ManagerJobListSerializer(serializers.ModelSerializer):
+    """Serializer representing project job list item with health and workload progress."""
+
     client = ManagerClientMiniSerializer(read_only=True)
     manager = ManagerUserMiniSerializer(read_only=True)
     task_counts = serializers.SerializerMethodField()
@@ -57,12 +68,12 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "id",
-            "job_code",  # ➕ BỔ SUNG: Mã dự án (VD: ERP-2024-068)
+            "job_code",
             "job_name",
             "description",
             "client",
             "manager",
-            "priority",  # ➕ BỔ SUNG: Mức độ ưu tiên (HIGH, MEDIUM, LOW)
+            "priority",
             "status",
             "start_date",
             "deadline",
@@ -76,6 +87,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         ]
 
     def get_team_size(self, obj):
+        """Calculate total count of unique team assignees and chat participants."""
         from chat.models import ChatParticipant
         task_assignee_ids = set(obj.tasks.values_list("assignee_id", flat=True).distinct())
         team_participant_ids = set(
@@ -87,6 +99,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         return len(task_assignee_ids | team_participant_ids)
 
     def get_project_team(self, obj):
+        """Return list of project team members with active task counts."""
         from accounts.models import CustomUser
         from chat.models import ChatParticipant
         from django.db.models import Count, Q
@@ -101,7 +114,6 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         all_member_ids = (task_assignee_ids | team_participant_ids) - {obj.manager_id}
         users = CustomUser.objects.filter(id__in=all_member_ids, is_active=True).select_related("profile", "profile__department")
 
-        # Đếm số task đang hoạt động (chưa hoàn thành) của từng nhân viên trong Job này
         active_counts_query = (
             obj.tasks.filter(
                 status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS, Task.Status.REVIEWING]
@@ -124,6 +136,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         ]
 
     def get_task_counts(self, obj):
+        """Retrieve aggregated task status counts for the job."""
         annotated_fields = [
             "total_tasks",
             "todo_count",
@@ -143,7 +156,6 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
                 "cancelled_count": obj.cancelled_count,
             }
 
-            # 2. FALLBACK TỐI ƯU: Đếm tất cả trạng thái trong CHỈ 1 CÂU QUERY SQL duy nhất
         from django.db.models import Count, Q
 
         counts = obj.tasks.aggregate(
@@ -157,17 +169,21 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         return counts
 
     def get_is_overdue(self, obj):
+        """Determine whether job deadline has passed for incomplete jobs."""
         return obj.deadline < timezone.localdate() and obj.status not in [
             Job.Status.COMPLETED,
             Job.Status.CANCELLED,
         ]
 
     def get_health(self, obj):
+        """Calculate dynamic health indicator dictionary for job."""
         task_counts = self.get_task_counts(obj)
         return calculate_job_health(obj, task_counts=task_counts)
 
 
 class ManagerJobDetailSerializer(ManagerJobListSerializer):
+    """Detailed serializer for single job retrieval in manager views."""
+
     manager = ManagerUserMiniSerializer(read_only=True)
 
     class Meta(ManagerJobListSerializer.Meta):
@@ -180,6 +196,8 @@ class ManagerJobDetailSerializer(ManagerJobListSerializer):
 
 
 class ManagerJobCreateSerializer(serializers.ModelSerializer):
+    """Serializer validating new job creation parameters submitted by managers."""
+
     client_id = serializers.PrimaryKeyRelatedField(
         source="client",
         queryset=Client.objects.filter(is_active=True),
@@ -195,9 +213,9 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "client_id",
-            "job_code",  # ➕ BỔ SUNG: Cho phép truyền mã dự án
+            "job_code",
             "job_name",
-            "priority",  # ➕ BỔ SUNG: Cho phép chọn độ ưu tiên (Mặc định MEDIUM)
+            "priority",
             "description",
             "start_date",
             "deadline",
@@ -205,6 +223,7 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        """Validate manager scoping, past deadline restrictions, and date sequence."""
         forbidden_fields = {
             "manager",
             "manager_id",
@@ -254,7 +273,7 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {
                             "initial_team_member_ids": (
-                                f"Nhân viên có ID {invalid_emps} không thuộc quyền quản lý của bạn."
+                                f"Employees with IDs {invalid_emps} are not assigned under your direct management."
                             )
                         }
                     )
@@ -263,6 +282,8 @@ class ManagerJobCreateSerializer(serializers.ModelSerializer):
 
 
 class ManagerJobUpdateSerializer(serializers.ModelSerializer):
+    """Serializer validating job edits and team member modifications by managers."""
+
     team_member_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
@@ -273,13 +294,14 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
         model = Job
         fields = [
             "job_name",
-            "priority",  # ➕ BỔ SUNG: Cho phép sửa độ ưu tiên khi Edit Job
+            "priority",
             "description",
             "deadline",
             "team_member_ids",
         ]
 
     def validate(self, attrs):
+        """Validate update constraints, deadline adjustments, and active child task guards."""
         forbidden_fields = {
             "manager",
             "manager_id",
@@ -298,7 +320,6 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                 }
             )
         job = self.instance
-        # 🛡️ DEFENSIVE GUARD: Khóa cập nhật Job nếu Client bị Admin vô hiệu hóa
         if job and job.client and not job.client.is_active:
             raise serializers.ValidationError(
                 f"Cannot update project '{job.job_name}' because client '{job.client.client_name}' is deactivated by Admin. "
@@ -313,7 +334,6 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                     {"deadline": "Job deadline must not be earlier than start date."}
                 )
 
-            # ➕ KIỂM TRA RÀNG BUỘC TIẾN ĐỘ: Chỉ chặn khi Manager thực sự RÚT NGẮN Deadline Job nhỏ hơn Task con đang mở
             if job.deadline and new_deadline < job.deadline:
                 max_task = (
                     job.tasks.exclude(status=Task.Status.CANCELLED)
@@ -351,13 +371,11 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {
                             "team_member_ids": (
-                                f"Nhân viên có ID {invalid_emps} không thuộc quyền quản lý của bạn."
+                                f"Employees with IDs {invalid_emps} are not assigned under your direct management."
                             )
                         }
                     )
 
-            # CHỐT CHẶN NGHIÊM NGẶT (STRICT GUARD):
-            # Không cho phép bỏ nhân viên ra khỏi Job nếu nhân viên đó đang có Task dang dở (TODO, IN_PROGRESS, REVIEWING)
             if job:
                 from chat.models import ChatParticipant
                 from accounts.models import CustomUser
@@ -403,6 +421,8 @@ class ManagerJobUpdateSerializer(serializers.ModelSerializer):
 
 
 class ManagerJobStatusChangeSerializer(serializers.Serializer):
+    """Serializer validating requested job status transition and required reason text."""
+
     new_status = serializers.ChoiceField(
         choices=Job.Status.choices,
     )
@@ -414,6 +434,7 @@ class ManagerJobStatusChangeSerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
+        """Ensure reason text is supplied for cancellation or on-hold status changes."""
         new_status = attrs.get("new_status")
         reason = attrs.get("reason")
 

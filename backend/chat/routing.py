@@ -1,3 +1,8 @@
+"""
+Module: chat.routing
+Description: WebSocket URL patterns for real-time chat consumer routing.
+"""
+
 from django.urls import re_path
 from . import consumers
 

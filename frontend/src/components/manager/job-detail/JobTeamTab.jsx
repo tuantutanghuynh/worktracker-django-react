@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { Building2 } from 'lucide-react';
 import PaginationBar from '../../common/table/PaginationBar';
 import UserAvatar from '../../common/avatar/UserAvatar';
+import { cn } from '../../../utils/cn';
 
 export default function JobTeamTab({ groupedTeamMembers = [], openTaskDrawer }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,32 +36,92 @@ export default function JobTeamTab({ groupedTeamMembers = [], openTaskDrawer }) 
           {paginatedTeamMembers.map((member, idx) => (
             <div
               key={member.id || `unassigned-${idx}`}
-              className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between"
+              className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all space-y-3.5 flex flex-col justify-between"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              {/* Card Header: Avatar, Name, Email, Department */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3 min-w-0">
                   <UserAvatar
                     src={member.avatar_url}
                     fullName={member.name}
                     size="md"
-                    className="w-10 h-10 rounded-xl shrink-0"
+                    showStatus={true}
+                    isOnline={true}
                   />
-                  <div>
-                    <h4 className="font-extrabold text-sm text-slate-900">{member.name}</h4>
-                    <p className="text-xs text-slate-500">{member.email || 'Unassigned queue'}</p>
+                  <div className="min-w-0">
+                    <h4 className="font-extrabold text-sm text-slate-900 truncate">
+                      {member.name}
+                    </h4>
+                    <p className="text-xs text-slate-400 truncate">{member.email || 'Unassigned queue'}</p>
+                    {member.department_name && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold mt-0.5">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{member.department_name}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-                  {member.tasks.length} {member.tasks.length === 1 ? 'Task' : 'Tasks'}
-                </span>
               </div>
 
+              {/* Workload Progress Bar */}
+              {member.id && (
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-slate-500">Workload Capacity:</span>
+                    <span
+                      className={cn(
+                        member.workloadStatus === 'OVERLOADED' && 'text-rose-600',
+                        member.workloadStatus === 'BALANCED' && 'text-amber-600',
+                        member.workloadStatus === 'AVAILABLE' && 'text-emerald-600'
+                      )}
+                    >
+                      {member.capacityPct}% (~{member.dailyRequiredHours}h/day)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        member.workloadStatus === 'OVERLOADED' && 'bg-rose-500',
+                        member.workloadStatus === 'BALANCED' && 'bg-amber-500',
+                        member.workloadStatus === 'AVAILABLE' && 'bg-emerald-500'
+                      )}
+                      style={{ width: `${Math.min(member.capacityPct || 0, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Workload Status & Stats */}
+              {member.id && (
+                <div className="flex items-center justify-between pt-1 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-[11px]">
+                    <span>{member.activeTasks || member.tasks.length} Tasks</span>
+                    <span className="text-slate-300">|</span>
+                    <span>{member.activeJobs || 0} Jobs</span>
+                  </div>
+
+                  <span
+                    className={cn(
+                      'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider',
+                      member.workloadStatus === 'OVERLOADED' && 'bg-rose-50 text-rose-700 border-rose-200',
+                      member.workloadStatus === 'BALANCED' && 'bg-amber-50 text-amber-700 border-amber-200',
+                      member.workloadStatus === 'AVAILABLE' && 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    )}
+                  >
+                    {member.workloadStatus || 'AVAILABLE'}
+                  </span>
+                </div>
+              )}
+
+              {/* Assigned Deliverables for this Job */}
               <div className="space-y-1.5 pt-2.5 border-t border-slate-100 text-xs">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Assigned Deliverables:
-                </p>
-                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Assigned Deliverables ({member.tasks.length}):
+                  </p>
+                </div>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                   {member.tasks.length === 0 ? (
                     <p className="text-xs text-slate-400 italic">No tasks currently assigned</p>
                   ) : (
@@ -69,7 +131,7 @@ export default function JobTeamTab({ groupedTeamMembers = [], openTaskDrawer }) 
                         onClick={() => openTaskDrawer(t.id)}
                         className="p-2 bg-slate-50 hover:bg-blue-50/70 rounded-xl border border-slate-100 flex items-center justify-between cursor-pointer transition"
                       >
-                        <span className="text-xs font-semibold text-slate-800 truncate max-w-[200px]">
+                        <span className="text-xs font-semibold text-slate-800 truncate max-w-[180px]">
                           {t.title}
                         </span>
                         <span className="text-[10px] font-extrabold text-slate-600 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200 shrink-0">

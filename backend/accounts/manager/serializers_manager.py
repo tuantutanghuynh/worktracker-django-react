@@ -1,22 +1,24 @@
+"""
+Module: accounts.manager.serializers_manager
+Description: Manager serializers for team employee workload, utilization metrics, and department lookups.
+"""
+
 from rest_framework import serializers
 
 from accounts.models import CustomUser, Department, EmployeeProfile
 
 
-# ============================================================
-# Serializer hỗ trợ hiển thị danh sách nhân viên trong scope Manager
-# ============================================================
 class ManagerDepartmentMiniSerializer(serializers.ModelSerializer):
+    """Compact serializer for department selection dropdowns in manager views."""
+
     class Meta:
         model = Department
         fields = ["id", "name"]
 
 
 class ManagerEmployeeListSerializer(serializers.ModelSerializer):
-    """
-    Serializer đọc thông tin nhân viên kèm profile và chỉ số Workload / Utilization Rate.
-    Dùng cho API danh sách nhân viên theo scope.
-    """
+    """Serializer representing team employee details with workload and utilization metrics."""
+
     full_name = serializers.CharField(source="profile.full_name", read_only=True)
     phone_number = serializers.CharField(source="profile.phone_number", read_only=True)
     department = ManagerDepartmentMiniSerializer(source="profile.department", read_only=True)
@@ -24,7 +26,6 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
     avatar_url = serializers.CharField(source="profile.avatar_url", read_only=True)
     joined_date = serializers.DateField(source="profile.joined_date", read_only=True)
 
-    # ➕ Các trường tính toán động (Computed Fields) từ Service & Annotation
     active_tasks_count = serializers.IntegerField(read_only=True, default=0)
     active_jobs_count = serializers.SerializerMethodField()
     logged_hours = serializers.SerializerMethodField()
@@ -61,42 +62,52 @@ class ManagerEmployeeListSerializer(serializers.ModelSerializer):
         ]
 
     def _get_workload_info(self, obj):
-        """Hàm trợ giúp lấy dict chứa chỉ số workload của user từ context"""
+        """Retrieve precomputed workload data dictionary for user from serializer context."""
         workload_map = self.context.get("workload_map", {})
         return workload_map.get(obj.id, {})
 
     def _get_smart_workload(self, obj):
+        """Calculate dynamic workload pressure and metrics using utilization service."""
         from timesheets.services.manager_employee_utilization_service import calculate_smart_workload_pressure
         return calculate_smart_workload_pressure(obj)
 
     def get_active_jobs_count(self, obj):
+        """Return total active jobs associated with employee."""
         sw = self._get_smart_workload(obj)
         return sw.get("active_jobs_count", 0)
 
     def get_logged_hours(self, obj):
+        """Return total logged work hours for the reporting window."""
         return self._get_workload_info(obj).get("logged_hours", 0.0)
 
     def get_capacity_hours(self, obj):
+        """Return total working capacity hours for the reporting window."""
         return self._get_workload_info(obj).get("capacity_hours", 0.0)
 
     def get_utilization_rate(self, obj):
+        """Return computed utilization rate percentage."""
         return self._get_workload_info(obj).get("utilization_rate", 0.0)
 
     def get_capacity_pct(self, obj):
+        """Return current capacity percentage usage."""
         sw = self._get_smart_workload(obj)
         return sw.get("capacity_pct", 0.0)
 
     def get_workload_status(self, obj):
+        """Return categorical workload status label."""
         sw = self._get_smart_workload(obj)
         return sw.get("workload_status", "AVAILABLE")
 
     def get_daily_required_hours(self, obj):
+        """Return daily required workload hours."""
         sw = self._get_smart_workload(obj)
         return sw.get("daily_required_hours", 0.0)
 
     def get_smart_workload_status(self, obj):
+        """Return smart workload pressure status indicator."""
         sw = self._get_smart_workload(obj)
         return sw.get("workload_status", "AVAILABLE")
 
     def get_workload(self, obj):
+        """Return complete smart workload pressure summary dictionary."""
         return self._get_smart_workload(obj)

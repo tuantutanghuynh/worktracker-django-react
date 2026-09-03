@@ -1,3 +1,8 @@
+"""
+Module: chat.serializers
+Description: Serializers for chat room listings, participants, message history, and user summaries.
+"""
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import ChatRoom, ChatParticipant, ChatMessage
@@ -6,6 +11,8 @@ User = get_user_model()
 
 
 class ChatUserSerializer(serializers.ModelSerializer):
+    """Serializer representing user identity, role, department, and avatar in chat interfaces."""
+
     full_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
     role_code = serializers.SerializerMethodField()
@@ -16,23 +23,27 @@ class ChatUserSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "full_name", "role", "role_code", "department_name", "avatar_url"]
 
     def get_role_code(self, obj):
+        """Return role code string for user."""
         if getattr(obj, "role", None):
             return obj.role.code if hasattr(obj.role, "code") else str(obj.role).upper()
         return "EMPLOYEE"
 
     def get_full_name(self, obj):
+        """Return full name from profile or fallback to email prefix."""
         profile = getattr(obj, "profile", None)
         if profile and getattr(profile, "full_name", None):
             return profile.full_name
         return getattr(obj, "full_name", "") or obj.email.split("@")[0]
 
     def get_avatar_url(self, obj):
+        """Return avatar image URL from profile."""
         profile = getattr(obj, "profile", None)
         if profile and getattr(profile, "avatar_url", None):
             return profile.avatar_url
         return None
 
     def get_department_name(self, obj):
+        """Return department name from profile with default for admin role."""
         profile = getattr(obj, "profile", None)
         if profile and getattr(profile, "department", None):
             return profile.department.name
@@ -43,6 +54,8 @@ class ChatUserSerializer(serializers.ModelSerializer):
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
+    """Serializer representing chat messages, attachments, and ownership indicator."""
+
     sender = ChatUserSerializer(read_only=True)
     is_mine = serializers.SerializerMethodField()
 
@@ -62,6 +75,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "sender", "created_at", "is_mine"]
 
     def get_is_mine(self, obj):
+        """Check whether message sender matches the current authenticated user."""
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return obj.sender_id == request.user.id
@@ -69,6 +83,8 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 
 class ChatRoomListSerializer(serializers.ModelSerializer):
+    """Serializer representing chat room overview, unread counts, and participant summaries."""
+
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     other_participant = serializers.SerializerMethodField()
@@ -101,6 +117,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         ]
 
     def get_last_message(self, obj):
+        """Return latest message preview dictionary in room."""
         last_msg = obj.messages.select_related("sender", "sender__role").order_by("-created_at").first()
         if last_msg and last_msg.sender:
             sender_role = getattr(last_msg.sender.role, "code", "EMPLOYEE") if getattr(last_msg.sender, "role", None) else ("ADMIN" if last_msg.sender.is_superuser else "EMPLOYEE")
@@ -117,6 +134,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         return None
 
     def get_unread_count(self, obj):
+        """Calculate number of unread messages since user's last-read timestamp."""
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             participant = obj.participants.filter(user=request.user).first()
@@ -125,6 +143,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         return 0
 
     def get_other_participant(self, obj):
+        """Return profile information of opposite participant in 1-on-1 direct rooms."""
         if obj.room_type == ChatRoom.RoomType.DIRECT:
             request = self.context.get("request")
             if request and request.user.is_authenticated:
@@ -134,9 +153,11 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         return None
 
     def get_participants_count(self, obj):
+        """Return total count of participants in room."""
         return obj.participants.count()
 
     def get_participants(self, obj):
+        """Return serialized list of all participants in room."""
         participants_qs = obj.participants.select_related(
             "user", "user__role", "user__profile", "user__profile__department"
         ).all()
@@ -174,6 +195,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         return result
 
     def get_is_archived(self, obj):
+        """Return boolean indicating whether job channel is closed or cancelled."""
         if obj.room_type == ChatRoom.RoomType.JOB and obj.job:
             return obj.job.status in ["COMPLETED", "CANCELLED"]
         return False

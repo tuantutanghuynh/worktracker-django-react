@@ -1,3 +1,8 @@
+"""
+Module: accounts.manager.views_manager
+Description: Manager views for team employee lists, workload summaries, and department lookups.
+"""
+
 import calendar
 from datetime import date
 from django.db.models import Count, Q
@@ -25,10 +30,8 @@ from timesheets.services.manager_employee_utilization_service import (
 
 
 class ManagerDepartmentListView(ListAPIView):
-    """
-    GET /api/manager/accounts/departments/
-    Trả về danh sách phòng ban để Manager chọn khi gán phòng ban cho nhân viên.
-    """
+    """List available departments for manager employee filtering and assignment."""
+
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
@@ -41,18 +44,7 @@ class ManagerDepartmentListView(ListAPIView):
 
 
 class ManagerTeamEmployeeListView(ListAPIView):
-    """
-    GET /api/manager/accounts/employees/
-
-    Trả về danh sách nhân viên kèm thông tin Workload Status và Utilization Rate.
-    Manager dùng để theo dõi hiệu suất và tìm người để giao task.
-
-    Query Params:
-        - department_id (optional): Lọc theo phòng ban.
-        - search (optional): Tìm theo email hoặc họ tên.
-        - start_date (optional): Ngày bắt đầu tính hiệu suất (YYYY-MM-DD).
-        - end_date (optional): Ngày kết thúc tính hiệu suất (YYYY-MM-DD).
-    """
+    """List assigned team employees with active workload calculations and utilization metrics."""
 
     permission_classes = [
         IsActiveAuthenticated,
@@ -60,18 +52,10 @@ class ManagerTeamEmployeeListView(ListAPIView):
         HasPermissionCode,
     ]
     required_permission = "team:view"
-
     serializer_class = ManagerEmployeeListSerializer
 
     def get_queryset(self):
-        # Phạm vi quản lý: Manager CHỈ thấy nhân viên thuộc tuyến báo cáo của
-        # mình (EmployeeProfile.manager). Trước đây endpoint này trả về toàn
-        # bộ nhân viên công ty, nên bất kỳ Manager nào cũng giao việc được cho
-        # bất kỳ ai — không đúng quy trình nghiệp vụ.
-        #
-        # Nhân viên chưa được gán Manager sẽ không hiện với ai cả. Đó là hành
-        # vi mong muốn: Admin phải chủ động gán, không để rơi vào tay ngẫu
-        # nhiên. Trang User List có bộ lọc "Chưa gán" để Admin dọn số này.
+        """Filter employees strictly assigned to the authenticated manager with task annotations."""
         qs = (
             CustomUser.objects.filter(
                 role__code="EMPLOYEE",
@@ -130,7 +114,7 @@ class ManagerTeamEmployeeListView(ListAPIView):
         return qs
 
     def list(self, request, *args, **kwargs):
-        # 1. Parse date range từ query params (mặc định là tháng hiện tại)
+        """Calculate workload metrics over the query date range and return enriched employee list."""
         today = date.today()
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
@@ -148,11 +132,9 @@ class ManagerTeamEmployeeListView(ListAPIView):
             _, last_day = calendar.monthrange(today.year, today.month)
             end_date = date(today.year, today.month, last_day)
 
-        # 2. Tính toán tổng hợp chỉ số workload của team bằng Service
         summary_data = get_team_workload_summary(request.user, start_date, end_date)
         workload_map = {emp["user_id"]: emp for emp in summary_data["employees"]}
 
-        # 3. Nạp workload_map vào context của Serializer
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
 

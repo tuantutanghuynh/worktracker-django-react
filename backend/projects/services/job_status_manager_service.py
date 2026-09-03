@@ -1,3 +1,8 @@
+"""
+Module: projects.services.job_status_manager_service
+Description: Service managing state transitions, business rules, and audit trails for project job statuses.
+"""
+
 from django.db import transaction
 from rest_framework.exceptions import APIException, PermissionDenied
 
@@ -8,12 +13,14 @@ from system.services.audit_manager_service import snapshot, log_action
 
 
 class BusinessRuleError(APIException):
+    """Exception indicating violation of a domain business rule constraint."""
     status_code = 400
     default_detail = "Business rule violation."
     default_code = "business_rule_error"
 
 
 class InvalidTransition(APIException):
+    """Exception indicating an impermissible state transition for job status."""
     status_code = 400
     default_detail = "Invalid job status transition."
     default_code = "invalid_job_status_transition"
@@ -52,9 +59,7 @@ JOB_TRANSITIONS = {
 
 
 def manager_assert_job_owner(user, job):
-    """
-    Manager chỉ được thao tác Job do chính họ quản lý.
-    """
+    """Ensure that the requesting manager is the assigned owner of the job."""
     if not user or not user.is_authenticated:
         raise PermissionDenied("AUTHENTICATION_REQUIRED")
 
@@ -68,13 +73,7 @@ def manager_assert_job_owner(user, job):
 
 
 def manager_check_job_completable(job):
-    """
-    Điều kiện để Manager chuyển Job sang COMPLETED.
-
-    Theo FR-29:
-    - Không còn task đang mở.
-    - Không còn log work PENDING.
-    """
+    """Verify that a job has no open tasks or pending log works before completion."""
     has_open_tasks = Task.objects.filter(
         job_id=job.id,
         status__in=[
@@ -97,11 +96,7 @@ def manager_check_job_completable(job):
 
 
 def validate_job_transition(job, new_status, reason):
-    """
-    Validate transition theo bảng trạng thái Job.
-    """
-    # 🛡️ DEFENSIVE GUARD: Nếu Client bị Admin vô hiệu hóa (Inactive), Job bị đóng băng hoàn toàn.
-    # Tuyệt đối không cho phép Manager kích hoạt lại (ACTIVE) hoặc chuyển trạng thái khác ngoài CANCELLED.
+    """Validate requested job status change against transition matrix and active client status."""
     if job.client and not job.client.is_active and new_status != Job.Status.CANCELLED:
         raise BusinessRuleError(
             f"Cannot change status to '{new_status}' because client '{job.client.client_name}' is deactivated by Admin. "
@@ -124,15 +119,7 @@ def validate_job_transition(job, new_status, reason):
 
 
 def manager_change_job_status(*, user, job, new_status, reason=None, request=None):
-    """
-    Đổi trạng thái Job cho Manager.
-
-    Quy tắc:
-    - Lock row bằng select_for_update().
-    - Check scope sau khi lock lại record.
-    - Validate transition.
-    - Ghi audit log trong cùng transaction.
-    """
+    """Update job status within atomic transaction with row locking and audit logging."""
     with transaction.atomic():
         locked_job = Job.objects.select_related("client").select_for_update().get(id=job.id)
 

@@ -1,47 +1,47 @@
-from rest_framework.views import APIView
-from rest_framework.throttling import ScopedRateThrottle
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework import status
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+"""
+Module: accounts.auth.views_auth
+Description: Authentication API views handling login, logout, password recovery, and credential updates.
+"""
+
 import time
 import redis
+from django.conf import settings
 from django.core.cache import caches
 from django.core.mail import send_mail
-from rest_framework_simplejwt.views import TokenRefreshView
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from accounts.models import RolePermission
 from system.utils import log_audit_event
 from ..authentication import is_reauth_required
-from .serializers_auth import LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer, ChangePasswordSerializer
-from django.conf import settings
+from .serializers_auth import (
+    LoginSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+    ChangePasswordSerializer,
+)
 
 blacklist_cache = caches["blacklist"]
 
 
-# This file holds the views shared by every role for authentication:
-# LoginView and LogoutView (issuing and revoking JWTs),
-# ForgotPasswordView/ResetPasswordView (self-service password recovery via
-# a one-time emailed token, see PasswordReset in models.py), and
-# ChangePasswordView (set a new password while already logged in — used to
-# satisfy must_change_password on CustomUser). Deliberately uses plain
-# IsAuthenticated, not HasPermission, so it is never blocked by the
-# must_change_password gate in permissions.py — see that file for why.
-
-
-# Wraps the default refresh endpoint with the same reauth check used for
-# access tokens (WorkTrackerJWTAuthentication). Without this, a refresh
-# token issued before a role change would just keep minting fresh access
-# tokens forever, since TokenRefreshView never goes through our custom
-# authentication class — require_reauth() alone would do nothing.
 class ReauthAwareTokenRefreshView(TokenRefreshView):
+    """Token refresh view validating permission change invalidation timestamps before refreshing."""
+
     def post(self, request, *args, **kwargs):
+        """Process refresh token submission and check for forced re-authentication requirements."""
         raw_refresh = request.data.get("refresh")
         if raw_refresh:
             try:
                 token = RefreshToken(raw_refresh)
             except TokenError:
-                token = None  # invalid/expired — let the parent view produce the normal error response
+                token = None
 
             if token is not None:
                 user_id = token.get("user_id")
@@ -55,14 +55,15 @@ class ReauthAwareTokenRefreshView(TokenRefreshView):
         return super().post(request, *args, **kwargs)
 
 
-# Public endpoint: verifies email/password and issues an access + refresh token pair.
 class LoginView(APIView):
+    """Public authentication endpoint verifying credentials and issuing JWT token pairs."""
+
     permission_classes = [AllowAny]
-    # Gioi han 10 lan/phut moi IP — xem DEFAULT_THROTTLE_RATES.
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'login'
 
     def post(self, request):
+        """Authenticate user credentials and return access and refresh tokens."""
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -70,12 +71,13 @@ class LoginView(APIView):
         return Response(tokens, status=status.HTTP_200_OK)
 
 
-# Revokes the current access token immediately by blacklisting its jti in Redis,
-# instead of waiting for it to expire naturally.
 class LogoutView(APIView):
+    """Authenticated endpoint revoking current access token via Redis blacklist."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """Blacklist current token identifier in Redis until its natural expiration."""
         token = request.auth
         jti = token["jti"]
         ttl = token["exp"] - int(time.time())
@@ -92,15 +94,15 @@ class LogoutView(APIView):
         return Response({"detail": "Logged out successfully."}, status=status.HTTP_200_OK)
 
 
-# Public endpoint: always replies with the same 200 message, whether or not
-# the email exists, and only emails a reset token when it does.
 class ForgotPasswordView(APIView):
+    """Public endpoint generating a password reset token and dispatching email."""
+
     permission_classes = [AllowAny]
-    # Endpoint cong khai, gui email that -> siet 5 lan/phut moi IP.
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'password_reset'
 
     def post(self, request):
+        """Process forgot password request and dispatch reset link email if account exists."""
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reset = serializer.create_reset_token()
@@ -120,14 +122,15 @@ class ForgotPasswordView(APIView):
         )
 
 
-# Public endpoint: exchanges a valid, unused, non-expired reset token for a new password.
 class ResetPasswordView(APIView):
+    """Public endpoint consuming a reset token to update the account password."""
+
     permission_classes = [AllowAny]
-    # Endpoint cong khai, gui email that -> siet 5 lan/phut moi IP.
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'password_reset'
 
     def post(self, request):
+        """Verify reset token and update user password with audit logging."""
         serializer = ResetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.apply_new_password()
@@ -141,23 +144,20 @@ class ResetPasswordView(APIView):
         )
 
         return Response({"detail": "Password has been reset successfully"}, status=status.HTTP_200_OK)
-# Authenticated endpoint: any logged-in user can change their own password.
-# permission_classes is plain IsAuthenticated (not HasPermission) on purpose
-# — see the file header above and permissions.py for why.
-from accounts.models import RolePermission
+
 
 class ChangePasswordView(APIView):
+    """Authenticated endpoint enabling users to change their password and reissue active tokens."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """Validate current password, apply new password, and issue fresh JWT session tokens."""
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.apply_new_password()
 
-        # Thu hồi mọi session: blacklist toàn bộ refresh token cũ của user này
-        # (cùng model OutstandingToken/BlacklistedToken của simplejwt, dùng
-        # cho "logout everywhere"), cộng thêm access token hiện tại — access
-        # token không tự mất hiệu lực chỉ vì refresh token bị blacklist.
+        # Invalidate existing refresh tokens across all sessions
         for outstanding in OutstandingToken.objects.filter(user=request.user):
             BlacklistedToken.objects.get_or_create(token=outstanding)
 
@@ -169,7 +169,7 @@ class ChangePasswordView(APIView):
                 try:
                     blacklist_cache.set(f"blacklist:{jti}", "1", timeout=ttl)
                 except redis.exceptions.RedisError:
-                    pass  # best-effort — đổi mật khẩu vẫn đã thành công, không rollback vì lỗi Redis
+                    pass
 
         log_audit_event(
             actor=request.user,
@@ -179,7 +179,6 @@ class ChangePasswordView(APIView):
             request=request,
         )
 
-        # Cấp token mới cho phiên làm việc hiện tại, đưa thẳng vào Dashboard không cần đăng nhập lại
         refresh = RefreshToken.for_user(request.user)
         refresh["email"] = request.user.email
         refresh["role"] = request.user.role.code if request.user.role else None

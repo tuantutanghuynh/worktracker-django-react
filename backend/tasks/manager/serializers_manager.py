@@ -1,3 +1,8 @@
+"""
+Module: tasks.manager.serializers_manager
+Description: Serializers for manager task lists, detail views, creation, editing, Kanban moves, comments, and attachments.
+"""
+
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
@@ -8,6 +13,8 @@ from tasks.services.task_deadline_calculator_service import calculate_task_deadl
 
 
 class ManagerUserMiniSerializer(serializers.Serializer):
+    """Compact serializer representing basic user identity, role, and avatar."""
+
     id = serializers.IntegerField()
     email = serializers.EmailField()
     role = serializers.CharField(source="role.code", read_only=True)
@@ -15,14 +22,14 @@ class ManagerUserMiniSerializer(serializers.Serializer):
     avatar_url = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
+        """Return full name from profile or fallback to email."""
         profile = getattr(obj, "profile", None)
-
         if profile and profile.full_name:
             return profile.full_name
-
         return obj.email
 
     def get_avatar_url(self, obj):
+        """Return avatar image URL from user profile."""
         profile = getattr(obj, "profile", None)
         if profile and getattr(profile, "avatar_url", None):
             return profile.avatar_url
@@ -30,6 +37,8 @@ class ManagerUserMiniSerializer(serializers.Serializer):
 
 
 class ManagerJobMiniSerializer(serializers.ModelSerializer):
+    """Compact serializer representing parent project job details and client status."""
+
     client_name = serializers.CharField(source="client.client_name", read_only=True)
     client_is_active = serializers.BooleanField(source="client.is_active", read_only=True)
 
@@ -46,6 +55,8 @@ class ManagerJobMiniSerializer(serializers.ModelSerializer):
 
 
 class ManagerTaskListSerializer(serializers.ModelSerializer):
+    """Serializer representing task list items with calculated deadline health and metadata counts."""
+
     job = ManagerJobMiniSerializer(read_only=True)
     assignee = ManagerUserMiniSerializer(read_only=True)
     is_overdue = serializers.SerializerMethodField()
@@ -75,6 +86,7 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
         ]
 
     def get_is_overdue(self, obj):
+        """Determine whether task has passed deadline while incomplete."""
         return (
             obj.deadline < timezone.localdate()
             and obj.status not in [
@@ -84,21 +96,23 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
         )
 
     def get_deadline_health(self, obj):
+        """Calculate dynamic deadline health dictionary for task."""
         return calculate_task_deadline_health(obj)
 
     def get_comment_count(self, obj):
+        """Return total count of discussion comments on task."""
         if hasattr(obj, "comment_count"):
             return obj.comment_count
-
         return obj.comments.count()
 
     def get_attachment_count(self, obj):
+        """Return total count of attached files on task."""
         if hasattr(obj, "attachment_count"):
             return obj.attachment_count
-
         return obj.attachments.count()
 
     def get_rejection_count(self, obj):
+        """Return total count of rejection comments on task."""
         return obj.comments.filter(
             Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
             | Q(content__startswith="[Rejection Note]")
@@ -106,6 +120,7 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
         ).count()
 
     def get_latest_rejection(self, obj):
+        """Return details of most recent task rejection note."""
         comment = (
             obj.comments.filter(
                 Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
@@ -136,6 +151,8 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
 
 
 class ManagerTaskDetailSerializer(ManagerTaskListSerializer):
+    """Detailed serializer for single task inspection in manager views."""
+
     job = ManagerJobMiniSerializer(read_only=True)
     creator = ManagerUserMiniSerializer(read_only=True)
     rejection_history = serializers.SerializerMethodField()
@@ -152,6 +169,7 @@ class ManagerTaskDetailSerializer(ManagerTaskListSerializer):
         ]
 
     def get_rejection_history(self, obj):
+        """Return complete chronological list of rejection notes for task."""
         comments = (
             obj.comments.filter(
                 Q(comment_type=TaskComment.CommentType.REJECTION_NOTE)
@@ -179,6 +197,8 @@ class ManagerTaskDetailSerializer(ManagerTaskListSerializer):
 
 
 class ManagerTaskCreateSerializer(serializers.Serializer):
+    """Serializer validating parameters for new task creation by manager."""
+
     job_id = serializers.IntegerField()
     assignee_id = serializers.IntegerField(
         required=False,
@@ -197,14 +217,14 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
     deadline = serializers.DateField()
 
     def validate_title(self, value):
+        """Validate non-empty task title."""
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError("Task title is required.")
-
         return value
 
     def validate_deadline(self, value):
+        """Ensure task deadline is not set in past."""
         today = timezone.localdate()
         if value < today:
             raise serializers.ValidationError(
@@ -213,6 +233,7 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
         return value
 
     def validate_assignee_id(self, value):
+        """Ensure assigned user is active employee."""
         if value:
             from django.contrib.auth import get_user_model
             User = get_user_model()
@@ -225,6 +246,8 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
 
 
 class ManagerTaskUpdateSerializer(serializers.Serializer):
+    """Serializer validating field updates on existing task."""
+
     title = serializers.CharField(
         max_length=255,
         required=False,
@@ -242,14 +265,14 @@ class ManagerTaskUpdateSerializer(serializers.Serializer):
     assignee_id = serializers.IntegerField(required=False)
 
     def validate_title(self, value):
+        """Ensure updated title is not empty string."""
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError("Task title cannot be empty.")
-
         return value
 
     def validate_assignee_id(self, value):
+        """Ensure reassigned user is an active employee."""
         if value is not None:
             from django.contrib.auth import get_user_model
             User = get_user_model()
@@ -261,15 +284,17 @@ class ManagerTaskUpdateSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
+        """Ensure at least one modifiable field is provided in payload."""
         if not attrs:
             raise serializers.ValidationError(
                 "At least one field must be provided."
             )
-
         return attrs
 
 
 class ManagerTaskStatusSerializer(serializers.Serializer):
+    """Serializer validating explicit status change requests."""
+
     to_status = serializers.ChoiceField(
         choices=Task.Status.choices,
     )
@@ -282,6 +307,8 @@ class ManagerTaskStatusSerializer(serializers.Serializer):
 
 
 class ManagerKanbanMoveSerializer(serializers.Serializer):
+    """Serializer validating Kanban column transition and adjacent task positions."""
+
     to_status = serializers.ChoiceField(
         choices=Task.Status.choices,
         required=False,
@@ -303,6 +330,7 @@ class ManagerKanbanMoveSerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
+        """Ensure preceding and following sibling task IDs are not identical."""
         prev_task_id = attrs.get("prev_task_id")
         next_task_id = attrs.get("next_task_id")
 
@@ -321,6 +349,8 @@ class ManagerKanbanMoveSerializer(serializers.Serializer):
 
 
 class ManagerTaskCommentSerializer(serializers.ModelSerializer):
+    """Serializer managing creation and retrieval of task discussion comments."""
+
     user = ManagerUserMiniSerializer(read_only=True)
 
     class Meta:
@@ -342,15 +372,16 @@ class ManagerTaskCommentSerializer(serializers.ModelSerializer):
         ]
 
     def validate_content(self, value):
+        """Validate non-empty comment body text."""
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError("Comment content is required.")
-
         return value
 
 
 class ManagerTaskAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer managing task file attachment records and metadata."""
+
     user = ManagerUserMiniSerializer(read_only=True)
 
     class Meta:
@@ -372,30 +403,23 @@ class ManagerTaskAttachmentSerializer(serializers.ModelSerializer):
         ]
 
     def validate_file_name(self, value):
+        """Validate non-empty file name string."""
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError("file_name is required.")
-
         return value
-
 
     def validate_file_url(self, value):
+        """Validate non-empty file URL string."""
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError("file_url is required.")
-
         return value
 
 
-# ============================================================
-# Compatibility serializers
-# Giữ lại để tasks/views_manager.py cũ không bị vỡ import.
-# Sau khi refactor views_manager.py xong, có thể bỏ dần nếu không dùng.
-# ============================================================
-
 class TaskSerializer(serializers.ModelSerializer):
+    """Compatibility serializer for legacy task operations."""
+
     class Meta:
         model = Task
         fields = [
@@ -422,20 +446,15 @@ class TaskSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        """
-        Compatibility create cho view cũ.
-
-        Lưu ý:
-        - Logic chuẩn sẽ chuyển sang task_manager_service.create_task().
-        - Hàm này chỉ giúp serializer cũ không bị lỗi khi chưa refactor view.
-        """
+        """Fallback creation setting default order index if omitted."""
         if not validated_data.get("order_index"):
             validated_data["order_index"] = "U"
-
         return super().create(validated_data)
 
 
 class RejectTaskSerializer(serializers.Serializer):
+    """Serializer validating mandatory rejection explanation text."""
+
     rejection_reason = serializers.CharField(
         required=True,
         allow_blank=False,
@@ -443,11 +462,10 @@ class RejectTaskSerializer(serializers.Serializer):
     )
 
     def validate_rejection_reason(self, value):
+        """Ensure rejection reason contains non-whitespace text."""
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError(
                 "Rejection reason is required."
             )
-
         return value

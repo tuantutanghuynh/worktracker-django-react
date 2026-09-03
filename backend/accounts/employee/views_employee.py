@@ -1,3 +1,8 @@
+"""
+Module: accounts.employee.views_employee
+Description: Employee self-service views for profile management, avatar uploads, and personal KPI analytics.
+"""
+
 import uuid
 from datetime import timedelta
 from decimal import Decimal
@@ -22,44 +27,42 @@ from accounts.employee.serializers_employee import (
 )
 
 
-
-
-# EmployeeProfile is only auto-created for accounts made through
-# /api/auth/users/ — Admin/Manager accounts provisioned by createsuperuser
-# or seed scripts have no profile row, and this endpoint is open to every
-# authenticated role, so create it on first access instead of 404ing them
-# out of their own profile page. full_name is NOT NULL, hence the default
-# (same fallback used by UserViewSet.assign_department).
 def get_or_create_own_profile(user):
+    """Retrieve existing employee profile or initialize a new profile record on first access."""
     profile, _ = EmployeeProfile.objects.get_or_create(
         user=user, defaults={"full_name": user.email}
     )
     return profile
 
 
-# Lets any logged-in user view and edit their own profile (full_name, phone_number only).
 class ProfileView(APIView):
+    """Endpoint allowing authenticated users to view and update their personal profile data."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """Retrieve personal profile details for the authenticated user."""
         profile = get_or_create_own_profile(request.user)
         serializer = EmployeeProfileSerializer(profile)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request):
+        """Update personal profile fields for the authenticated user."""
         profile = get_or_create_own_profile(request.user)
         serializer = EmployeeProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-# Lets the caller replace their own avatar image, saving it to MEDIA_ROOT
-# and storing the resulting URL on their profile.
+
 class AvatarUploadView(APIView):
+    """Endpoint enabling authenticated users to upload and update their profile avatar image."""
+
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
     def patch(self, request):
+        """Save uploaded avatar image to storage and update profile avatar URL."""
         profile = get_or_create_own_profile(request.user)
 
         serializer = AvatarUploadSerializer(data=request.data)
@@ -75,13 +78,14 @@ class AvatarUploadView(APIView):
 
         return Response({"avatar_url": profile.avatar_url}, status=status.HTTP_200_OK)
 
-# Employee's own KPI: overdue task count (as of now), hours logged this
-# calendar week (Mon-Sun), and completion rate over an optional date range
-# (defaults to all-time) — filtered by Task.deadline, not creation date.
+
 class PersonalKPIView(APIView):
+    """Endpoint computing personal performance metrics, on-time rates, and logged hours trends."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """Calculate and return aggregated personal KPI metrics for authenticated user."""
         query = PersonalKPIQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         start_date = query.validated_data.get("start_date")
@@ -118,8 +122,6 @@ class PersonalKPIView(APIView):
         completed_count = completion_tasks.filter(status=Task.Status.COMPLETED).count()
         completion_rate = (completed_count / total_count) if total_count else None
 
-        # On-time rate — trong số task đã COMPLETED (có completed_at), bao
-        # nhiêu % hoàn thành đúng hạn (completed_at <= deadline).
         completed_with_date_qs = completion_tasks.filter(
             status=Task.Status.COMPLETED, completed_at__isnull=False
         )
@@ -131,8 +133,6 @@ class PersonalKPIView(APIView):
             (on_time_count / completed_with_date_count) if completed_with_date_count else None
         )
 
-        # Productivity — số task hoàn thành trên mỗi giờ đã log (all-time,
-        # loại VOIDED/REJECTED giống mọi chỗ tính giờ khác trong view này).
         hours_logged_total = LogWork.objects.filter(user=user).exclude(
             review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED]
         ).aggregate(total=Sum("hours_spent"))["total"] or Decimal("0.00")
@@ -140,9 +140,6 @@ class PersonalKPIView(APIView):
             (completed_count / float(hours_logged_total)) if hours_logged_total > 0 else None
         )
 
-                # Task status breakdown — how many of the user's own tasks sit in
-        # each status. Excludes CANCELLED, same as completion_rate above,
-        # so a cancelled task doesn't skew either metric.
         status_counts = (
             Task.objects.filter(assignee=user)
             .exclude(status=Task.Status.CANCELLED)
@@ -151,9 +148,6 @@ class PersonalKPIView(APIView):
         )
         task_status_breakdown = {row["status"]: row["count"] for row in status_counts}
 
-        # Hours by project — top 5 projects by hours logged, all-time.
-        # LogWork -> task -> job is a read-only cross-app join (job/task
-        # belong to Minh Anh/Long's apps); never writes to those tables.
         hours_by_project = list(
             LogWork.objects.filter(user=user)
             .exclude(review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED])
@@ -162,8 +156,6 @@ class PersonalKPIView(APIView):
             .order_by("-total_hours")[:5]
         )
 
-        # Daily hours trend — last 14 days, including days with 0 hours
-        # (the frontend line chart needs a continuous x-axis, not gaps).
         trend_start = today - timedelta(days=13)
         logged_by_day = {
             row["work_date"]: row["total"]
@@ -181,8 +173,6 @@ class PersonalKPIView(APIView):
             }
             for i in range(14)
         ]
-
-
 
         return Response({
             "overdue_tasks_count": overdue_tasks_count,
@@ -209,5 +199,4 @@ class PersonalKPIView(APIView):
             "task_status_breakdown": task_status_breakdown,
             "hours_by_project": hours_by_project,
             "daily_hours_trend": daily_hours_trend,
-
         }, status=status.HTTP_200_OK)

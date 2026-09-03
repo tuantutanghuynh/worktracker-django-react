@@ -1,3 +1,8 @@
+"""
+Module: reports.manager.urls_manager
+Description: URL routing configuration for manager dashboard, analytical reports, and export endpoints.
+"""
+
 from django.urls import path
 
 from reports.manager.views_manager import (
@@ -6,7 +11,6 @@ from reports.manager.views_manager import (
     ManagerTaskSummaryReportView,
     ManagerTimesheetDetailReportView,
 )
-
 
 urlpatterns = [
     path(

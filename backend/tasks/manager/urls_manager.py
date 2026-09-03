@@ -1,8 +1,12 @@
+"""
+Module: tasks.manager.urls_manager
+Description: URL routing configuration for manager task management and Kanban endpoints.
+"""
+
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from tasks.manager.views_manager import TaskViewSet, ManagerJobKanbanView
-
 
 router = DefaultRouter()
 

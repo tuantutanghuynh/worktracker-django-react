@@ -1,3 +1,6 @@
-from django.contrib import admin
+"""
+Module: reports.admin
+Description: Django admin panel registrations for reports models.
+"""
 
-# Register your models here.
+from django.contrib import admin

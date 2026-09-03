@@ -1,3 +1,6 @@
-from django.shortcuts import render
+"""
+Module: tasks.views
+Description: Base views and shared controllers for tasks module.
+"""
 
-# Create your views here.
+from django.shortcuts import render

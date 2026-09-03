@@ -1,21 +1,24 @@
+"""
+Module: accounts.admin.serializers
+Description: Admin serializers for managing roles, user accounts, departments, and profile assignments.
+"""
+
 from rest_framework import serializers
 from ..models import Role, CustomUser, Department, EmployeeProfile
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    """Serializer representing system roles and active status."""
+
     class Meta:
         model = Role
         fields = ['id', 'code', 'name', 'description', 'is_active']
 
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):
-    # Email của Manager phụ trách — trả kèm để User List hiện được tên người
-    # quản lý mà không phải gọi thêm một request tra cứu cho từng dòng.
+    """Serializer representing employee profile details with manager relationships."""
+
     manager_email = serializers.EmailField(source='manager.email', read_only=True, default=None)
-    # Khoá tài khoản Manager KHÔNG gỡ tuyến báo cáo — khoá là thao tác đảo
-    # ngược được, gỡ đi thì mở khoá lại không khôi phục nổi. Đổi lại phải cho
-    # Admin thấy được trạng thái này: nhân viên vẫn trỏ tới một Manager không
-    # đăng nhập được, tức là trên thực tế đang không ai quản lý.
     manager_is_active = serializers.BooleanField(source='manager.is_active', read_only=True, default=None)
 
     class Meta:
@@ -26,40 +29,30 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
         ]
 
 
-# ── CHUAN HOA EMAIL ───────────────────────────────────────────────────────
-#
-# Email khong phan biet hoa thuong theo chuan (RFC 5321 ve phan domain, va
-# tren thuc te moi nha cung cap mail deu coi phan local la khong phan biet).
-# Nhung CustomUser.email la unique=True — so khop CHINH XAC — nen
-# "Admin@x.com" va "admin@x.com" se thanh HAI tai khoan khac nhau, va nguoi
-# dung phai go dung y het hoa thuong luc tao moi dang nhap duoc.
-#
-# Chuan hoa ngay tai tang serializer cua Admin: moi email ghi xuong DB deu
-# la chu thuong. Khong dung toi phan dang nhap — do la file cua anh Tu.
 def normalize_email(value, instance=None):
+    """Normalize email to lowercase and ensure uniqueness across active and inactive accounts."""
     email = (value or "").strip().lower()
     if not email:
         raise serializers.ValidationError("Email is required.")
 
-    trung = CustomUser.objects.filter(email__iexact=email)
+    duplicates = CustomUser.objects.filter(email__iexact=email)
     if instance is not None:
-        trung = trung.exclude(pk=instance.pk)
-    khac = trung.first()
-    if khac is not None:
-        trang_thai = "" if khac.is_active else " (deactivated)"
+        duplicates = duplicates.exclude(pk=instance.pk)
+    existing = duplicates.first()
+    if existing is not None:
+        status_suffix = "" if existing.is_active else " (deactivated)"
         raise serializers.ValidationError(
-            f"An account with the email '{khac.email}'{trang_thai} already exists. "
+            f"An account with the email '{existing.email}'{status_suffix} already exists. "
             f"Email addresses are case-insensitive, so '{value}' is the same account."
         )
     return email
 
 
 class UserSerializer(serializers.ModelSerializer):
+    """Serializer for displaying and updating existing user account details."""
+
     profile = EmployeeProfileSerializer(read_only=True)
     role_detail = RoleSerializer(source='role', read_only=True)
-    # validators=[] de bo UniqueValidator ma DRF tu them tu unique=True:
-    # validator do chay TRUOC validate_email() nen chi so khop chinh xac,
-    # "Admin@x.com" se lot qua roi vo o tang DB thanh loi 500.
     email = serializers.EmailField(max_length=155, validators=[])
 
     class Meta:
@@ -68,22 +61,18 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'role': {'write_only': True}}
 
     def validate_email(self, value):
+        """Validate normalized email uniqueness excluding the current user instance."""
         return normalize_email(value, instance=self.instance)
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
+    """Serializer for provisioning new user accounts with department and manager associations."""
+
     password = serializers.CharField(write_only=True)
     email = serializers.EmailField(max_length=155, validators=[])
-    # Not a CustomUser field — EmployeeProfile.department is what actually
-    # holds this, so it's declared explicitly and popped off before the
-    # CustomUser is built.
     department = serializers.PrimaryKeyRelatedField(
         queryset=Department.objects.all(), required=False, allow_null=True, write_only=True
     )
-    # Cũng không phải field của CustomUser — EmployeeProfile.manager mới là nơi
-    # lưu. Gán ngay lúc tạo là quan trọng: nhân viên không có Manager sẽ không
-    # Manager nào nhìn thấy và không ai giao việc được, tức là tài khoản vừa
-    # tạo xong đã không dùng được.
     manager = serializers.PrimaryKeyRelatedField(
         queryset=CustomUser.objects.filter(role__code='MANAGER', is_active=True),
         required=False, allow_null=True, write_only=True
@@ -94,13 +83,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = ['email', 'password', 'role', 'is_active', 'department', 'manager']
 
     def validate_email(self, value):
+        """Validate normalized email uniqueness for new account provisioning."""
         return normalize_email(value)
 
     def validate(self, attrs):
+        """Ensure manager assignments are only permitted for employee role accounts."""
         manager = attrs.get('manager')
         role = attrs.get('role')
-        # Chỉ EMPLOYEE mới có tuyến báo cáo. Chặn ở đây thay vì bỏ qua im lặng
-        # để Admin biết ngay là mình chọn nhầm.
         if manager and role and getattr(role, 'code', None) != 'EMPLOYEE':
             raise serializers.ValidationError(
                 {'manager': 'Only EMPLOYEE accounts can have an assigned Manager.'}
@@ -108,6 +97,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Create new user entity and initialize associated EmployeeProfile record."""
         password = validated_data.pop('password')
         department = validated_data.pop('department', None)
         manager = validated_data.pop('manager', None)
@@ -121,6 +111,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
+    """Serializer for managing organizational department entities."""
+
     class Meta:
         model = Department
         fields = ['id', 'name', 'description', 'manager', 'created_at']

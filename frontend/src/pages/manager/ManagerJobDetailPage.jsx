@@ -70,9 +70,14 @@ export default function ManagerJobDetailPage() {
           : swp?.workload_status === 'BALANCED'
           ? '🟢 Balanced'
           : '⚪ Available';
+      const name = emp.full_name || emp.email;
+      const email = emp.email || '';
+      const dept = emp.department_name || 'Staff';
       return {
         value: String(emp.user_id || emp.id),
-        label: `${emp.full_name || emp.email} (${emp.department_name || 'Staff'}) [${statusLabel}]`,
+        label: `${name} (${dept})`,
+        description: email !== name ? `${email} • ${dept}` : dept,
+        badge: statusLabel,
       };
     });
   }, [employeesResponse]);
@@ -103,14 +108,39 @@ export default function ManagerJobDetailPage() {
     const rawTeam = job?.project_team || (Array.isArray(employeesResponse) ? employeesResponse : []);
     const memberMap = {};
 
+    const empWorkloadMap = {};
+    const empList = Array.isArray(employeesResponse)
+      ? employeesResponse
+      : employeesResponse?.results || [];
+    empList.forEach((e) => {
+      const eId = String(e.id || e.user_id);
+      empWorkloadMap[eId] = e;
+    });
+
     rawTeam.forEach((emp) => {
-      const key = String(emp.id);
+      const key = String(emp.id || emp.user_id);
+      const matched = empWorkloadMap[key] || emp;
+
+      const capacityPct =
+        matched.capacity_pct !== undefined && matched.capacity_pct !== null
+          ? parseFloat(matched.capacity_pct)
+          : 0;
+      const dailyRequiredHours = parseFloat(matched.daily_required_hours || 0);
+      const workloadStatus = matched.smart_workload_status || matched.workload_status || 'AVAILABLE';
+      const activeTasks = matched.active_tasks_count !== undefined ? matched.active_tasks_count : (matched.activeTasks || 0);
+      const activeJobs = matched.active_jobs_count !== undefined ? matched.active_jobs_count : (matched.activeJobs || 0);
+
       memberMap[key] = {
-        id: emp.id,
+        id: emp.id || emp.user_id,
         name: emp.full_name || emp.email,
         email: emp.email || '',
         avatar_url: emp.avatar_url || emp.profile?.avatar_url || null,
         department_name: emp.department_name || emp.department?.name || 'General Staff',
+        capacityPct,
+        dailyRequiredHours,
+        workloadStatus,
+        activeTasks,
+        activeJobs,
         tasks: [],
       };
     });
@@ -119,12 +149,18 @@ export default function ManagerJobDetailPage() {
       const assignee = task.assignee;
       const key = assignee?.id ? String(assignee.id) : 'unassigned';
       if (!memberMap[key]) {
+        const matched = empWorkloadMap[key] || {};
         memberMap[key] = {
           id: assignee?.id || null,
           name: assignee?.full_name || assignee?.email || 'Unassigned Tasks',
           email: assignee?.email || '',
           avatar_url: assignee?.avatar_url || assignee?.profile?.avatar_url || null,
-          department_name: 'General Staff',
+          department_name: matched.department_name || matched.department?.name || 'General Staff',
+          capacityPct: matched.capacity_pct ? parseFloat(matched.capacity_pct) : 0,
+          dailyRequiredHours: parseFloat(matched.daily_required_hours || 0),
+          workloadStatus: matched.smart_workload_status || matched.workload_status || 'AVAILABLE',
+          activeTasks: matched.active_tasks_count || 0,
+          activeJobs: matched.active_jobs_count || 0,
           tasks: [],
         };
       }

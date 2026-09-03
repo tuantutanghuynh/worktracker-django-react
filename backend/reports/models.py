@@ -1,3 +1,6 @@
-from django.db import models
+"""
+Module: reports.models
+Description: Data models for the analytical reports module.
+"""
 
-# Create your models here.
+from django.db import models

@@ -1,3 +1,8 @@
+"""
+Module: reports.services.manager_dashboard_service
+Description: Service assembling manager dashboard analytical aggregates, workload stats, and productivity heatmaps.
+"""
+
 from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
@@ -16,6 +21,7 @@ from timesheets.services.manager_employee_utilization_service import calculate_w
 
 
 def decimal_to_float(value):
+    """Convert Decimal values to float or return zero for None."""
     if value is None:
         return 0.0
 
@@ -26,6 +32,7 @@ def decimal_to_float(value):
 
 
 def get_month_range(month, year):
+    """Return start date and end date for specified month and year."""
     start_date = date(year, month, 1)
     last_day = monthrange(year, month)[1]
     end_date = date(year, month, last_day)
@@ -34,11 +41,7 @@ def get_month_range(month, year):
 
 
 def build_task_metrics_summary(user):
-    """
-    TỐI ƯU HIỆU NĂNG:
-    Gom 2 hàm build_task_status_summary và build_overdue_task_rate làm một,
-    thực hiện ĐÚNG 1 CÂU QUERY SQL DUY NHẤT thay vì 3 câu SQL riêng lẻ.
-    """
+    """Aggregate task counts by status and calculate overdue rates in a single query."""
     today = date.today()
     active_condition = Q(
         status__in=[
@@ -80,10 +83,7 @@ def build_task_metrics_summary(user):
 
 
 def build_team_hours_summary(user, month, year):
-    """
-    Thống kê tổng hợp giờ làm việc của team: Tổng giờ, Giờ đã duyệt (Approved),
-    Giờ chờ duyệt (Pending), Giờ bị từ chối (Rejected).
-    """
+    """Aggregate total logged, approved, pending, and rejected team work hours for the month."""
     start_date, end_date = get_month_range(month, year)
 
     qs = (
@@ -111,17 +111,12 @@ def build_team_hours_summary(user, month, year):
 
 
 def build_team_total_hours(user, month, year):
-    """
-    Tổng giờ log work trong tháng/năm.
-    VOIDED không tính vào dashboard.
-    """
+    """Calculate total non-voided logged hours for team in month."""
     return build_team_hours_summary(user, month, year)["team_total_hours"]
 
 
 def build_pending_timesheets_count(user):
-    """
-    Đếm số ngày công (user_id, work_date) đang chờ duyệt của Manager.
-    """
+    """Count number of distinct user work dates awaiting review by the manager."""
     return (
         scoped_logworks(user)
         .filter(review_status=LogWork.ReviewStatus.PENDING)
@@ -132,14 +127,7 @@ def build_pending_timesheets_count(user):
 
 
 def build_workload_per_employee(user, month, year):
-    """
-    So sánh workload theo Employee:
-    - open_task_count
-    - logged_hours trong tháng
-    - capacity_hours
-    - utilization_rate (%)
-    - workload_status (Normal | High | Overloaded)
-    """
+    """Calculate employee open task load, logged hours, capacity, and utilization status."""
     start_date, end_date = get_month_range(month, year)
 
     daily_hours = getattr(settings, "DAILY_WORKING_HOURS", 8)
@@ -239,12 +227,7 @@ def build_workload_per_employee(user, month, year):
 
 
 def build_productivity_heatmap(user, month, year):
-    """
-    Heatmap đơn giản:
-        employee x day = total hours
-
-    Trả về dạng list để frontend dễ render.
-    """
+    """Aggregate logged work hours per employee and work date for heatmap visualization."""
     start_date, end_date = get_month_range(month, year)
 
     rows = (
@@ -280,13 +263,7 @@ def build_productivity_heatmap(user, month, year):
 
 
 def build_dashboard(user, month, year):
-    """
-    Manager Dashboard.
-
-    Toàn bộ dữ liệu lấy từ scoped_*.
-    Không truy cập Task.objects.all(), Job.objects.all(), LogWork.objects.all()
-    trong dashboard Manager.
-    """
+    """Compile comprehensive manager dashboard metrics dictionary."""
     managed_jobs_count = scoped_jobs(user).count()
     status_summary, overdue_task_rate = build_task_metrics_summary(user)
     hours_summary = build_team_hours_summary(user, month, year)

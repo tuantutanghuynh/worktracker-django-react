@@ -1,13 +1,16 @@
+"""
+Module: chat.models
+Description: Database models for chat rooms, participants, and message history.
+"""
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
 
-# ============================================================
-# BẢNG: chat_rooms
-# Đại diện cho một phòng chat (Kênh dự án hoặc Hội thoại 1-1).
-# ============================================================
 class ChatRoom(models.Model):
+    """Represents a chat channel for project jobs or 1-on-1 direct conversations."""
+
     class RoomType(models.TextChoices):
         JOB = "JOB", "Job Channel"
         DIRECT = "DIRECT", "Direct Message"
@@ -34,16 +37,15 @@ class ChatRoom(models.Model):
         ordering = ["-updated_at"]
 
     def __str__(self):
+        """Return formatted room title based on room type."""
         if self.room_type == self.RoomType.JOB and self.job:
             return f"Job Channel: {self.name or self.job.job_name}"
         return f"Direct Room #{self.id}: {self.name or '1-on-1'}"
 
 
-# ============================================================
-# BẢNG: chat_participants
-# Quản lý thành viên tham gia phòng chat và mốc thời gian đọc tin.
-# ============================================================
 class ChatParticipant(models.Model):
+    """Tracks member participation and last-read timestamps for a chat room."""
+
     room = models.ForeignKey(
         ChatRoom,
         on_delete=models.CASCADE,
@@ -62,14 +64,13 @@ class ChatParticipant(models.Model):
         unique_together = ("room", "user")
 
     def __str__(self):
+        """Return participant user and room identifier."""
         return f"{self.user} in Room #{self.room_id}"
 
 
-# ============================================================
-# BẢNG: chat_messages
-# Lưu trữ tin nhắn và tệp tin đính kèm.
-# ============================================================
 class ChatMessage(models.Model):
+    """Stores chat message text, attachments, and creation timestamps."""
+
     room = models.ForeignKey(
         ChatRoom,
         on_delete=models.CASCADE,
@@ -91,4 +92,5 @@ class ChatMessage(models.Model):
         ordering = ["created_at"]
 
     def __str__(self):
+        """Return message sender, room ID, and truncated content preview."""
         return f"Msg #{self.id} by {self.sender_id} in Room #{self.room_id}: {self.content[:30]}"

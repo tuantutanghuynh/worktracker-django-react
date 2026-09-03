@@ -1,3 +1,8 @@
+"""
+Module: tasks.employee.views_employee
+Description: Employee-scoped controllers for viewing assigned tasks, submitting deliverables, changing status, and commenting.
+"""
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -16,31 +21,27 @@ from .serializers_employee import (
     EmployeeTaskCommentSerializer
 )
 
+
 class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet xử lý toàn bộ API Task & Kanban cho Employee.
-    Bảo mật: Chỉ trả về Task được giao cho chính user đang đăng nhập (assignee = request.user).
-    """
+    """ViewSet handling employee personal task listings, status submissions, deliverable attachments, and discussions."""
+
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # 🔒 Chặn xem trộm: Chỉ lấy Task của chính mình
+        """Retrieve task queryset restricted strictly to current authenticated employee."""
         return Task.objects.filter(
             assignee=self.request.user
         ).select_related('job', 'job__manager').prefetch_related('attachments', 'comments')
 
     def get_serializer_class(self):
+        """Return detail serializer for single item retrieval or list serializer for collections."""
         if self.action == 'retrieve':
             return EmployeeTaskDetailSerializer
         return EmployeeTaskListSerializer
 
     @action(detail=True, methods=['patch'], url_path='status')
     def change_status(self, request, pk=None):
-        """
-        API Kéo thả Kanban hoặc Thu hồi: Cập nhật status qua apply_transition() dùng chung —
-        tự validate transition + đúng actor (FR-39), tự notify Manager, tự
-        ghi audit log. Không tự set task.status trực tiếp.
-        """
+        """Update task status via transition workflow engine for Kanban drag-and-drop or recall."""
         task = self.get_object()
         serializer = EmployeeTaskStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -70,9 +71,7 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='attachments')
     def upload_deliverable(self, request, pk=None):
-        """
-        API Nộp sản phẩm bàn giao (Deliverable) khi nộp task sang REVIEWING.
-        """
+        """Upload deliverable file attachment for task submitted for review."""
         task = self.get_object()
         if task.status in [Task.Status.COMPLETED, Task.Status.CANCELLED]:
             return Response(
@@ -87,7 +86,6 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Sử dụng service lưu trữ file chuẩn của hệ thống
         file_data = save_task_attachment(task_id=task.id, uploaded_file=file_obj)
 
         attachment = TaskAttachment.objects.create(
@@ -103,9 +101,7 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['get', 'post'], url_path='comments')
     def task_comments(self, request, pk=None):
-        """
-        API Thảo luận & Comment trên Task.
-        """
+        """Retrieve task comments or post a new discussion comment."""
         task = self.get_object()
 
         if request.method == 'GET':
@@ -113,7 +109,6 @@ class EmployeeTaskViewSet(viewsets.ReadOnlyModelViewSet):
             serializer = EmployeeTaskCommentSerializer(comments, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # 🔒 Khóa chặt comment khi task đang Reviewing hoặc Completed hoặc Cancelled
         if task.status in [Task.Status.REVIEWING, Task.Status.COMPLETED, Task.Status.CANCELLED]:
             return Response(
                 {"error": f"Cannot add comments to a task in '{task.status}' status. Task modifications are locked."}, 

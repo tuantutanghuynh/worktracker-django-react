@@ -236,20 +236,29 @@ export default function CreateTaskDrawer({
           </div>
 
           <div>
-            <label className="block font-bold text-slate-800 mb-1">
-              Assign to Employee <span className="text-slate-400 font-normal">(Optional — Defaults to Manager if unassigned)</span>
-            </label>
-            <select
-              {...register('assignee_id')}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
-            >
-              <option value="">-- Unassigned (Save as Draft under Manager) --</option>
-              {employeeOptions.map((emp) => (
-                <option key={emp.value} value={emp.value}>
-                  {emp.label}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="assignee_id"
+              control={control}
+              render={({ field }) => (
+                <SelectDropdown
+                  label={
+                    <span className="font-bold text-slate-800">
+                      Assign to Employee <span className="text-slate-400 font-normal">(Optional — Defaults to Manager if unassigned)</span>
+                    </span>
+                  }
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={[
+                    { value: '', label: '-- Unassigned (Save as Draft under Manager) --' },
+                    ...employeeOptions,
+                  ]}
+                  placeholder="-- Search and select an employee --"
+                  searchable={true}
+                  theme="light"
+                  error={errors.assignee_id?.message}
+                />
+              )}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

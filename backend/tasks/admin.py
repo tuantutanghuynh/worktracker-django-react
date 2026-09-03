@@ -1,3 +1,6 @@
-from django.contrib import admin
+"""
+Module: tasks.admin
+Description: Django admin panel registrations for tasks and work items.
+"""
 
-# Register your models here.
+from django.contrib import admin

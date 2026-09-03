@@ -1,3 +1,8 @@
+"""
+Module: reports.services.manager_task_summary_report_service
+Description: Service compiling aggregated task summaries, status distributions, and assignee metrics for managers.
+"""
+
 from datetime import date
 from decimal import Decimal
 
@@ -8,6 +13,7 @@ from system.security.scoping_manager import scoped_tasks
 
 
 def decimal_to_float(value):
+    """Convert Decimal values to float or return zero for None."""
     if value is None:
         return 0.0
 
@@ -18,6 +24,7 @@ def decimal_to_float(value):
 
 
 def user_display_name(user):
+    """Return user full name from profile or fallback to email."""
     if user is None:
         return None
 
@@ -30,6 +37,7 @@ def user_display_name(user):
 
 
 def apply_task_summary_filters(queryset, filters):
+    """Filter task summary queryset by job, assignee, status, priority, and deadline range."""
     job_id = filters.get("job_id")
     assignee_id = filters.get("assignee_id")
     status = filters.get("status")
@@ -59,6 +67,7 @@ def apply_task_summary_filters(queryset, filters):
 
 
 def build_status_summary(queryset):
+    """Aggregate total task counts mapped by status code."""
     summary = {
         status_value: 0
         for status_value, status_label in Task.Status.choices
@@ -78,6 +87,7 @@ def build_status_summary(queryset):
 
 
 def build_priority_summary(queryset):
+    """Aggregate total task counts mapped by priority level."""
     summary = {
         priority_value: 0
         for priority_value, priority_label in Task.Priority.choices
@@ -97,11 +107,12 @@ def build_priority_summary(queryset):
 
 
 def build_job_summary(queryset):
+    """Aggregate task counts grouped by parent job."""
     rows = (
         queryset
         .values(
             "job_id",
-            "job__job_code",  # ➕ BỔ SUNG: Thêm job_code vào values
+            "job__job_code",
             "job__job_name",
             "job__status",
             "job__deadline",
@@ -113,7 +124,7 @@ def build_job_summary(queryset):
     return [
         {
             "job_id": row["job_id"],
-            "job_code": row["job__job_code"],  # ➕ BỔ SUNG: job_code
+            "job_code": row["job__job_code"],
             "job_name": row["job__job_name"],
             "job_status": row["job__status"],
             "job_deadline": row["job__deadline"],
@@ -124,6 +135,7 @@ def build_job_summary(queryset):
 
 
 def build_assignee_summary(queryset):
+    """Aggregate task counts grouped by assignee."""
     rows = (
         queryset
         .values(
@@ -150,6 +162,7 @@ def build_assignee_summary(queryset):
 
 
 def build_overdue_summary(queryset):
+    """Calculate active task totals, overdue counts, and overdue rate percentage."""
     today = date.today()
 
     active_queryset = queryset.exclude(
@@ -167,7 +180,6 @@ def build_overdue_summary(queryset):
 
     if total_active_tasks == 0:
         overdue_rate = 0
-
     else:
         overdue_rate = round(
             overdue_tasks / total_active_tasks * 100,
@@ -182,6 +194,7 @@ def build_overdue_summary(queryset):
 
 
 def serialize_task_row(task):
+    """Serialize individual task instance with related job, assignee, and creator fields."""
     return {
         "id": task.id,
         "title": task.title,
@@ -195,7 +208,7 @@ def serialize_task_row(task):
         "updated_at": task.updated_at,
         "job": {
             "id": task.job_id,
-            "job_code": task.job.job_code,  # ➕ BỔ SUNG: job_code
+            "job_code": task.job.job_code,
             "job_name": task.job.job_name,
             "status": task.job.status,
             "deadline": task.job.deadline,
@@ -214,14 +227,7 @@ def serialize_task_row(task):
 
 
 def build_task_summary_report(*, user, filters):
-    """
-    Manager Task Summary Report.
-
-    Scope bắt buộc:
-        tasks.job.manager_id = request.user.id
-
-    Report này chỉ đọc dữ liệu, không ghi dữ liệu nghiệp vụ.
-    """
+    """Generate complete task summary report dataset within manager scope."""
     base_queryset = (
         scoped_tasks(user)
         .select_related(

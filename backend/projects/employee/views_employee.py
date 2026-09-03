@@ -1,3 +1,8 @@
+"""
+Module: projects.employee.views_employee
+Description: Employee view providing project memberships, assigned managers, and fellow teammates.
+"""
+
 from collections import defaultdict
 
 from django.db.models import Count
@@ -12,17 +17,13 @@ from projects.employee.serializers_employee import EmployeeMyTeamJobSerializer
 
 
 class EmployeeMyTeamView(APIView):
-    """
-    GET /api/employee/team/
+    """View providing employee-scoped project overviews, designated managers, and fellow team members."""
 
-    Danh sách dự án Employee đang tham gia, kèm Manager phụ trách và
-    đồng nghiệp cùng dự án. Chỉ danh tính/liên hệ — không có số liệu
-    workload (đó là dữ liệu chỉ hợp lý cho Manager xem).
-    """
     permission_classes = [IsActiveAuthenticated, HasPermissionCode]
     required_permission = "job:view"
 
     def get(self, request):
+        """Retrieve list of active projects with teammates and project-wide task statistics."""
         job_ids = list(employee_job_ids(request.user))
 
         jobs = (
@@ -54,9 +55,6 @@ class EmployeeMyTeamView(APIView):
                 "is_me": row["assignee_id"] == request.user.id,
             })
 
-        # Tiến độ TOÀN BỘ dự án (mọi task, không chỉ của riêng request.user) —
-        # cùng công thức % đã dùng ở ManagerJobDetailPage (frontend):
-        # pct = completed / total, total tính cả CANCELLED (không loại trừ).
         status_rows = (
             Task.objects.filter(job_id__in=job_ids)
             .values("job_id", "status")

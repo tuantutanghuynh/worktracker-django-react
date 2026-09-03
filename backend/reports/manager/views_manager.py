@@ -1,3 +1,8 @@
+"""
+Module: reports.manager.views_manager
+Description: Manager API views for dashboard metrics, task summary reports, timesheet details, and file exports.
+"""
+
 from django.http import HttpResponse
 from django.utils import timezone
 
@@ -26,13 +31,7 @@ from system.security.permissions_manager import IsActiveAuthenticated, IsManager
 
 
 class ManagerDashboardView(APIView):
-    """
-    GET /api/manager/dashboard/
-
-    Dashboard của Manager:
-    - Chỉ lấy dữ liệu trong jobs.manager_id = request.user.id
-    - Không ghi dữ liệu nghiệp vụ
-    """
+    """View compiling manager dashboard analytics including job health, task metrics, and employee utilization."""
 
     permission_classes = [
         IsActiveAuthenticated,
@@ -42,6 +41,7 @@ class ManagerDashboardView(APIView):
     required_permission = "report:view"
 
     def get(self, request):
+        """Retrieve aggregated dashboard metrics for requested month and year."""
         today = timezone.localdate()
 
         data = {
@@ -65,17 +65,7 @@ class ManagerDashboardView(APIView):
 
 
 class ManagerTaskSummaryReportView(APIView):
-    """
-    GET /api/manager/reports/task-summary/
-
-    Báo cáo tổng hợp Task trong scope Manager:
-    - job_id
-    - assignee_id
-    - status
-    - priority
-    - deadline_from
-    - deadline_to
-    """
+    """View generating task summary reports across statuses, assignees, and deadlines within manager scope."""
 
     permission_classes = [
         IsActiveAuthenticated,
@@ -85,6 +75,7 @@ class ManagerTaskSummaryReportView(APIView):
     required_permission = "report:view"
 
     def get(self, request):
+        """Generate filtered task summary report data."""
         serializer = ManagerTaskSummaryReportQuerySerializer(
             data=request.query_params,
         )
@@ -102,21 +93,7 @@ class ManagerTaskSummaryReportView(APIView):
 
 
 class ManagerTimesheetDetailReportView(APIView):
-    """
-    GET /api/manager/reports/timesheet-detail/
-
-    Báo cáo chi tiết Timesheet trong scope Manager:
-    - work_date_from
-    - work_date_to
-    - employee_id
-    - department_id
-    - job_id
-    - task_id
-    - task_status
-    - review_status
-    - locked_period_status
-    - include_voided
-    """
+    """View generating granular timesheet work log reports within manager scope."""
 
     permission_classes = [
         IsActiveAuthenticated,
@@ -126,6 +103,7 @@ class ManagerTimesheetDetailReportView(APIView):
     required_permission = "report:view"
 
     def get(self, request):
+        """Generate filtered timesheet work log report data."""
         serializer = ManagerTimesheetDetailReportQuerySerializer(
             data=request.query_params,
         )
@@ -143,30 +121,7 @@ class ManagerTimesheetDetailReportView(APIView):
 
 
 class ManagerReportExportView(APIView):
-    """
-    POST /api/manager/reports/export/
-
-    Export report ra file.
-
-    Body mẫu:
-        {
-            "report_type": "TASK_SUMMARY",
-            "file_format": "XLSX",
-            "job_id": 1
-        }
-
-    Hoặc:
-        {
-            "report_type": "TIMESHEET_DETAIL",
-            "file_format": "XLSX",
-            "work_date_from": "2026-07-01",
-            "work_date_to": "2026-07-31"
-        }
-
-    Ghi chú:
-    - Export là thao tác read-only với dữ liệu nghiệp vụ.
-    - Nhưng vẫn phải ghi AuditLog hành động REPORT_EXPORTED.
-    """
+    """View exporting task summary and timesheet reports to formatted file spreadsheets."""
 
     permission_classes = [
         IsActiveAuthenticated,
@@ -176,6 +131,7 @@ class ManagerReportExportView(APIView):
     required_permission = "report:export"
 
     def post(self, request):
+        """Export report dataset and return downloadable file response with audit logging."""
         serializer = ManagerReportExportQuerySerializer(
             data=request.data,
         )

@@ -124,10 +124,24 @@ export default function TaskDetailDrawer() {
     const list = Array.isArray(employeesResponse)
       ? employeesResponse
       : employeesResponse.results || [];
-    return list.map((emp) => ({
-      value: String(emp.user_id || emp.id),
-      label: `${emp.full_name || emp.email} (${emp.department_name || 'Staff'})`,
-    }));
+    return list.map((emp) => {
+      const swp = emp.smart_workload_pressure;
+      const statusLabel =
+        swp?.workload_status === 'OVERLOADED'
+          ? '🔴 Overloaded'
+          : swp?.workload_status === 'BALANCED'
+          ? '🟢 Balanced'
+          : '⚪ Available';
+      const name = emp.full_name || emp.email;
+      const email = emp.email || '';
+      const dept = emp.department_name || 'Staff';
+      return {
+        value: String(emp.user_id || emp.id),
+        label: `${name} (${dept})`,
+        description: email !== name ? `${email} • ${dept}` : dept,
+        badge: statusLabel,
+      };
+    });
   }, [employeesResponse]);
 
   // Chuẩn hóa danh sách

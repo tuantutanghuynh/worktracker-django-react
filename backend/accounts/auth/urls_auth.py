@@ -1,3 +1,8 @@
+"""
+Module: accounts.auth.urls_auth
+Description: URL routing configuration for public and shared authentication endpoints.
+"""
+
 from django.urls import path
 
 from .views_auth import (
@@ -9,8 +14,6 @@ from .views_auth import (
     ChangePasswordView,
 )
 
-# Auth routes shared by every role — no role-specific permission required
-# beyond holding a valid (non-blacklisted) JWT where applicable.
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),

@@ -1,3 +1,8 @@
+"""
+Module: tasks.services.task_transition_manager_service
+Description: Service managing task status transitions, role-based authorization, comment logging, and notifications.
+"""
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -21,12 +26,14 @@ EMPLOYEE_ROLE_CODE = "EMPLOYEE"
 
 
 class InvalidTaskTransition(APIException):
+    """Exception indicating an impermissible state transition for task status."""
     status_code = 400
     default_detail = "Invalid task status transition."
     default_code = "invalid_task_transition"
 
 
 class BusinessRuleError(APIException):
+    """Exception indicating violation of domain constraints during task transitions."""
     status_code = 400
     default_detail = "Business rule violation."
     default_code = "business_rule_error"
@@ -63,8 +70,6 @@ TASK_TRANSITIONS = {
         ACTOR_JOB_MANAGER,
         ACTOR_ADMIN,
     ],
-    # 🚀 CHUẨN JIRA WORKFLOW (RE-OPEN TASK):
-    # Cho phép Manager & Admin mở lại Task đã Completed về In Progress hoặc To Do để giao nhân viên làm lại
     (Task.Status.COMPLETED, Task.Status.IN_PROGRESS): [
         ACTOR_JOB_MANAGER,
         ACTOR_ADMIN,
@@ -73,8 +78,6 @@ TASK_TRANSITIONS = {
         ACTOR_JOB_MANAGER,
         ACTOR_ADMIN,
     ],
-    # 🔄 KHÔI PHỤC TASK (RESTORE CANCELLED TASK):
-    # Cho phép Manager & Admin khôi phục lại Task đã Cancel về To Do hoặc In Progress
     (Task.Status.CANCELLED, Task.Status.TODO): [
         ACTOR_JOB_MANAGER,
         ACTOR_ADMIN,
@@ -84,7 +87,6 @@ TASK_TRANSITIONS = {
         ACTOR_ADMIN,
     ],
 }
-
 
 EVENT_MAP = {
     (
@@ -103,11 +105,13 @@ EVENT_MAP = {
 
 
 def get_user_role_code(user):
+    """Return normalized role code string for user."""
     role = getattr(user, "role", None)
     return getattr(role, "code", None)
 
 
 def get_action_name(from_status, to_status):
+    """Determine audit log action identifier based on state transition endpoints."""
     if from_status == Task.Status.REVIEWING and to_status == Task.Status.COMPLETED:
         return "APPROVE_TASK"
 
@@ -124,6 +128,7 @@ def get_action_name(from_status, to_status):
 
 
 def get_event_type(from_status, to_status):
+    """Return notification event type mapped to status transition pair."""
     return EVENT_MAP.get(
         (from_status, to_status),
         Notification.EventType.TASK_STATUS_CHANGED,
@@ -131,6 +136,7 @@ def get_event_type(from_status, to_status):
 
 
 def get_transition_title(from_status, to_status, task):
+    """Return human-readable notification subject string for status transition."""
     if to_status == Task.Status.COMPLETED:
         return "Task approved"
 
@@ -150,9 +156,7 @@ def get_transition_title(from_status, to_status, task):
 
 
 def assert_actor(user, task, allowed_actors):
-    """
-    Kiểm tra user có thuộc actor được phép cho transition hay không.
-    """
+    """Verify that user role or assignment permits execution of transition."""
     role_code = get_user_role_code(user)
 
     if ACTOR_ADMIN in allowed_actors and role_code == ADMIN_ROLE_CODE:
@@ -172,12 +176,10 @@ def assert_actor(user, task, allowed_actors):
 
 
 def validate_transition(task, to_status, reason=None):
-    # 0. Chặn thao tác khi Client bị vô hiệu hóa (trừ khi Cancel task)
+    """Validate transition eligibility, required reasons, and active client constraints."""
     if task.job.client and not task.job.client.is_active and to_status != Task.Status.CANCELLED:
         raise BusinessRuleError("CLIENT_DEACTIVATED_CANNOT_TRANSITION_TASK")
 
-    # Cho phép Hủy Task (CANCELLED) bất kể Job đang ở PLANNING, ON_HOLD hay ACTIVE.
-    # Nhưng chặn các hành động thực thi sản xuất (In Progress, Reviewing, Completed) nếu Job không ACTIVE.
     if task.job.status != "ACTIVE" and to_status != Task.Status.CANCELLED:
         raise BusinessRuleError("JOB_NOT_ACTIVE_CANNOT_TRANSITION_TASK")
 
@@ -191,7 +193,6 @@ def validate_transition(task, to_status, reason=None):
         task.status == Task.Status.TODO
         and to_status == Task.Status.IN_PROGRESS
     ):
-        # Chặn nếu Task vẫn đang tạm đứng tên Manager (chưa giao cho Nhân viên thực tế)
         if task.assignee and getattr(getattr(task.assignee, "role", None), "code", None) == "MANAGER":
             raise BusinessRuleError("MUST_ASSIGN_TO_EMPLOYEE_BEFORE_STARTING")
 
@@ -221,7 +222,6 @@ def validate_transition(task, to_status, reason=None):
     if to_status == Task.Status.CANCELLED and not reason:
         raise BusinessRuleError("CANCELLATION_REASON_REQUIRED")
 
-        # 🚀 Yêu cầu lý do khi Manager Re-open Task từ COMPLETED về IN_PROGRESS hoặc TODO
     if (
         task.status == Task.Status.COMPLETED
         and to_status in (Task.Status.IN_PROGRESS, Task.Status.TODO)
@@ -233,9 +233,7 @@ def validate_transition(task, to_status, reason=None):
 
 
 def apply_transition(*, user, task, to_status, reason=None, request=None):
-    """
-    Áp dụng transition Task theo bảng §8.1.
-    """
+    """Execute task status transition, create rejection comments, and broadcast notifications."""
     clean_reason = reason.strip() if isinstance(reason, str) else reason
 
     with transaction.atomic():
@@ -292,7 +290,6 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
                 comment_type=TaskComment.CommentType.REJECTION_NOTE,
             )
 
-            # 🚀 Tự động lưu Lý do làm lại thành Bình luận để Nhân viên đọc được
         if from_status == Task.Status.COMPLETED and to_status in (
             Task.Status.IN_PROGRESS,
             Task.Status.TODO,
@@ -334,8 +331,6 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
             request=request,
         )
 
-        # 🚀 Auto-Release Check (Theo Quy trinh moi):
-        # Neu nhan vien nay khong con Task dang thuc hien (TODO, IN_PROGRESS, REVIEWING) nao o Job nay
         if to_status == Task.Status.COMPLETED:
             remaining_tasks_count = Task.objects.filter(
                 job_id=locked_task.job_id,
@@ -375,7 +370,6 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
 
-        # 🚀 2.2. Gửi Email thông báo khi nhân viên nộp task lên hàng chờ REVIEWING
         if to_status == Task.Status.REVIEWING:
             try:
                 from tasks.services.task_email_service import send_task_submitted_email
@@ -383,7 +377,6 @@ def apply_transition(*, user, task, to_status, reason=None, request=None):
             except Exception:
                 pass
 
-        # 🚀 2.3. Gửi Email thông báo khi Manager từ chối Task / Yêu cầu làm lại (REVIEWING -> IN_PROGRESS)
         if (
             from_status == Task.Status.REVIEWING
             and to_status == Task.Status.IN_PROGRESS

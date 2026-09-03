@@ -1,3 +1,8 @@
+"""
+Module: tasks.manager.filters_manager
+Description: Custom filter parser and ordering handler for manager-scoped task queries.
+"""
+
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -8,14 +13,7 @@ from tasks.models import Task, TaskComment
 
 
 class ManagerTaskFilter:
-    """
-    Filter Task cho Manager.
-
-    Lưu ý:
-    - Queryset truyền vào phải là queryset đã scope:
-          scoped_tasks(request.user)
-    - Không dùng class này với Task.objects.all() cho Manager.
-    """
+    """Filter processor for manager task list queries supporting status, priority, review scope, and search filters."""
 
     VALID_ORDER_FIELDS = {
         "deadline",
@@ -29,6 +27,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def apply(cls, queryset, params):
+        """Apply all configured filtering routines and field ordering to task queryset."""
         queryset = cls.filter_status(queryset, params)
         queryset = cls.filter_priority(queryset, params)
         queryset = cls.filter_job(queryset, params)
@@ -45,6 +44,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_status(cls, queryset, params):
+        """Filter queryset by single status or comma-separated list of task statuses."""
         status = params.get("status")
         status_in = params.get("status__in")
 
@@ -89,6 +89,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_priority(cls, queryset, params):
+        """Filter queryset by single priority or comma-separated priority levels."""
         priority = params.get("priority")
         priority_in = params.get("priority__in")
 
@@ -133,6 +134,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_job(cls, queryset, params):
+        """Filter queryset by parent job primary key."""
         job_id = params.get("job_id")
 
         if not job_id:
@@ -149,6 +151,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_assignee(cls, queryset, params):
+        """Filter queryset by assigned employee primary key."""
         assignee_id = params.get("assignee_id")
 
         if not assignee_id:
@@ -165,6 +168,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_deadline_range(cls, queryset, params):
+        """Filter queryset within specified deadline date boundaries."""
         deadline_from = params.get("deadline_from")
         deadline_to = params.get("deadline_to")
 
@@ -196,6 +200,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_is_overdue(cls, queryset, params):
+        """Filter queryset for overdue tasks based on current date."""
         is_overdue = params.get("is_overdue")
 
         if is_overdue is None:
@@ -234,6 +239,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_rejections(cls, queryset, params):
+        """Filter queryset based on presence of task rejection comments."""
         has_rejections = params.get("has_rejections")
         if has_rejections is not None:
             val = str(has_rejections).lower() in ["true", "1", "yes"]
@@ -255,6 +261,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_review_scope(cls, queryset, params):
+        """Filter tasks relevant to manager quality review queues."""
         is_review_scope = params.get("is_review_scope")
         if is_review_scope is not None and str(is_review_scope).lower() in ["true", "1", "yes"]:
             rejection_task_ids = (
@@ -276,6 +283,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_submitted_date(cls, queryset, params):
+        """Filter tasks submitted or updated on specific calendar date."""
         submitted_date = params.get("submitted_date")
         if submitted_date:
             parsed_date = parse_date(submitted_date)
@@ -292,6 +300,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def filter_search(cls, queryset, params):
+        """Perform text search across task title, description, assignee name, and project metadata."""
         search = params.get("search")
 
         if not search:
@@ -313,6 +322,7 @@ class ManagerTaskFilter:
 
     @classmethod
     def apply_ordering(cls, queryset, params):
+        """Apply requested ordering parameter or default Kanban column rank ordering."""
         ordering = params.get("ordering")
 
         if not ordering:

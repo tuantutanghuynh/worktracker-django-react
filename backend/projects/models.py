@@ -1,25 +1,22 @@
+"""
+Module: projects.models
+Description: Data models for client directories, master project jobs, and related entity relationships.
+"""
+
 from django.conf import settings
 from django.db import models
 from django.db.models.functions import Lower, Trim
 
 
-# ============================================================
-# BẢNG 8: clients
-# Danh mục Khách hàng / Đối tác gốc
-# Là root business entity cho jobs.
-# Áp dụng soft delete (is_active) thay vì xóa vật lý
-# để bảo toàn dữ liệu lịch sử của các job đã liên kết.
-# ============================================================
 class Client(models.Model):
-    client_name = models.CharField(max_length=255)
+    """Represents a client organization or corporate partner."""
 
-    # UNIQUE + INDEX phục vụ tìm kiếm và đảm bảo không trùng mã số thuế
+    client_name = models.CharField(max_length=255)
     tax_code = models.CharField(
         max_length=50,
         unique=True,
         db_index=True,
     )
-
     contact_person = models.CharField(
         max_length=150,
         blank=True,
@@ -35,54 +32,34 @@ class Client(models.Model):
         blank=True,
         null=True,
     )
-    # Cờ Soft Delete. Chuyển về False thay vì xóa vật lý.
-    # INDEX để filter active/inactive nhanh.
     is_active = models.BooleanField(
         default=True,
         db_index=True,
-
     )
-
     address = models.CharField(
         max_length=255,
         blank=True,
         null=True,
-
-    )  # Địa chỉ trụ sở / Địa chỉ xuất hóa đơn
-
+    )
     industry = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-    )  # Lĩnh vực hoạt động (IT, Banking, Finance...)
-
+    )
     notes = models.TextField(
         blank=True,
         null=True,
-    )  # Ghi chú nội bộ / Lưu ý khi hợp tác
-
+    )
     created_at = models.DateTimeField(
         auto_now_add=True
-    )  # Ngày khởi tạo bản ghi
-
+    )
     updated_at = models.DateTimeField(
         auto_now=True
-    )  # Ngày cập nhật thông tin gần nhất
+    )
 
     class Meta:
         db_table = "clients"
         constraints = [
-            # Tên khách hàng phải là duy nhất, KHÔNG phân biệt hoa thường.
-            #
-            # Dùng Lower() chứ không phải unique=True trên field: ràng buộc
-            # thường chỉ so khớp chính xác, nên "ABC Corp" và "abc corp" vẫn
-            # lọt qua và tạo ra 2 dòng nhìn y hệt nhau trong danh sách.
-            # Trim() vì cùng lý do: "  ABC  " cũng phải tính là trùng.
-            #
-            # Đây là lớp cuối. ClientSerializer đã chặn sớm với thông báo dễ
-            # hiểu; ràng buộc này bắt những đường không đi qua serializer:
-            # lệnh seed, shell, script quản trị, và cả hai request gửi lên
-            # cùng lúc mà cả hai đều thấy "chưa trùng".
             models.UniqueConstraint(
                 Lower(Trim("client_name")),
                 name="unique_client_name_case_insensitive",
@@ -90,26 +67,18 @@ class Client(models.Model):
         ]
 
     def __str__(self):
+        """Return the client name."""
         return self.client_name  
 
-# ============================================================
-# BẢNG 9: jobs
-# Danh mục Dự án / Gói công việc lớn (master job).
-#
-# Lưu ý quan trọng:
-# jobs.manager_id là field DUY NHẤT được dùng để tính
-# Manager access scope trên toàn hệ thống (jobs, tasks,
-# timesheets, reports). Không dùng departments.manager_id
-# cho mục đích này (xem FR-31, FR-99, FR-117).
-# ============================================================
+
 class Job(models.Model):
+    """Represents a master project job managed by an assigned manager."""
 
     class Priority(models.TextChoices):
-        HIGH   = 'HIGH',   'High'
+        HIGH = 'HIGH', 'High'
         MEDIUM = 'MEDIUM', 'Medium'
-        LOW    = 'LOW',    'Low'
+        LOW = 'LOW', 'Low'
 
-    # ENUM trạng thái dự án (FR-29: Job Status Management)
     class Status(models.TextChoices):
         PLANNING = "PLANNING", "Planning"
         ACTIVE = "ACTIVE", "Active"
@@ -117,51 +86,35 @@ class Job(models.Model):
         ON_HOLD = "ON_HOLD", "On Hold"
         CANCELLED = "CANCELLED", "Cancelled"
 
-    # Khóa ngoại trỏ đến Khách hàng.
-    # RESTRICT để chặn xóa khách hàng nếu đang có dự án liên kết.
     client = models.ForeignKey(
         Client,
         on_delete=models.RESTRICT,
         related_name="jobs",
     )
-
-    # Khóa ngoại trỏ đến User (Manager phụ trách).
-    # Dùng settings.AUTH_USER_MODEL thay vì import CustomUser trực tiếp
-    # để tránh circular import giữa các app.
-    # RESTRICT để bảo vệ lịch sử công việc.
     manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.RESTRICT,
         related_name="managed_jobs",
     )
-
     job_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
     job_name = models.CharField(max_length=255)
-
     priority = models.CharField(
         max_length=10,
         choices=Priority.choices,
         default=Priority.MEDIUM,
         db_index=True,
-
     )
-    
     description = models.TextField(
         blank=True,
         null=True,
     )
-
     start_date = models.DateField()
-
-    # INDEX để tối ưu tốc độ quét dự án trễ hạn (overdue job lookup).
     deadline = models.DateField(db_index=True)
-
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.PLANNING,
     )
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -169,4 +122,5 @@ class Job(models.Model):
         db_table = "jobs"
 
     def __str__(self):
+        """Return the job name."""
         return self.job_name

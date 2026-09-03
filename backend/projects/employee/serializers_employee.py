@@ -1,3 +1,8 @@
+"""
+Module: projects.employee.serializers_employee
+Description: Employee serializers for project job overviews, team rosters, and task completion progress.
+"""
+
 from rest_framework import serializers
 
 from projects.models import Job
@@ -5,9 +10,8 @@ from tasks.models import Task
 
 
 class EmployeeMyTeamJobSerializer(serializers.ModelSerializer):
-    """1 dự án mà Employee đang tham gia, kèm Manager + đồng nghiệp
-    cùng dự án. `teammates_by_job` (dict job_id -> list) được truyền
-    qua context để tránh N+1 (đã tính bulk 1 lần ở view)."""
+    """Serializer representing employee job involvement with manager profile, teammates, and task statistics."""
+
     client_name = serializers.CharField(source="client.client_name", read_only=True)
     manager = serializers.SerializerMethodField()
     teammates = serializers.SerializerMethodField()
@@ -22,6 +26,7 @@ class EmployeeMyTeamJobSerializer(serializers.ModelSerializer):
         ]
 
     def get_manager(self, obj):
+        """Return profile overview dictionary for the assigned project manager."""
         manager = obj.manager
         profile = getattr(manager, "profile", None)
         return {
@@ -32,13 +37,12 @@ class EmployeeMyTeamJobSerializer(serializers.ModelSerializer):
         }
 
     def get_teammates(self, obj):
+        """Return cached list of team members engaged on the project."""
         teammates_by_job = self.context.get("teammates_by_job", {})
         return teammates_by_job.get(obj.id, [])
 
     def get_task_progress(self, obj):
-        """Tiến độ TOÀN BỘ dự án — tổng hợp mọi task trong job (không chỉ
-        task của người gọi API). Công thức khớp ManagerJobDetailPage:
-        pct = completed / total, total tính cả CANCELLED."""
+        """Calculate overall project task counts and completion percentage."""
         stats = self.context.get("task_stats_by_job", {}).get(obj.id, {})
         total = sum(stats.values())
         completed = stats.get(Task.Status.COMPLETED, 0)

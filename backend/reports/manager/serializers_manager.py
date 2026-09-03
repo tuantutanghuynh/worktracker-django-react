@@ -1,3 +1,8 @@
+"""
+Module: reports.manager.serializers_manager
+Description: Query parameter serializers for manager dashboard analytics and report exports.
+"""
+
 from rest_framework import serializers
 
 from tasks.models import Task
@@ -5,6 +10,8 @@ from timesheets.models import LogWork
 
 
 class ManagerDashboardQuerySerializer(serializers.Serializer):
+    """Serializer validating month and year parameters for manager dashboard analytics."""
+
     month = serializers.IntegerField(
         min_value=1,
         max_value=12,
@@ -15,6 +22,8 @@ class ManagerDashboardQuerySerializer(serializers.Serializer):
 
 
 class ManagerTaskSummaryReportQuerySerializer(serializers.Serializer):
+    """Serializer validating filter criteria for task summary report queries."""
+
     job_id = serializers.IntegerField(
         required=False,
     )
@@ -37,6 +46,7 @@ class ManagerTaskSummaryReportQuerySerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
+        """Ensure deadline start date is on or before deadline end date."""
         deadline_from = attrs.get("deadline_from")
         deadline_to = attrs.get("deadline_to")
 
@@ -51,6 +61,8 @@ class ManagerTaskSummaryReportQuerySerializer(serializers.Serializer):
 
 
 class ManagerTimesheetDetailReportQuerySerializer(serializers.Serializer):
+    """Serializer validating filter criteria for detailed timesheet report queries."""
+
     work_date_from = serializers.DateField(
         required=False,
     )
@@ -90,6 +102,7 @@ class ManagerTimesheetDetailReportQuerySerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
+        """Ensure work date start is on or before work date end."""
         work_date_from = attrs.get("work_date_from")
         work_date_to = attrs.get("work_date_to")
 
@@ -104,6 +117,8 @@ class ManagerTimesheetDetailReportQuerySerializer(serializers.Serializer):
 
 
 class ManagerReportExportQuerySerializer(serializers.Serializer):
+    """Serializer validating parameters and filters for report file export requests."""
+
     report_type = serializers.ChoiceField(
         choices=[
             ("TASK_SUMMARY", "Task Summary"),
@@ -117,7 +132,6 @@ class ManagerReportExportQuerySerializer(serializers.Serializer):
         ],
     )
 
-    # Common filters
     job_id = serializers.IntegerField(
         required=False,
     )
@@ -131,7 +145,6 @@ class ManagerReportExportQuerySerializer(serializers.Serializer):
         required=False,
     )
 
-    # Task filters
     status = serializers.ChoiceField(
         choices=Task.Status.choices,
         required=False,
@@ -150,7 +163,6 @@ class ManagerReportExportQuerySerializer(serializers.Serializer):
         required=False,
     )
 
-    # Timesheet filters
     work_date_from = serializers.DateField(
         required=False,
     )
@@ -178,6 +190,7 @@ class ManagerReportExportQuerySerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
+        """Validate chronology across deadline and work date ranges."""
         deadline_from = attrs.get("deadline_from")
         deadline_to = attrs.get("deadline_to")
 

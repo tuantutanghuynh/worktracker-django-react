@@ -1,3 +1,8 @@
+"""
+Module: projects.manager.views_manager
+Description: Manager viewsets for scoped project job administration and client catalog lookups.
+"""
+
 from django.db import transaction
 from django.db.models import Count, Q
 
@@ -25,14 +30,7 @@ from system.services.audit_manager_service import snapshot, log_action
 
 
 class ManagerJobViewSet(viewsets.ModelViewSet):
-    """
-    Manager Job API.
-
-    Scope chính thức:
-        jobs.manager_id = request.user.id
-
-    Không dùng departments.manager_id để tính scope.
-    """
+    """ViewSet managing manager-scoped project job retrieval, creation, updates, and state transitions."""
 
     permission_classes = [
         IsActiveAuthenticated,
@@ -49,10 +47,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
     ]
     
     def get_permissions(self):
-        """
-        Khai báo required_permission động dựa trên action hiện tại.
-        HasPermissionCode sẽ tự động lấy giá trị này để kiểm duyệt.
-        """
+        """Map specific actions to required permission codes."""
         action_permissions = {
             "list": "job:view",
             "retrieve": "job:view",
@@ -61,17 +56,11 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
             "change_status": "job:change_status",
         }
         
-        # Gán quyền tương ứng vào self, nếu action không nằm trong dict trên, nó sẽ gán None (bị chặn)
         self.required_permission = action_permissions.get(self.action)
-        
         return super().get_permissions()
 
     def get_queryset(self):
-        """
-        Queryset gốc luôn phải được scope trước.
-
-        Manager chỉ thấy Job do chính Manager đó phụ trách.
-        """
+        """Retrieve scoped job queryset annotated with task status aggregates for the manager."""
         return (
             scoped_jobs(self.request.user)
             .select_related("client", "manager", "manager__profile")
@@ -107,6 +96,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         )
 
     def get_serializer_class(self):
+        """Return dedicated serializer based on request action."""
         if self.action == "list":
             return ManagerJobListSerializer
 
@@ -122,9 +112,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         return ManagerJobDetailSerializer
 
     def list(self, request, *args, **kwargs):
-        """
-        GET /api/manager/jobs/
-        """
+        """List paginated and filtered project jobs for authenticated manager."""
         queryset = self.get_queryset()
         queryset = ManagerJobFilter.apply(queryset, request.query_params)
 
@@ -142,9 +130,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         )
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/manager/jobs/{id}/
-        """
+        """Retrieve detailed job record by primary key."""
         job = self.get_object()
         serializer = ManagerJobDetailSerializer(job)
 
@@ -154,15 +140,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         )
 
     def create(self, request, *args, **kwargs):
-        """
-        POST /api/manager/jobs/
-
-        Manager tạo Job:
-        - Không được truyền manager_id.
-        - Hệ thống tự gán manager = request.user.
-        - Status dùng default của model: PLANNING.
-        - Khởi tạo Kênh Chat dự án và gán Team Members do Manager chọn.
-        """
+        """Create new job instance, bind manager ownership, and initialize project chat room."""
         serializer = ManagerJobCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
@@ -172,7 +150,6 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
                 manager=request.user,
             )
 
-            # Tự động khởi tạo Kênh Chat Dự án và gán Project Team
             from chat.models import ChatRoom, ChatParticipant
             room_name = f"#{job.job_code or f'JOB-{job.id}'}: {job.job_name}"
             room, _ = ChatRoom.objects.get_or_create(
@@ -217,25 +194,14 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
         )
 
     def partial_update(self, request, *args, **kwargs):
-        """
-        PATCH /api/manager/jobs/{id}/
-
-        Manager chỉ được cập nhật:
-        - job_name
-        - description
-        - deadline
-
-        Không xử lý status ở endpoint này.
-        Status dùng endpoint riêng:
-            POST /api/manager/jobs/{id}/status/
-        """
+        """Update job details, adjust team members, and record audit log."""
         job = self.get_object()
 
         old_values = snapshot(
             job,
             fields=[
                 "job_name",
-                "priority",    # ➕ BỔ SUNG: Chụp lại độ ưu tiên cũ
+                "priority",
                 "description",
                 "deadline",
             ],
@@ -265,12 +231,10 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
                 )
                 ChatParticipant.objects.get_or_create(room=room, user=request.user)
 
-                # Cập nhật danh sách thành viên dự án
                 current_participants = ChatParticipant.objects.filter(
                     room=room
                 ).exclude(user=request.user)
 
-                # Thêm thành viên mới
                 target_emps = CustomUser.objects.filter(
                     id__in=team_member_ids,
                     role__code="EMPLOYEE",
@@ -279,10 +243,8 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
                 )
                 target_emp_ids = set(target_emps.values_list("id", flat=True))
 
-                # Xóa những thành viên bị bỏ chọn
                 current_participants.exclude(user_id__in=target_emp_ids).delete()
 
-                # Thêm mới những thành viên chưa có
                 for emp in target_emps:
                     _, created = ChatParticipant.objects.get_or_create(room=room, user=emp)
                     if created:
@@ -319,11 +281,7 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="status")
     def change_status(self, request, pk=None):
-        """
-        POST /api/manager/jobs/{id}/status/
-
-        Đổi trạng thái Job theo state machine trong service.
-        """
+        """Execute state transition for job status via status manager service."""
         job = self.get_object()
 
         serializer = ManagerJobStatusChangeSerializer(data=request.data)
@@ -346,10 +304,8 @@ class ManagerJobViewSet(viewsets.ModelViewSet):
 
 
 class ManagerClientViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Manager Client API (Read-only).
-    Cho phép Manager xem danh sách khách hàng để chọn khi tạo / gán Job.
-    """
+    """Read-only viewset listing active clients for manager assignment dropdowns."""
+
     permission_classes = [
         IsActiveAuthenticated,
         IsManagerRole,
@@ -359,5 +315,6 @@ class ManagerClientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Client.objects.filter(is_active=True).order_by("client_name")
 
     def get_permissions(self):
+        """Assign client view permission for manager queries."""
         self.required_permission = "client:view"
-        return super().get_permissions()
+        return super().get_permissions()

@@ -1,3 +1,8 @@
+"""
+Module: tasks.services.task_manager_service
+Description: Service managing task creation, updates, assignee verification, and Kanban drag-and-drop repositioning.
+"""
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
@@ -14,7 +19,6 @@ from system.services.notification_manager_service import notify
 from tasks.services.order_index_manager_service import key_between
 from tasks.services.task_transition_manager_service import apply_transition
 
-
 EMPLOYEE_ROLE_CODE = "EMPLOYEE"
 
 JOB_STATUS_ALLOW_CREATE = [
@@ -24,33 +28,20 @@ JOB_STATUS_ALLOW_CREATE = [
 
 
 class BusinessRuleError(APIException):
+    """Exception indicating violation of domain constraints during task operations."""
     status_code = 400
     default_detail = "Business rule violation."
     default_code = "business_rule_error"
 
 
 def assert_task_in_manager_scope(user, task):
-    """
-    Manager chỉ được thao tác task thuộc job do mình quản lý.
-    """
+    """Ensure task belongs to a project managed by the authenticated manager."""
     if task.job.manager_id != user.id:
         raise PermissionDenied("TASK_OUT_OF_MANAGER_SCOPE")
 
 
 def get_active_employee_or_error(user_id, manager=None):
-    """
-    Lấy assignee hợp lệ.
-
-    Theo FR-34, task được giao cho Employee.
-
-    Khi truyền `manager`, hàm còn kiểm tra Employee đó có thuộc tuyến báo cáo
-    của Manager này không (EmployeeProfile.manager). Đây là chốt chặn để một
-    Manager không giao được việc cho nhân viên của Manager khác — trước đây
-    chỉ kiểm role nên ai cũng giao cho ai cũng được.
-
-    Đặt luật ở đây chứ không ở serializer vì đây là điểm nghẽn duy nhất: cả
-    create_task lẫn update_task đều đi qua hàm này.
-    """
+    """Retrieve and validate that target user is an active employee within manager reporting hierarchy."""
     User = get_user_model()
 
     try:
@@ -90,6 +81,7 @@ def get_active_employee_or_error(user_id, manager=None):
 
 
 def validate_task_deadline(job, deadline, is_create=False):
+    """Validate task deadline against current date and project parent deadline."""
     if not deadline:
         return
 
@@ -110,6 +102,7 @@ def validate_task_deadline(job, deadline, is_create=False):
 
 
 def get_last_order_key(job_id, status):
+    """Return order index key of last task in specified status column."""
     last_task = (
         Task.objects.filter(
             job_id=job_id,
@@ -123,11 +116,7 @@ def get_last_order_key(job_id, status):
 
 
 def add_default_followers(task, users):
-    """
-    Thêm follower cho task.
-
-    ignore_conflicts=True để không lỗi nếu user đã follow trước đó.
-    """
+    """Register default follower records for newly created or reassigned tasks."""
     follower_rows = []
 
     for user in users:
@@ -147,17 +136,7 @@ def add_default_followers(task, users):
 
 
 def create_task(*, user, data, request=None):
-    """
-    Manager tạo Task.
-
-    data dự kiến gồm:
-        job_id
-        assignee_id
-        title
-        description
-        priority
-        deadline
-    """
+    """Create new task within atomic transaction with order index calculation and assignment alerts."""
     job_id = data.get("job_id")
     assignee_id = data.get("assignee_id")
     title = data.get("title")
@@ -185,7 +164,6 @@ def create_task(*, user, data, request=None):
             pk=job_id,
         )
 
-        # 🛡️ DEFENSIVE GUARD: Khóa tạo Task nếu Client bị Admin vô hiệu hóa
         if job.client and not job.client.is_active:
             raise BusinessRuleError(
                 f"Cannot create task because client '{job.client.client_name}' is deactivated by Admin. "
@@ -198,7 +176,6 @@ def create_task(*, user, data, request=None):
         if assignee_id:
             assignee = get_active_employee_or_error(assignee_id, manager=user)
         else:
-            # Nếu chưa chọn nhân viên: Mặc định tạm gán cho chính Manager tạo task (Unassigned draft)
             assignee = user
 
         last_key = get_last_order_key(
@@ -223,7 +200,6 @@ def create_task(*, user, data, request=None):
             users=list(set([assignee, user])),
         )
 
-        # Tự động cập nhật thành viên dự án (ChatParticipant) nếu là nhân viên
         if assignee.id != user.id:
             from chat.models import ChatRoom, ChatParticipant
             room = ChatRoom.objects.filter(job=job, room_type=ChatRoom.RoomType.JOB).first()
@@ -262,7 +238,6 @@ def create_task(*, user, data, request=None):
                 related_url="/employee/my-tasks",
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
-            # 🚀 Gửi Email thông báo phân công Task mới (2.1)
             try:
                 from tasks.services.task_email_service import send_task_assigned_email
                 send_task_assigned_email(task, request=request)
@@ -273,16 +248,7 @@ def create_task(*, user, data, request=None):
 
 
 def update_task(*, user, task, data, request=None):
-    """
-    Manager cập nhật Task.
-
-    Cho phép:
-    - title
-    - description
-    - priority
-    - deadline
-    - assignee_id
-    """
+    """Update task fields with optimistic locking and reassignment notification handling."""
     allowed_fields = {
         "title",
         "description",
@@ -310,7 +276,6 @@ def update_task(*, user, task, data, request=None):
 
         assert_task_in_manager_scope(user, locked_task)
 
-        # 🛡️ DEFENSIVE GUARD: Khóa cập nhật Task nếu Client bị Admin vô hiệu hóa
         if locked_task.job.client and not locked_task.job.client.is_active:
             raise BusinessRuleError(
                 f"Cannot update task because client '{locked_task.job.client.client_name}' is deactivated by Admin. "
@@ -374,7 +339,6 @@ def update_task(*, user, task, data, request=None):
                 ],
             )
 
-            # Tự động cập nhật thành viên dự án (ChatParticipant) nếu là nhân viên
             if new_assignee and new_assignee.id != user.id:
                 from chat.models import ChatRoom, ChatParticipant
                 room = ChatRoom.objects.filter(job=locked_task.job, room_type=ChatRoom.RoomType.JOB).first()
@@ -389,7 +353,6 @@ def update_task(*, user, task, data, request=None):
                 related_url="/employee/my-tasks",
                 channel=Notification.ChannelType.SYSTEM_ONLY,
             )
-            # 🚀 Gửi Email thông báo phân công Task mới (2.1)
             try:
                 from tasks.services.task_email_service import send_task_assigned_email
                 send_task_assigned_email(locked_task, request=request)
@@ -419,6 +382,7 @@ def update_task(*, user, task, data, request=None):
 
 
 def get_neighbor_task(user, task_id, job_id, status):
+    """Retrieve adjacent sibling task in same Kanban column for relative order calculations."""
     if not task_id:
         return None
 
@@ -441,17 +405,7 @@ def move_task_kanban(
     reason=None,
     request=None,
 ):
-    """
-    Kanban drag-and-drop.
-
-    FR-39 chia làm 2 trường hợp:
-    1. Reorder cùng cột:
-       - Chỉ đổi order_index.
-       - Không validate transition.
-    2. Kéo sang cột khác:
-       - Phải gọi state machine apply_transition().
-       - Transition sai phải bị backend reject.
-    """
+    """Move task between Kanban columns or reorder within current column."""
     with transaction.atomic():
         locked_task = (
             scoped_tasks(user)
@@ -462,7 +416,6 @@ def move_task_kanban(
 
         assert_task_in_manager_scope(user, locked_task)
 
-        # 🛡️ DEFENSIVE GUARD: Khóa kéo thả Kanban nếu Client bị Admin vô hiệu hóa
         if locked_task.job.client and not locked_task.job.client.is_active:
             raise BusinessRuleError(
                 f"Cannot move or reorder task '{locked_task.title}' because client '{locked_task.job.client.client_name}' is deactivated by Admin. The project is frozen."

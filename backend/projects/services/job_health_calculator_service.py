@@ -1,24 +1,16 @@
+"""
+Module: projects.services.job_health_calculator_service
+Description: Calculates dynamic project job health indicators and velocity-to-deadline forecast metrics.
+"""
+
 from django.utils import timezone
 
 
 def calculate_job_health(job, task_counts=None, today=None):
-    """
-    Calculate dynamic Job Health & Risk Indicator based on Velocity-to-Deadline Forecast (VDF).
-
-    Returns a dict with:
-      - code: "COMPLETED" | "CANCELLED" | "OVERDUE" | "PLANNING" | "ON_TRACK" | "AT_RISK" | "CRITICAL"
-      - label: Human-readable status label
-      - color: "green" | "yellow" | "red" | "blue" | "gray"
-      - risk_ratio: Float or None (T_needed / T_remaining)
-      - velocity_per_day: Float (Completed tasks per day)
-      - estimated_days_needed: Float or None
-      - days_remaining: Int
-      - days_elapsed: Int
-    """
+    """Calculate dynamic Job Health and risk indicator based on velocity-to-deadline forecast."""
     if today is None:
         today = timezone.localdate()
 
-    # Terminal statuses
     if job.status == "COMPLETED":
         return {
             "code": "COMPLETED",
@@ -47,14 +39,12 @@ def calculate_job_health(job, task_counts=None, today=None):
             "days_elapsed": 0,
         }
 
-    # Date computations
     start_date = job.start_date or today
     deadline = job.deadline or today
 
     days_elapsed = max((today - start_date).days, 0)
     days_remaining = (deadline - today).days
 
-    # Extract task counts
     if task_counts is None:
         from tasks.models import Task
         from django.db.models import Count, Q
@@ -78,7 +68,6 @@ def calculate_job_health(job, task_counts=None, today=None):
 
     active_backlog = todo_count + in_progress_count + reviewing_count
 
-    # 1. Check if already Overdue
     if days_remaining < 0:
         return {
             "code": "OVERDUE",
@@ -91,7 +80,6 @@ def calculate_job_health(job, task_counts=None, today=None):
             "days_elapsed": days_elapsed,
         }
 
-    # 2. Check if all tasks completed already
     if total_tasks > 0 and active_backlog == 0:
         return {
             "code": "ON_TRACK",
@@ -104,7 +92,6 @@ def calculate_job_health(job, task_counts=None, today=None):
             "days_elapsed": days_elapsed,
         }
 
-    # 3. Cold Start / Planning phase (< 3 days or 0 completed tasks early)
     if days_elapsed <= 3 and completed_count == 0:
         return {
             "code": "PLANNING",
@@ -117,7 +104,6 @@ def calculate_job_health(job, task_counts=None, today=None):
             "days_elapsed": days_elapsed,
         }
 
-    # 4. Calculate Velocity & Risk Ratio
     effective_elapsed = max(days_elapsed, 1)
     velocity = completed_count / effective_elapsed
 
@@ -134,8 +120,6 @@ def calculate_job_health(job, task_counts=None, today=None):
         }
 
     estimated_days_needed = active_backlog / velocity
-
-    # Risk Ratio R = Days Needed / Days Remaining
     effective_remaining = max(days_remaining, 1)
     risk_ratio = round(estimated_days_needed / effective_remaining, 2)
 

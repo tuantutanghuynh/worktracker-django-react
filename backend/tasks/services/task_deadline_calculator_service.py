@@ -1,22 +1,16 @@
+"""
+Module: tasks.services.task_deadline_calculator_service
+Description: Service computing task deadline health indicators, remaining days, and percentage thresholds.
+"""
+
 from django.utils import timezone
 
 
 def calculate_task_deadline_health(task, today=None):
-    """
-    Calculate dynamic Task Deadline Health & Remaining Time % based on RAG Thresholds.
-
-    Returns a dict with:
-      - code: "COMPLETED" | "CANCELLED" | "OVERDUE" | "CRITICAL" | "WARNING" | "ON_TRACK"
-      - label: Human-readable label
-      - color: "green" | "yellow" | "red" | "gray"
-      - remaining_percent: Float (0.0 to 100.0)
-      - days_remaining: Int
-      - total_days: Int
-    """
+    """Calculate dynamic task deadline health and remaining time percentage."""
     if today is None:
         today = timezone.localdate()
 
-    # Terminal statuses
     if task.status == "COMPLETED":
         created_date = (
             task.created_at.date()
@@ -59,7 +53,6 @@ def calculate_task_deadline_health(task, today=None):
     total_days = max((deadline - created_date).days, 1)
     days_remaining = (deadline - today).days
 
-    # 1. Overdue
     if days_remaining < 0:
         return {
             "code": "OVERDUE",
@@ -70,7 +63,6 @@ def calculate_task_deadline_health(task, today=None):
             "total_days": total_days,
         }
 
-    # 2. Percentage calculation
     remaining_percent = round(
         min(max((days_remaining / total_days) * 100, 0.0), 100.0), 1
     )

@@ -1,3 +1,6 @@
-from django.shortcuts import render
+"""
+Module: reports.views
+Description: Base views and shared controllers for reports module.
+"""
 
-# Create your views here.
+from django.shortcuts import render

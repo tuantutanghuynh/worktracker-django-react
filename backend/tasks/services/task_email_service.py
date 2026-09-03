@@ -1,12 +1,8 @@
 """
-Dịch vụ gửi email thông báo sự kiện liên quan tới Task và Dự án.
-
-Tuân thủ quy tắc:
-- Gửi email qua send_templated_email (HTML multipart + Plain-text).
-- Bọc try/except fail-silently an toàn: sự cố máy chủ mail không bao giờ
-  làm rollback transaction nghiệp vụ.
-- Tự động lấy FRONTEND_URL từ settings.
+Module: tasks.services.task_email_service
+Description: Email dispatch service delivering templated notifications for task assignments, submissions, rejections, and team additions.
 """
+
 import logging
 from django.conf import settings
 from system.services.email_service import send_templated_email
@@ -15,9 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def send_task_assigned_email(task, request=None):
-    """
-    Gửi email cho nhân viên khi được phân công Task mới (2.1).
-    """
+    """Send templated email notification to assignee upon new task assignment."""
     if not task.assignee or not task.assignee.email:
         return False
 
@@ -46,9 +40,7 @@ def send_task_assigned_email(task, request=None):
 
 
 def send_task_submitted_email(task, note="", request=None):
-    """
-    Gửi email cho Quản lý dự án khi nhân viên nộp bài duyệt (2.2).
-    """
+    """Send templated email notification to manager when task is submitted for review."""
     if not task.job or not task.job.manager or not task.job.manager.email:
         return False
 
@@ -76,9 +68,7 @@ def send_task_submitted_email(task, note="", request=None):
 
 
 def send_task_rejected_email(task, reason="", reviewer=None, request=None):
-    """
-    Gửi email cho nhân viên khi Task bị từ chối / yêu cầu làm lại (2.3).
-    """
+    """Send templated email notification to assignee when task review is rejected."""
     if not task.assignee or not task.assignee.email:
         return False
 
@@ -105,9 +95,7 @@ def send_task_rejected_email(task, reason="", reviewer=None, request=None):
 
 
 def send_project_team_added_email(job, member, request=None):
-    """
-    Gửi email thông báo cho nhân viên khi được thêm vào Project Team (4.1).
-    """
+    """Send templated email notification to user when assigned to project job team."""
     if not member or not member.email:
         return False
 
