@@ -109,6 +109,7 @@ export default function ManagerJobDetailPage() {
         id: emp.id,
         name: emp.full_name || emp.email,
         email: emp.email || '',
+        avatar_url: emp.avatar_url || emp.profile?.avatar_url || null,
         department_name: emp.department_name || emp.department?.name || 'General Staff',
         tasks: [],
       };
@@ -122,6 +123,7 @@ export default function ManagerJobDetailPage() {
           id: assignee?.id || null,
           name: assignee?.full_name || assignee?.email || 'Unassigned Tasks',
           email: assignee?.email || '',
+          avatar_url: assignee?.avatar_url || assignee?.profile?.avatar_url || null,
           department_name: 'General Staff',
           tasks: [],
         };

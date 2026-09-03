@@ -29,6 +29,7 @@ const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 // lễ, nên một ngày không có log CHƯA CHẮC là quên chấm công — có thể là
 // nghỉ phép. "No Log" mô tả đúng sự thật đo được, không quy kết.
 const STATUS_OPTIONS = [
+  { value: '', label: 'All status' },
   { value: 'NORMAL', label: 'Normal' },
   { value: 'WARNING', label: 'Below Target' },
   { value: 'MISSING', label: 'No Log' },
@@ -119,16 +120,22 @@ export function TimesheetControlPage() {
   const totalCount = employeesPage?.count || 0;
 
   const { data: departmentsPage } = useAdminDepartments({ page_size: 500 });
-  const departmentOptions = (departmentsPage?.results || []).map((d) => ({
-    value: String(d.id),
-    label: d.name,
-  }));
+  const departmentOptions = [
+    { value: '', label: 'All departments' },
+    ...(departmentsPage?.results || []).map((d) => ({
+      value: String(d.id),
+      label: d.name,
+    })),
+  ];
 
   const { data: managersPage } = useAdminUsers({ role: 'MANAGER', page_size: 500 });
-  const managerOptions = (managersPage?.results || []).map((m) => ({
-    value: String(m.id),
-    label: m.email,
-  }));
+  const managerOptions = [
+    { value: '', label: 'All managers' },
+    ...(managersPage?.results || []).map((m) => ({
+      value: String(m.id),
+      label: m.email,
+    })),
+  ];
 
   // Every GLOBAL lock ever created — small list (at most 1 per month/year
   // in the system's history), so no pagination needed here. Used to find
@@ -261,7 +268,8 @@ export function TimesheetControlPage() {
           <SelectDropdown
             theme="light"
             label="Department"
-            placeholder="All departments"
+            searchable
+            placeholder="Type to search..."
             options={departmentOptions}
             value={department}
             onChange={setDepartment}
@@ -269,7 +277,8 @@ export function TimesheetControlPage() {
           <SelectDropdown
             theme="light"
             label="Manager"
-            placeholder="All managers"
+            searchable
+            placeholder="Type to search..."
             options={managerOptions}
             value={manager}
             onChange={setManager}
@@ -283,6 +292,23 @@ export function TimesheetControlPage() {
             onChange={setStatusFilter}
           />
         </div>
+        {Boolean(search || department || manager || statusFilter) && (
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setDepartment('');
+                setManager('');
+                setStatusFilter('');
+                setPage(1);
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline flex items-center gap-1"
+            >
+              <span>✕</span> Clear all filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Không dùng overflow-x-auto: table-fixed + width theo % nên bảng luôn

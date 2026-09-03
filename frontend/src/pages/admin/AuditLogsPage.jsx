@@ -27,6 +27,7 @@ const ROLE_TABS = [
   { value: 'EMPLOYEE', label: 'Employee' },
 ];
 const SEVERITY_OPTIONS = [
+  { value: '', label: 'All severities' },
   { value: 'CRITICAL', label: 'Critical' },
   { value: 'WARNING', label: 'Warning' },
   { value: 'NORMAL', label: 'Normal' },
@@ -97,18 +98,24 @@ export function AuditLogsPage() {
   const { data: usersPage } = useAdminUsers({ page_size: 500 });
   const users = usersPage?.results || [];
   const userById = Object.fromEntries(users.map((u) => [u.id, u]));
-  const actorOptions = users
-    .filter((u) => u.role_detail?.code === roleTab)
-    .map((u) => ({ value: String(u.id), label: u.email }));
+  const actorOptions = [
+    { value: '', label: 'All users' },
+    ...users
+      .filter((u) => u.role_detail?.code === roleTab)
+      .map((u) => ({ value: String(u.id), label: u.email })),
+  ];
 
   // Populated from the values actually present in the table (see
   // AuditLogViewSet.filter_options), not hardcoded, so it never drifts out
   // of sync as new action types get added elsewhere in the app.
   const { data: filterOptions } = useAdminAuditLogFilterOptions();
-  const actionOptions = (filterOptions?.actions || []).map((a) => ({
-    value: a,
-    label: getActionLabel(a),
-  }));
+  const actionOptions = [
+    { value: '', label: 'All actions' },
+    ...(filterOptions?.actions || []).map((a) => ({
+      value: a,
+      label: getActionLabel(a),
+    })),
+  ];
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 

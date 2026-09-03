@@ -242,7 +242,8 @@ export function DepartmentsPage() {
               <SelectDropdown
                 theme="light"
                 label="Manager"
-                placeholder="No manager"
+                searchable
+                placeholder="Type to search..."
                 options={managerOptions}
                 value={field.value}
                 onChange={field.onChange}

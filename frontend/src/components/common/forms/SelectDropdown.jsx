@@ -42,6 +42,8 @@ export default function SelectDropdown({
 
   const selectedOption = options.find(o => String(o.value) === String(value));
 
+  const [openUpward, setOpenUpward] = useState(false);
+
   // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -53,10 +55,38 @@ export default function SelectDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter(o => 
-    o.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.badge?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Tự động tính toán hướng mở (lật lên trên nếu phía dưới không đủ 250px)
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 250 && rect.top > 250) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
+  }, [isOpen]);
+
+  const stripAccents = (str) => {
+    if (!str) return '';
+    return String(str)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
+  };
+
+  const cleanQuery = stripAccents(searchQuery.trim());
+  const filteredOptions = options.filter((o) => {
+    if (!cleanQuery) return true;
+    return (
+      stripAccents(o.label).includes(cleanQuery) ||
+      stripAccents(o.badge).includes(cleanQuery) ||
+      stripAccents(o.description).includes(cleanQuery)
+    );
+  });
 
   const handleSelect = (optionValue) => {
     if (onChange) onChange(optionValue);
@@ -92,19 +122,41 @@ export default function SelectDropdown({
       >
         <div className="flex items-center gap-2 truncate">
           {LeftIcon && <LeftIcon className={cn("w-4 h-4 shrink-0", isLight ? "text-slate-400" : "text-slate-400")} />}
-          {selectedOption ? (
+          {selectedOption && value !== '' ? (
             <span className={cn("truncate font-semibold", isLight ? "text-slate-900" : "text-slate-100")}>{selectedOption.label}</span>
           ) : (
             <span className={isLight ? "text-slate-400" : "text-slate-500"}>{placeholder}</span>
           )}
         </div>
-        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0", isOpen && "rotate-180")} />
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {selectedOption && value !== '' && !required && !disabled && (
+            <span
+              role="button"
+              tabIndex={0}
+              title="Clear selection"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onChange) onChange('');
+                setIsOpen(false);
+                setSearchQuery('');
+              }}
+              className={cn(
+                "p-0.5 rounded-md transition-colors hover:bg-slate-200/80 cursor-pointer",
+                isLight ? "text-slate-400 hover:text-slate-700" : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              <X className="w-3.5 h-3.5" />
+            </span>
+          )}
+          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0", isOpen && "rotate-180")} />
+        </div>
       </button>
 
       {/* Dropdown Menu Panel */}
       {isOpen && !disabled && (
         <div className={cn(
-          "absolute left-0 right-0 top-full mt-1 z-50 border rounded-xl shadow-2xl overflow-hidden animate-slide-in-top",
+          "absolute left-0 right-0 z-50 border rounded-xl shadow-2xl overflow-hidden",
+          openUpward ? "bottom-full mb-1 animate-slide-in-bottom" : "top-full mt-1 animate-slide-in-top",
           isLight ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"
         )}>
           {/* Optional Search Input */}

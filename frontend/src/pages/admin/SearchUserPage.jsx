@@ -91,9 +91,13 @@ export function SearchUserPage() {
   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
   // The list filter matches on role CODE (role__code), not the id the edit
   // form posts — hence a separate option list built from the same roles.
-  const roleFilterOptions = roles.map((r) => ({ value: r.code, label: r.name }));
+  const roleFilterOptions = [
+    { value: '', label: 'All roles' },
+    ...roles.map((r) => ({ value: r.code, label: r.name })),
+  ];
 
   const STATUS_FILTER_OPTIONS = [
+    { value: '', label: 'All status' },
     { value: 'true', label: 'Active' },
     { value: 'false', label: 'Locked' },
   ];
@@ -107,9 +111,11 @@ export function SearchUserPage() {
     { value: '', label: 'No Department' },
     ...departments.map((d) => ({ value: String(d.id), label: d.name })),
   ];
-  // Bản dùng cho filter — không có mục "No Department" vì ô trống ở đây
-  // đã mang nghĩa "tất cả phòng ban".
-  const departmentFilterOptions = departments.map((d) => ({ value: String(d.id), label: d.name }));
+  // Bản dùng cho filter
+  const departmentFilterOptions = [
+    { value: '', label: 'All departments' },
+    ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+  ];
 
   // Danh sach Manager de do 2 dropdown ben duoi. Tai qua chinh endpoint
   // users voi role=MANAGER; page_size=500 de lay het, khong bi cat o trang
@@ -124,6 +130,7 @@ export function SearchUserPage() {
   // Ban dung cho filter: them muc "Chua gan" de Admin tim ra nhung nhan vien
   // khong thuoc tuyen nao — ho vo hinh voi moi Manager nen phai gan lai.
   const managerFilterOptions = [
+    { value: '', label: 'All managers' },
     { value: 'none', label: 'No Manager assigned' },
     ...managers.map((m) => ({ value: String(m.id), label: managerLabel(m) })),
   ];
@@ -276,7 +283,8 @@ export function SearchUserPage() {
           <SelectDropdown
             theme="light"
             label="Department"
-            placeholder="All departments"
+            searchable
+            placeholder="Type to search..."
             options={departmentFilterOptions}
             value={departmentFilter}
             onChange={setDepartmentFilter}
@@ -284,7 +292,8 @@ export function SearchUserPage() {
           <SelectDropdown
             theme="light"
             label="Manager"
-            placeholder="All managers"
+            searchable
+            placeholder="Type to search..."
             options={managerFilterOptions}
             value={managerFilter}
             onChange={setManagerFilter}
@@ -440,6 +449,8 @@ export function SearchUserPage() {
               <SelectDropdown
                 theme="light"
                 label="Department"
+                searchable
+                placeholder="Type to search..."
                 options={departmentOptions}
                 value={selectedUser.profile?.department ? String(selectedUser.profile.department) : ''}
                 onChange={onChangeDepartment}
@@ -455,6 +466,8 @@ export function SearchUserPage() {
                 <SelectDropdown
                   theme="light"
                   label="Manager"
+                  searchable
+                  placeholder="Type to search..."
                   options={managerOptions}
                   value={selectedUser.profile?.manager ? String(selectedUser.profile.manager) : ''}
                   onChange={onChangeManager}

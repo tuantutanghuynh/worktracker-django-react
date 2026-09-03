@@ -130,6 +130,8 @@ export function CreateUserPage() {
             <SelectDropdown
               theme="light"
               label="Department (optional)"
+              searchable
+              placeholder="Type to search..."
               options={departmentOptions}
               value={field.value}
               onChange={field.onChange}
@@ -147,6 +149,8 @@ export function CreateUserPage() {
                 <SelectDropdown
                   theme="light"
                   label="Manager"
+                  searchable
+                  placeholder="Type to search..."
                   options={managerOptions}
                   value={field.value}
                   onChange={field.onChange}

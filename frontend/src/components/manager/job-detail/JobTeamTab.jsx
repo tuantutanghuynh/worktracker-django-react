@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import PaginationBar from '../../common/table/PaginationBar';
+import UserAvatar from '../../common/avatar/UserAvatar';
 
 export default function JobTeamTab({ groupedTeamMembers = [], openTaskDrawer }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,9 +38,12 @@ export default function JobTeamTab({ groupedTeamMembers = [], openTaskDrawer }) 
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-extrabold text-sm flex items-center justify-center shadow-2xs">
-                    {member.name[0].toUpperCase()}
-                  </div>
+                  <UserAvatar
+                    src={member.avatar_url}
+                    fullName={member.name}
+                    size="md"
+                    className="w-10 h-10 rounded-xl shrink-0"
+                  />
                   <div>
                     <h4 className="font-extrabold text-sm text-slate-900">{member.name}</h4>
                     <p className="text-xs text-slate-500">{member.email || 'Unassigned queue'}</p>

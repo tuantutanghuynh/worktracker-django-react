@@ -24,12 +24,12 @@ export default function BaseModal({
         {/* Khung chứa Modal */}
         <Dialog.Content
           className={cn(
-            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden focus:outline-none transition-all animate-in zoom-in-95 duration-200',
+            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-visible focus:outline-none transition-all animate-in zoom-in-95 duration-200',
             maxWidth
           )}
         >
           {/* Header Modal */}
-          <div className="flex items-start justify-between p-5 border-b border-slate-100">
+          <div className="flex items-start justify-between p-5 border-b border-slate-100 rounded-t-2xl">
             <div>
               <Dialog.Title className="text-base font-bold text-slate-900 leading-snug">
                 {title}
@@ -54,7 +54,7 @@ export default function BaseModal({
 
           {/* Footer Modal */}
           {footer && (
-            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-2xl">
               {footer}
             </div>
           )}
