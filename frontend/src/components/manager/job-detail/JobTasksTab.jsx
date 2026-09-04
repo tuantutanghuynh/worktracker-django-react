@@ -3,6 +3,7 @@ import { Search, Eye, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import DataTable from '../../common/table/DataTable';
 import PaginationBar from '../../common/table/PaginationBar';
+import UserAvatar from '../../common/avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
 
 function formatDateSafe(dateStr) {
@@ -74,9 +75,13 @@ export default function JobTasksTab({ tasks = [], tasksLoading = false, openTask
         }
         return (
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-            <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-extrabold uppercase shrink-0">
-              {(assignee.full_name || assignee.email || 'U')[0]}
-            </div>
+            <UserAvatar
+              user={assignee}
+              src={assignee.avatar_url || assignee.avatar}
+              fullName={assignee.full_name || assignee.email}
+              size="xs"
+              className="shrink-0 shadow-2xs"
+            />
             <span className="truncate max-w-[130px]">{assignee.full_name || assignee.email}</span>
           </div>
         );

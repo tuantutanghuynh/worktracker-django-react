@@ -12,9 +12,30 @@ def calculate_smart_workload_pressure(user):
     """Calculate real-time smart workload pressure by evaluating open task priorities and deadlines."""
     from tasks.models import Task
     from projects.models import Job
+    from chat.models import ChatParticipant
     from django.utils import timezone
 
     today = timezone.localdate()
+
+    # In-scope job statuses: PLANNING, ACTIVE, and ON_HOLD (excludes terminal statuses COMPLETED & CANCELLED)
+    IN_SCOPE_JOB_STATUSES = [Job.Status.PLANNING, Job.Status.ACTIVE, Job.Status.ON_HOLD]
+
+    job_ids_from_team = set(
+        ChatParticipant.objects.filter(
+            room__job__isnull=False,
+            room__job__status__in=IN_SCOPE_JOB_STATUSES,
+            room__room_type="JOB",
+            user=user,
+        ).values_list("room__job_id", flat=True)
+    )
+    job_ids_from_tasks = set(
+        Job.objects.filter(
+            tasks__assignee=user,
+            status__in=IN_SCOPE_JOB_STATUSES,
+        ).values_list("id", flat=True)
+    )
+    all_active_job_ids = job_ids_from_team | job_ids_from_tasks
+    active_jobs_count = len(all_active_job_ids)
 
     active_tasks = Task.objects.filter(
         assignee=user,
@@ -24,8 +45,9 @@ def calculate_smart_workload_pressure(user):
     if not active_tasks.exists():
         return {
             "active_tasks_count": 0,
-            "active_jobs_count": 0,
+            "active_jobs_count": active_jobs_count,
             "daily_required_hours": 0.0,
+            "capacity_pct": 0.0,
             "workload_status": "AVAILABLE",
         }
 
@@ -43,12 +65,6 @@ def calculate_smart_workload_pressure(user):
     horizon_working_days = max(1, horizon_working_days)
 
     daily_required_hours = round(total_effort_hours / float(horizon_working_days), 1)
-
-    active_jobs_count = Job.objects.filter(
-        tasks__assignee=user,
-        status=Job.Status.ACTIVE
-    ).distinct().count()
-
     capacity_pct = round((daily_required_hours / 8.0) * 100.0, 1)
 
     if daily_required_hours < 4.0:

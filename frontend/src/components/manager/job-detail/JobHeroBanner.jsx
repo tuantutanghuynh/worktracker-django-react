@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Briefcase,
@@ -15,10 +15,16 @@ import {
   PauseCircle,
   AlertTriangle,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays, isValid, startOfDay } from 'date-fns';
 import { cn } from '../../../utils/cn';
 
+/**
+ * Module: components/manager/job-detail/JobHeroBanner
+ * Description: Executive Hero Banner presenting master job information, action controls, deliverable progress, and key schedule KPIs.
+ */
+
 function formatDateSafe(dateStr) {
+  /** Safely parse and format ISO date string to DD/MM/YYYY. */
   if (!dateStr) return 'N/A';
   try {
     return format(parseISO(dateStr), 'dd/MM/yyyy');
@@ -29,6 +35,7 @@ function formatDateSafe(dateStr) {
 
 export default function JobHeroBanner({
   job,
+  tasks = [],
   progressMetrics,
   isClientInactive,
   isJobFrozen,
@@ -36,6 +43,33 @@ export default function JobHeroBanner({
   onOpenCreateTaskDrawer,
 }) {
   const navigate = useNavigate();
+  const today = startOfDay(new Date());
+
+  // Calculate Executive Schedule KPIs
+  const scheduleKPIs = useMemo(() => {
+    let durationDays = 0;
+    if (job?.start_date && job?.deadline) {
+      const s = parseISO(job.start_date);
+      const d = parseISO(job.deadline);
+      if (isValid(s) && isValid(d)) {
+        durationDays = Math.max(differenceInCalendarDays(d, s) + 1, 1);
+      }
+    }
+
+    const total = tasks.length;
+    const completed = tasks.filter((t) => t.status === 'COMPLETED').length;
+    const todo = tasks.filter((t) => t.status === 'TODO').length;
+    const overdue = tasks.filter(
+      (t) => t.deadline && parseISO(t.deadline) < today && t.status !== 'COMPLETED'
+    ).length;
+
+    return {
+      durationDays: durationDays || 30,
+      completedRatio: `${completed}/${total}`,
+      overdueCount: overdue,
+      todoCount: todo,
+    };
+  }, [job, tasks, today]);
 
   if (!job) return null;
 
@@ -68,10 +102,12 @@ export default function JobHeroBanner({
       )}
 
       {/* 🌟 HERO MASTER INFO BANNER */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+        
+        {/* Row 1: Header Titles & Action Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           
-          {/* Left: Icon, Titles & Metadata */}
+          {/* Left: Icon, Titles & Badges */}
           <div className="flex items-center gap-3.5 min-w-0 flex-1">
             <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20 shrink-0">
               <Briefcase className="w-5 h-5" />
@@ -178,45 +214,66 @@ export default function JobHeroBanner({
           </div>
         </div>
 
-        {/* Horizontal Metadata Row */}
-        <div className="pt-2.5 border-t border-slate-100 flex items-center gap-6 text-xs text-slate-600 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
-            <span className="font-semibold text-slate-500">Client:</span>
-            <span className="font-bold text-slate-900">{job.client?.client_name || job.client_name || 'N/A'}</span>
-            {job.client && job.client.is_active === false && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
-                <PauseCircle className="w-2.5 h-2.5 text-rose-600" />
-                Inactive
+        {/* Row 2: Metadata & Executive KPI Cards */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          
+          {/* Left Metadata */}
+          <div className="flex items-center gap-6 text-xs text-slate-600 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="font-semibold text-slate-500">Client:</span>
+              <span className="font-bold text-slate-900">{job.client?.client_name || job.client_name || 'N/A'}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="font-semibold text-slate-500">Timeline:</span>
+              <span className="font-bold text-slate-900 font-mono">
+                {formatDateSafe(job.start_date)} → {formatDateSafe(job.deadline)}
               </span>
-            )}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="font-semibold text-slate-500">Created:</span>
+              <span className="font-bold text-slate-700 font-mono">{formatDateSafe(job.created_at)}</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span className="font-semibold text-slate-500">Timeline:</span>
-            <span className="font-bold text-slate-900 font-mono">
-              {formatDateSafe(job.start_date)} → {formatDateSafe(job.deadline)}
-            </span>
+          {/* 🌟 4 EXECUTIVE SCHEDULE KPIS (NEUMORPHIC CARDS) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+            <div className="px-3.5 py-1.5 rounded-xl bg-slate-50/80 border border-slate-200/70 text-center shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Duration</span>
+              <span className="text-sm font-extrabold text-slate-800">{scheduleKPIs.durationDays} Days</span>
+            </div>
+
+            <div className="px-3.5 py-1.5 rounded-xl bg-slate-50/80 border border-slate-200/70 text-center shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Completed</span>
+              <span className="text-sm font-extrabold text-emerald-600">{scheduleKPIs.completedRatio}</span>
+            </div>
+
+            <div className="px-3.5 py-1.5 rounded-xl bg-slate-50/80 border border-slate-200/70 text-center shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Overdue</span>
+              <span className={cn('text-sm font-extrabold', scheduleKPIs.overdueCount > 0 ? 'text-rose-600' : 'text-slate-400')}>
+                {scheduleKPIs.overdueCount} Tasks
+              </span>
+            </div>
+
+            <div className="px-3.5 py-1.5 rounded-xl bg-slate-50/80 border border-slate-200/70 text-center shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">To Do</span>
+              <span className="text-sm font-extrabold text-slate-700">{scheduleKPIs.todoCount} To Do</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-            <span className="font-semibold text-slate-500">Created:</span>
-            <span className="font-bold text-slate-700 font-mono">{formatDateSafe(job.created_at)}</span>
-          </div>
         </div>
 
-        {/* 📊 PROGRESS BAR KÈM LEGEND */}
+        {/* Row 3: Progress Bar */}
         {progressMetrics && (
-          <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
+          <div className="pt-3 border-t border-slate-100 space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
               <span className="flex items-center gap-1.5">
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
                 <span>Project Deliverable Progress</span>
-                <span className="text-slate-500 font-semibold">
-                  ({progressMetrics.completed}/{progressMetrics.total} tasks completed)
-                </span>
               </span>
               <span className="text-emerald-600 text-sm font-extrabold">{progressMetrics.pct}%</span>
             </div>
@@ -227,26 +284,6 @@ export default function JobHeroBanner({
                 style={{ width: `${progressMetrics.pct}%` }}
                 title={`Completed: ${progressMetrics.completed}/${progressMetrics.total}`}
               />
-            </div>
-
-            {/* Legend chú thích các trạng thái */}
-            <div className="flex items-center gap-4 text-[11px] font-semibold text-slate-500 pt-0.5 flex-wrap">
-              <span className="flex items-center gap-1 text-emerald-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>{progressMetrics.completed} Completed ({progressMetrics.pct}%)</span>
-              </span>
-              <span className="flex items-center gap-1 text-blue-700">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                <span>{progressMetrics.inProgress} In Progress</span>
-              </span>
-              <span className="flex items-center gap-1 text-purple-700">
-                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                <span>{progressMetrics.reviewing} Reviewing (QA)</span>
-              </span>
-              <span className="flex items-center gap-1 text-slate-600">
-                <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                <span>{progressMetrics.todo} To Do</span>
-              </span>
             </div>
           </div>
         )}

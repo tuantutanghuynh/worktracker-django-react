@@ -117,7 +117,7 @@ const MENU_CONFIG = {
         label: 'Operations',
         items: [
           { path: '/admin/timesheets', label: 'Timesheet Control', icon: Clock },
-          { path: '/admin/support', label: 'Support Desk', icon: Headphones, isChatBadge: true },
+          { path: '/admin/support', label: 'Support Desk', icon: Headphones, isAdminSupportBadge: true },
         ],
       },
       {
@@ -220,6 +220,19 @@ export default function Sidebar() {
     const dms = Array.isArray(chatRoomsData.direct_messages) ? chatRoomsData.direct_messages : [];
     return [...channels, ...dms].reduce((sum, r) => sum + (r.unread_count || 0), 0);
   }, [chatRoomsData]);
+
+  // 🚀 REACT QUERY: Lấy số lượng yêu cầu Support Desk đang chờ Admin phản hồi hoặc tin nhắn mới
+  const isAdmin = userRole === 'ADMIN';
+  const adminPendingSupportCount = useMemo(() => {
+    if (!isAdmin || !chatRoomsData) return 0;
+    const dms = Array.isArray(chatRoomsData.direct_messages) ? chatRoomsData.direct_messages : [];
+    return dms.filter((room) => {
+      const lastMsg = room.last_message;
+      const lastMsgFromAdmin = lastMsg?.is_from_admin || lastMsg?.sender_role === 'ADMIN' || lastMsg?.sender_id === displayUser?.id;
+      const isPending = (room.unread_count || 0) > 0 || (lastMsg && !lastMsgFromAdmin);
+      return isPending;
+    }).length;
+  }, [isAdmin, chatRoomsData, displayUser?.id]);
 
   // Tính toán danh sách Jobs hiển thị trong Recently Viewed Jobs
   const displayRecentJobs = useMemo(() => {
@@ -375,6 +388,12 @@ export default function Sidebar() {
                   {item.isChatBadge && unreadChatCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs animate-pulse">
                       {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                    </span>
+                  )}
+
+                  {item.isAdminSupportBadge && adminPendingSupportCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow-xs animate-pulse">
+                      {adminPendingSupportCount > 99 ? '99+' : adminPendingSupportCount}
                     </span>
                   )}
                 </NavLink>

@@ -72,6 +72,7 @@ export default function TaskDetailDrawer() {
     description: '',
     assignee_id: '',
     priority: 'MEDIUM',
+    start_date: '',
     deadline: '',
   });
 
@@ -114,6 +115,7 @@ export default function TaskDetailDrawer() {
         description: task.description || '',
         assignee_id: isManager ? '' : (task.assignee?.id ? String(task.assignee.id) : ''),
         priority: task.priority || 'MEDIUM',
+        start_date: task.start_date || '',
         deadline: task.deadline || '',
       });
     }
@@ -185,8 +187,37 @@ export default function TaskDetailDrawer() {
       return;
     }
 
-    if (editFormData.deadline && task?.job?.deadline && editFormData.deadline > task.job.deadline) {
-      toast.error(`Task deadline cannot exceed project deadline (${formatDateSafe(task.job.deadline)}).`);
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const jobStart = task?.job?.start_date;
+    const jobDeadline = task?.job?.deadline;
+
+    if (editFormData.start_date && editFormData.start_date < todayStr && editFormData.start_date !== task.start_date) {
+      toast.error(`Task start date cannot be in the past (must be on or after today: ${formatDateSafe(todayStr)}).`);
+      return;
+    }
+
+    if (editFormData.deadline && editFormData.deadline < todayStr && editFormData.deadline !== task.deadline) {
+      toast.error(`Task deadline cannot be in the past (must be on or after today: ${formatDateSafe(todayStr)}).`);
+      return;
+    }
+
+    if (editFormData.start_date && editFormData.deadline && editFormData.start_date > editFormData.deadline) {
+      toast.error('Task start date cannot be later than task deadline.');
+      return;
+    }
+
+    if (jobStart && editFormData.start_date && editFormData.start_date < jobStart) {
+      toast.error(`Task start date cannot be earlier than project start date (${formatDateSafe(jobStart)}).`);
+      return;
+    }
+
+    if (jobDeadline && editFormData.start_date && editFormData.start_date > jobDeadline) {
+      toast.error(`Task start date cannot exceed project deadline (${formatDateSafe(jobDeadline)}).`);
+      return;
+    }
+
+    if (jobDeadline && editFormData.deadline && editFormData.deadline > jobDeadline) {
+      toast.error(`Task deadline cannot exceed project deadline (${formatDateSafe(jobDeadline)}).`);
       return;
     }
 
@@ -195,6 +226,7 @@ export default function TaskDetailDrawer() {
       description: editFormData.description.trim() || '',
       assignee_id: editFormData.assignee_id ? Number(editFormData.assignee_id) : null,
       priority: editFormData.priority,
+      start_date: editFormData.start_date || null,
       deadline: editFormData.deadline || null,
     };
 

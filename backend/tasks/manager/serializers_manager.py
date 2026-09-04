@@ -58,7 +58,7 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
     """Serializer representing task list items with calculated deadline health and metadata counts."""
 
     job = ManagerJobMiniSerializer(read_only=True)
-    assignee = ManagerUserMiniSerializer(read_only=True)
+    assignee = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     deadline_health = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
@@ -73,6 +73,7 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
             "title",
             "priority",
             "status",
+            "start_date",
             "deadline",
             "job",
             "assignee",
@@ -83,7 +84,20 @@ class ManagerTaskListSerializer(serializers.ModelSerializer):
             "attachment_count",
             "rejection_count",
             "latest_rejection",
+            "created_at",
+            "updated_at",
         ]
+
+    def get_assignee(self, obj):
+        """Return serialized assignee or None if task is unassigned (assigned to manager)."""
+        if not obj.assignee:
+            return None
+        role_code = getattr(getattr(obj.assignee, "role", None), "code", None)
+        if role_code == "MANAGER":
+            return None
+        if obj.job and obj.assignee_id == obj.job.manager_id:
+            return None
+        return ManagerUserMiniSerializer(obj.assignee).data
 
     def get_is_overdue(self, obj):
         """Determine whether task has passed deadline while incomplete."""
@@ -214,6 +228,10 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
         choices=Task.Priority.choices,
         default=Task.Priority.MEDIUM,
     )
+    start_date = serializers.DateField(
+        required=False,
+        allow_null=True,
+    )
     deadline = serializers.DateField()
 
     def validate_title(self, value):
@@ -221,15 +239,6 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
         value = value.strip()
         if not value:
             raise serializers.ValidationError("Task title is required.")
-        return value
-
-    def validate_deadline(self, value):
-        """Ensure task deadline is not set in past."""
-        today = timezone.localdate()
-        if value < today:
-            raise serializers.ValidationError(
-                f"Task deadline cannot be in the past (must be on or after {today})."
-            )
         return value
 
     def validate_assignee_id(self, value):
@@ -243,6 +252,46 @@ class ManagerTaskCreateSerializer(serializers.Serializer):
             if getattr(getattr(user, "role", None), "code", None) != "EMPLOYEE":
                 raise serializers.ValidationError("Assignee must have an active EMPLOYEE role.")
         return value
+
+    def validate(self, attrs):
+        """Validate task dates and deadline constraints against job limits and today."""
+        today = timezone.localdate()
+        deadline = attrs.get("deadline")
+        start_date = attrs.get("start_date")
+        job_id = attrs.get("job_id")
+
+        if deadline and deadline < today:
+            raise serializers.ValidationError(
+                {"deadline": f"Task deadline cannot be in the past (must be on or after {today})."}
+            )
+
+        if start_date and start_date < today:
+            raise serializers.ValidationError(
+                {"start_date": f"Task start date cannot be in the past (must be on or after {today})."}
+            )
+
+        if start_date and deadline and start_date > deadline:
+            raise serializers.ValidationError(
+                {"start_date": "Task start date cannot be later than task deadline."}
+            )
+
+        if job_id:
+            job = Job.objects.filter(id=job_id).first()
+            if job:
+                if job.deadline and deadline and deadline > job.deadline:
+                    raise serializers.ValidationError(
+                        {"deadline": f"Task deadline cannot exceed project deadline ({job.deadline})."}
+                    )
+                if job.deadline and start_date and start_date > job.deadline:
+                    raise serializers.ValidationError(
+                        {"start_date": f"Task start date cannot exceed project deadline ({job.deadline})."}
+                    )
+                if job.start_date and start_date and start_date < job.start_date:
+                    raise serializers.ValidationError(
+                        {"start_date": f"Task start date cannot be earlier than project start date ({job.start_date})."}
+                    )
+
+        return attrs
 
 
 class ManagerTaskUpdateSerializer(serializers.Serializer):
@@ -261,8 +310,15 @@ class ManagerTaskUpdateSerializer(serializers.Serializer):
         choices=Task.Priority.choices,
         required=False,
     )
+    start_date = serializers.DateField(
+        required=False,
+        allow_null=True,
+    )
     deadline = serializers.DateField(required=False)
-    assignee_id = serializers.IntegerField(required=False)
+    assignee_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
 
     def validate_title(self, value):
         """Ensure updated title is not empty string."""
@@ -284,11 +340,61 @@ class ManagerTaskUpdateSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        """Ensure at least one modifiable field is provided in payload."""
+        """Ensure at least one modifiable field is provided and dates are within bounds."""
         if not attrs:
             raise serializers.ValidationError(
                 "At least one field must be provided."
             )
+
+        if self.instance:
+            if self.instance.status in [Task.Status.COMPLETED, Task.Status.CANCELLED]:
+                raise serializers.ValidationError(
+                    f"Cannot edit task in '{self.instance.status}' status. Task is closed."
+                )
+
+        today = timezone.localdate()
+        deadline = attrs.get("deadline")
+        start_date = attrs.get("start_date")
+        job = getattr(self.instance, "job", None) if self.instance else None
+
+        if self.instance and start_date is not None and start_date != self.instance.start_date:
+            if self.instance.status in [Task.Status.IN_PROGRESS, Task.Status.REVIEWING]:
+                raise serializers.ValidationError(
+                    {"start_date": f"Cannot change start date because task is already in '{self.instance.status}' status."}
+                )
+
+        effective_start = start_date if start_date is not None else getattr(self.instance, "start_date", None)
+        effective_deadline = deadline if deadline is not None else getattr(self.instance, "deadline", None)
+
+        if deadline and deadline < today:
+            raise serializers.ValidationError(
+                {"deadline": f"Task deadline cannot be in the past (must be on or after {today})."}
+            )
+
+        if start_date and start_date < today:
+            raise serializers.ValidationError(
+                {"start_date": f"Task start date cannot be in the past (must be on or after {today})."}
+            )
+
+        if effective_start and effective_deadline and effective_start > effective_deadline:
+            raise serializers.ValidationError(
+                {"start_date": "Task start date cannot be later than task deadline."}
+            )
+
+        if job:
+            if job.deadline and effective_deadline and effective_deadline > job.deadline:
+                raise serializers.ValidationError(
+                    {"deadline": f"Task deadline cannot exceed project deadline ({job.deadline})."}
+                )
+            if job.deadline and effective_start and effective_start > job.deadline:
+                raise serializers.ValidationError(
+                    {"start_date": f"Task start date cannot exceed project deadline ({job.deadline})."}
+                )
+            if job.start_date and effective_start and effective_start < job.start_date:
+                raise serializers.ValidationError(
+                    {"start_date": f"Task start date cannot be earlier than project start date ({job.start_date})."}
+                )
+
         return attrs
 
 

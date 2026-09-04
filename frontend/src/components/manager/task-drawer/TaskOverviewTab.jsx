@@ -38,14 +38,16 @@ export default function TaskOverviewTab({
               Task Scope & Description
             </h4>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
-          >
-            <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-            <span>Edit Task</span>
-          </button>
+          {task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+              <span>Edit Task</span>
+            </button>
+          )}
         </div>
 
         {/* Task Description Body */}
@@ -68,6 +70,22 @@ export default function TaskOverviewTab({
             <span className="font-medium text-slate-500">Created By:</span>
             <span className="font-bold text-slate-800">
               {task.creator?.full_name || task.creator?.email || 'Alexander Wright (Manager)'}
+            </span>
+          </div>
+
+          {task.start_date && (
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-slate-500">Planned Start:</span>
+              <span className="font-mono font-semibold text-blue-700">
+                {formatDateSafe(task.start_date, 'dd/MM/yyyy')}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-slate-500">Deadline:</span>
+            <span className="font-mono font-semibold text-rose-700">
+              {formatDateSafe(task.deadline, 'dd/MM/yyyy')}
             </span>
           </div>
 
@@ -156,7 +174,7 @@ export default function TaskOverviewTab({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SelectDropdown
           label="Priority"
           value={editFormData.priority}
@@ -169,11 +187,28 @@ export default function TaskOverviewTab({
         />
 
         <InputField
+          label="Start Date"
+          type="date"
+          min={task?.job?.start_date || undefined}
+          max={editFormData.deadline || task?.job?.deadline || undefined}
+          value={editFormData.start_date || ''}
+          onChange={(e) => setEditFormData({ ...editFormData, start_date: e.target.value })}
+          disabled={task.status === 'IN_PROGRESS' || task.status === 'REVIEWING'}
+          helperText={
+            task.status === 'IN_PROGRESS' || task.status === 'REVIEWING'
+              ? 'Locked once task is started.'
+              : undefined
+          }
+        />
+
+        <InputField
           label="Deadline"
           type="date"
+          min={editFormData.start_date || task?.job?.start_date || undefined}
           max={task?.job?.deadline || undefined}
-          value={editFormData.deadline}
+          value={editFormData.deadline || ''}
           onChange={(e) => setEditFormData({ ...editFormData, deadline: e.target.value })}
+          required
         />
       </div>
 

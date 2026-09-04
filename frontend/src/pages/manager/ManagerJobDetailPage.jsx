@@ -6,11 +6,13 @@ import {
   Clock,
   Info,
   AlertCircle,
+  CalendarRange,
 } from 'lucide-react';
 
 import TaskDetailDrawer from '../../components/manager/TaskDetailDrawer';
 import JobHeroBanner from '../../components/manager/job-detail/JobHeroBanner';
 import JobTasksTab from '../../components/manager/job-detail/JobTasksTab';
+import JobGanttTab from '../../components/manager/job-detail/JobGanttTab';
 import JobTeamTab from '../../components/manager/job-detail/JobTeamTab';
 import JobTimesheetsTab from '../../components/manager/job-detail/JobTimesheetsTab';
 import JobInfoTab from '../../components/manager/job-detail/JobInfoTab';
@@ -26,9 +28,15 @@ import { useLogWorks } from '../../hooks/queries/manager/useManagerTimesheets';
 import { useRecentJobsStore } from '../../stores/useRecentJobsStore';
 import { useUIStore } from '../../stores/useUIStore';
 
-// 4 Tab Cốt lõi của Trang Chi tiết Job
+/**
+ * Module: pages/manager/ManagerJobDetailPage
+ * Description: Master Project Job workspace providing tabs for task management, interactive Gantt timelines, team workloads, timesheets, and metadata.
+ */
+
+// 5 Tab Cốt lõi của Trang Chi tiết Job (Bao gồm Gantt Timeline)
 const TABS = [
   { id: 'tasks', label: 'Tasks List', icon: CheckSquare },
+  { id: 'gantt', label: 'Gantt Timeline', icon: CalendarRange },
   { id: 'team', label: 'Team & Workload', icon: Users },
   { id: 'timesheets', label: 'Timesheets & Work Logs', icon: Clock },
   { id: 'info', label: 'Project & Client Info', icon: Info },
@@ -47,7 +55,7 @@ export default function ManagerJobDetailPage() {
   // 🚀 TANSTACK REACT QUERY HOOKS: Nạp dữ liệu Job, Tasks, Employees và Timesheets
   const { data: job, isLoading: jobLoading, error: jobError } = useManagerJobDetail(id);
   const { data: taskResponse, isLoading: tasksLoading } = useManagerTasks({ job_id: id });
-  const { data: employeesResponse = [] } = useManagerEmployees({ job_id: id });
+  const { data: employeesResponse = [] } = useManagerEmployees();
   const { data: timesheetsData, isLoading: timesheetsLoading } = useLogWorks({ job_id: id });
 
   // 🌟 Tự động lưu Job vào Store Recently Viewed Jobs
@@ -103,138 +111,140 @@ export default function ManagerJobDetailPage() {
     return { total, completed, inProgress, reviewing, todo, pct };
   }, [tasks]);
 
-  // Nhóm nhân sự dự án cho Tab 2 (Team & Workload)
+  // Nhóm Tasks theo Team Member (Tab Team & Workload - Server-Driven Smart Workload)
   const groupedTeamMembers = useMemo(() => {
-    const rawTeam = job?.project_team || (Array.isArray(employeesResponse) ? employeesResponse : []);
-    const memberMap = {};
-
-    const empWorkloadMap = {};
-    const empList = Array.isArray(employeesResponse)
+    const rawEmployees = Array.isArray(employeesResponse)
       ? employeesResponse
       : employeesResponse?.results || [];
-    empList.forEach((e) => {
-      const eId = String(e.id || e.user_id);
-      empWorkloadMap[eId] = e;
+
+    const empMap = {};
+    rawEmployees.forEach((emp) => {
+      empMap[emp.id] = emp;
     });
 
-    rawTeam.forEach((emp) => {
-      const key = String(emp.id || emp.user_id);
-      const matched = empWorkloadMap[key] || emp;
+    const memberMap = {};
 
-      const capacityPct =
-        matched.capacity_pct !== undefined && matched.capacity_pct !== null
-          ? parseFloat(matched.capacity_pct)
-          : 0;
-      const dailyRequiredHours = parseFloat(matched.daily_required_hours || 0);
-      const workloadStatus = matched.smart_workload_status || matched.workload_status || 'AVAILABLE';
-      const activeTasks = matched.active_tasks_count !== undefined ? matched.active_tasks_count : (matched.activeTasks || 0);
-      const activeJobs = matched.active_jobs_count !== undefined ? matched.active_jobs_count : (matched.activeJobs || 0);
-
-      memberMap[key] = {
-        id: emp.id || emp.user_id,
-        name: emp.full_name || emp.email,
-        email: emp.email || '',
-        avatar_url: emp.avatar_url || emp.profile?.avatar_url || null,
-        department_name: emp.department_name || emp.department?.name || 'General Staff',
-        capacityPct,
-        dailyRequiredHours,
-        workloadStatus,
-        activeTasks,
-        activeJobs,
+    // 1. Khởi tạo toàn bộ nhân sự được phân bổ vào dự án (job.project_team)
+    const projectTeam = Array.isArray(job?.project_team) ? job.project_team : [];
+    projectTeam.forEach((pm) => {
+      const empData = empMap[pm.id] || {};
+      memberMap[pm.id] = {
+        id: pm.id,
+        name: pm.full_name || empData.full_name || pm.email,
+        email: pm.email || empData.email,
+        avatar_url: pm.avatar_url || empData.avatar_url,
+        department_name: pm.department_name || empData.departmentName || empData.department_name || 'General Staff',
+        capacityPct: empData.capacity_pct !== undefined && empData.capacity_pct !== null ? parseFloat(empData.capacity_pct) : 0,
+        dailyRequiredHours: parseFloat(empData.daily_required_hours || 0),
+        activeJobs: empData.active_jobs_count !== undefined && empData.active_jobs_count !== null ? empData.active_jobs_count : 0,
+        workloadStatus: empData.smart_workload_status || empData.workload_status || 'AVAILABLE',
         tasks: [],
+        stats: { total: 0, completed: 0, inProgress: 0, reviewing: 0, todo: 0 },
       };
     });
 
-    tasks.forEach((task) => {
-      const assignee = task.assignee;
-      const key = assignee?.id ? String(assignee.id) : 'unassigned';
-      if (!memberMap[key]) {
-        const matched = empWorkloadMap[key] || {};
-        memberMap[key] = {
-          id: assignee?.id || null,
-          name: assignee?.full_name || assignee?.email || 'Unassigned Tasks',
-          email: assignee?.email || '',
-          avatar_url: assignee?.avatar_url || assignee?.profile?.avatar_url || null,
-          department_name: matched.department_name || matched.department?.name || 'General Staff',
-          capacityPct: matched.capacity_pct ? parseFloat(matched.capacity_pct) : 0,
-          dailyRequiredHours: parseFloat(matched.daily_required_hours || 0),
-          workloadStatus: matched.smart_workload_status || matched.workload_status || 'AVAILABLE',
-          activeTasks: matched.active_tasks_count || 0,
-          activeJobs: matched.active_jobs_count || 0,
+    // 2. Gán task vào nhân sự tương ứng (Bỏ qua task Unassigned / Assigned to Manager)
+    tasks.forEach((t) => {
+      const assignee = t.assignee;
+      if (!assignee || !assignee.id) {
+        return; // Unassigned task -> không đưa vào thẻ nhân viên
+      }
+      if (assignee.role === 'MANAGER' || (job && assignee.id === job.manager_id)) {
+        return; // Task thuộc về Manager -> không tính vào khối lượng nhân viên
+      }
+
+      const memberId = assignee.id;
+      if (!memberMap[memberId]) {
+        const empData = empMap[memberId] || {};
+        memberMap[memberId] = {
+          id: memberId,
+          name: assignee.full_name || empData.full_name || assignee.email,
+          email: assignee.email || empData.email,
+          avatar_url: assignee.avatar_url || empData.avatar_url,
+          department_name: assignee.department_name || empData.departmentName || empData.department_name || 'General Staff',
+          capacityPct: empData.capacity_pct !== undefined && empData.capacity_pct !== null ? parseFloat(empData.capacity_pct) : 0,
+          dailyRequiredHours: parseFloat(empData.daily_required_hours || 0),
+          activeJobs: empData.active_jobs_count !== undefined && empData.active_jobs_count !== null ? empData.active_jobs_count : 0,
+          workloadStatus: empData.smart_workload_status || empData.workload_status || 'AVAILABLE',
           tasks: [],
+          stats: { total: 0, completed: 0, inProgress: 0, reviewing: 0, todo: 0 },
         };
       }
-      memberMap[key].tasks.push(task);
+
+      memberMap[memberId].tasks.push(t);
+      memberMap[memberId].stats.total += 1;
+      if (t.status === 'COMPLETED') memberMap[memberId].stats.completed += 1;
+      else if (t.status === 'IN_PROGRESS') memberMap[memberId].stats.inProgress += 1;
+      else if (t.status === 'REVIEWING') memberMap[memberId].stats.reviewing += 1;
+      else if (t.status === 'TODO') memberMap[memberId].stats.todo += 1;
     });
 
     return Object.values(memberMap);
-  }, [tasks, job?.project_team, employeesResponse]);
+  }, [job, tasks, employeesResponse]);
 
-  // Chuẩn hóa dữ liệu Timesheets của Job này
-  const timesheetsList = useMemo(() => {
-    if (Array.isArray(timesheetsData)) return timesheetsData;
-    if (timesheetsData && Array.isArray(timesheetsData.results)) return timesheetsData.results;
-    return [];
+  // Chuẩn hóa Danh sách Timesheets & Tính Metrics Tổng giờ
+  const { timesheetsList, timesheetsMetrics } = useMemo(() => {
+    const rawList = Array.isArray(timesheetsData)
+      ? timesheetsData
+      : timesheetsData?.results || [];
+
+    const totalHours = rawList.reduce((acc, log) => acc + (parseFloat(log.hours_spent) || 0), 0);
+    const pendingReview = rawList.filter((log) => log.review_status === 'PENDING').length;
+    const approved = rawList.filter((log) => log.review_status === 'APPROVED').length;
+    const rejected = rawList.filter((log) => log.review_status === 'REJECTED').length;
+
+    return {
+      timesheetsList: rawList,
+      timesheetsMetrics: {
+        totalHours: totalHours.toFixed(1),
+        totalLogs: rawList.length,
+        pendingReview,
+        approved,
+        rejected,
+      },
+    };
   }, [timesheetsData]);
 
-  // Tổng hợp chỉ số Giờ công của Dự án
-  const timesheetsMetrics = useMemo(() => {
-    let total = 0;
-    let approved = 0;
-    let pending = 0;
-    timesheetsList.forEach((lw) => {
-      const h = parseFloat(lw.hours_spent) || 0;
-      total += h;
-      if (lw.review_status === 'APPROVED') approved += h;
-      else if (lw.review_status === 'PENDING') pending += h;
-    });
-    return {
-      totalHours: total.toFixed(1),
-      approvedHours: approved.toFixed(1),
-      pendingHours: pending.toFixed(1),
-    };
-  }, [timesheetsList]);
-
-  // Kiểm tra khách hàng và dự án có bị đóng băng không
+  // Trạng thái Client và Job Frozen
   const isClientInactive = Boolean(job?.client && job.client.is_active === false);
-  const isJobFrozen = Boolean(
-    isClientInactive || (job && ['ON_HOLD', 'CANCELLED', 'COMPLETED'].includes(job.status))
-  );
+  const isJobFrozen = isClientInactive || job?.status === 'ON_HOLD' || job?.status === 'CANCELLED';
 
   if (jobLoading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-semibold text-slate-500">Loading project workspace...</p>
-        </div>
+      <div className="space-y-6 max-w-7xl mx-auto text-slate-800 pb-12 animate-pulse">
+        <div className="h-44 bg-slate-200/80 rounded-2xl"></div>
+        <div className="h-12 bg-slate-200/80 rounded-xl w-96"></div>
+        <div className="h-96 bg-slate-200/80 rounded-2xl"></div>
       </div>
     );
   }
 
   if (jobError || !job) {
     return (
-      <div className="p-8 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-3">
-        <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
-        <h3 className="text-sm font-bold text-rose-900">Project Not Found</h3>
-        <p className="text-xs text-rose-700">
-          The requested project workspace could not be located or you do not have permission to access it.
+      <div className="max-w-7xl mx-auto p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Project Job Not Found</h2>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">
+          The requested project job either does not exist or you do not have permission to view it.
         </p>
         <button
           onClick={() => navigate('/manager/jobs')}
-          className="px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700 transition cursor-pointer"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
         >
-          Return to Projects Hub
+          Back to Projects & Jobs
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 text-slate-800 pb-12">
+    <div className="space-y-6 w-full max-w-[1750px] mx-auto text-slate-800 pb-12">
       {/* 🌟 HERO MASTER INFO BANNER */}
       <JobHeroBanner
         job={job}
+        tasks={tasks}
         progressMetrics={progressMetrics}
         isClientInactive={isClientInactive}
         isJobFrozen={isJobFrozen}
@@ -242,8 +252,8 @@ export default function ManagerJobDetailPage() {
         onOpenCreateTaskDrawer={() => setCreateTaskDrawerOpen(true)}
       />
 
-      {/* Tabs Navigation */}
-      <div className="border-b border-slate-200 flex items-center gap-6 overflow-x-auto">
+      {/* 📑 TABS NAVIGATION ROW */}
+      <div className="flex items-center gap-6 border-b border-slate-200/80 overflow-x-auto">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -263,6 +273,11 @@ export default function ManagerJobDetailPage() {
               {tab.id === 'tasks' && (
                 <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 font-extrabold border border-blue-100">
                   {tasks.length}
+                </span>
+              )}
+              {tab.id === 'gantt' && (
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-100">
+                  Timeline
                 </span>
               )}
               {tab.id === 'team' && (
@@ -289,7 +304,17 @@ export default function ManagerJobDetailPage() {
         />
       )}
 
-      {/* 👥 TAB 2: Team & Workload */}
+      {/* 📊 TAB 2: Schedule & Gantt Timeline (NEW) */}
+      {activeTab === 'gantt' && (
+        <JobGanttTab
+          job={job}
+          tasks={tasks}
+          tasksLoading={tasksLoading}
+          openTaskDrawer={openTaskDrawer}
+        />
+      )}
+
+      {/* 👥 TAB 3: Team & Workload */}
       {activeTab === 'team' && (
         <JobTeamTab
           groupedTeamMembers={groupedTeamMembers}
@@ -297,7 +322,7 @@ export default function ManagerJobDetailPage() {
         />
       )}
 
-      {/* ⏱️ TAB 3: Timesheets & Work Logs */}
+      {/* ⏱️ TAB 4: Timesheets & Work Logs */}
       {activeTab === 'timesheets' && (
         <JobTimesheetsTab
           jobId={id}
@@ -307,7 +332,7 @@ export default function ManagerJobDetailPage() {
         />
       )}
 
-      {/* 🏢 TAB 4: Project & Client Info */}
+      {/* 🏢 TAB 5: Project & Client Info */}
       {activeTab === 'info' && (
         <JobInfoTab job={job} />
       )}

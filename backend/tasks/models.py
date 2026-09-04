@@ -51,6 +51,7 @@ class Task(models.Model):
         default=Status.TODO,
         db_index=True,
     )
+    start_date = models.DateField(blank=True, null=True, db_index=True)
     deadline = models.DateField(db_index=True)
     completed_at = models.DateTimeField(blank=True, null=True)
     order_index = models.CharField(max_length=255, db_index=True)

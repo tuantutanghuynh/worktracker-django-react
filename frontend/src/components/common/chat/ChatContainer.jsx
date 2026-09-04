@@ -512,7 +512,7 @@ export default function ChatContainer({
                 activeTab === 'DIRECT' && 'bg-white text-blue-600 shadow-xs font-semibold'
               )}
             >
-              DMs ({directMessages.length})
+              People ({directMessages.length})
             </button>
           </div>
         </div>

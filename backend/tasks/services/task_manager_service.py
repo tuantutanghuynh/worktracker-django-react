@@ -80,25 +80,66 @@ def get_active_employee_or_error(user_id, manager=None):
     return user
 
 
-def validate_task_deadline(job, deadline, is_create=False):
-    """Validate task deadline against current date and project parent deadline."""
-    if not deadline:
-        return
+def _coerce_to_date(val):
+    """Coerce string or datetime value to date instance safely."""
+    from datetime import date
+    if val is None:
+        return None
+    if isinstance(val, date):
+        return val
+    if hasattr(val, "date"):
+        return val.date()
+    if isinstance(val, str):
+        try:
+            return date.fromisoformat(val)
+        except ValueError:
+            return None
+    return None
 
+
+def validate_task_dates(job, start_date=None, deadline=None, is_create=False):
+    """Validate task start_date and deadline against today, job bounds, and chronological order."""
     today = timezone.localdate()
-    if is_create and deadline < today:
+
+    deadline = _coerce_to_date(deadline)
+    start_date = _coerce_to_date(start_date)
+
+    if is_create:
+        if deadline and deadline < today:
+            raise ValidationError(
+                {"deadline": f"Task deadline cannot be in the past (must be on or after {today})."}
+            )
+        if start_date and start_date < today:
+            raise ValidationError(
+                {"start_date": f"Task start date cannot be in the past (must be on or after {today})."}
+            )
+
+    if start_date and deadline and start_date > deadline:
         raise ValidationError(
-            {
-                "deadline": f"Task deadline cannot be in the past (must be on or after {today})."
-            }
+            {"start_date": "Task start date cannot be later than task deadline."}
         )
 
-    if job and job.deadline and deadline > job.deadline:
-        raise ValidationError(
-            {
-                "deadline": f"Task deadline cannot exceed project deadline ({job.deadline})."
-            }
-        )
+    if job:
+        job_deadline = _coerce_to_date(job.deadline)
+        job_start = _coerce_to_date(job.start_date)
+
+        if job_deadline and deadline and deadline > job_deadline:
+            raise ValidationError(
+                {"deadline": f"Task deadline cannot exceed project deadline ({job_deadline})."}
+            )
+        if job_deadline and start_date and start_date > job_deadline:
+            raise ValidationError(
+                {"start_date": f"Task start date cannot exceed project deadline ({job_deadline})."}
+            )
+        if job_start and start_date and start_date < job_start:
+            raise ValidationError(
+                {"start_date": f"Task start date cannot be earlier than project start date ({job_start})."}
+            )
+
+
+def validate_task_deadline(job, deadline, is_create=False):
+    """Validate task deadline against current date and project parent deadline (backward compatibility)."""
+    validate_task_dates(job, start_date=None, deadline=deadline, is_create=is_create)
 
 
 def get_last_order_key(job_id, status):
@@ -142,6 +183,7 @@ def create_task(*, user, data, request=None):
     title = data.get("title")
     description = data.get("description")
     priority = data.get("priority", Task.Priority.MEDIUM)
+    start_date = data.get("start_date")
     deadline = data.get("deadline")
 
     if not job_id:
@@ -173,6 +215,13 @@ def create_task(*, user, data, request=None):
         if job.status not in JOB_STATUS_ALLOW_CREATE:
             raise BusinessRuleError("JOB_STATUS_DOES_NOT_ALLOW_TASK_CREATE")
 
+        validate_task_dates(
+            job=job,
+            start_date=start_date,
+            deadline=deadline,
+            is_create=True,
+        )
+
         if assignee_id:
             assignee = get_active_employee_or_error(assignee_id, manager=user)
         else:
@@ -191,6 +240,7 @@ def create_task(*, user, data, request=None):
             description=description,
             priority=priority,
             status=Task.Status.TODO,
+            start_date=start_date,
             deadline=deadline,
             order_index=key_between(last_key, None),
         )
@@ -253,6 +303,7 @@ def update_task(*, user, task, data, request=None):
         "title",
         "description",
         "priority",
+        "start_date",
         "deadline",
         "assignee_id",
     }
@@ -276,6 +327,11 @@ def update_task(*, user, task, data, request=None):
 
         assert_task_in_manager_scope(user, locked_task)
 
+        if locked_task.status in [Task.Status.COMPLETED, Task.Status.CANCELLED]:
+            raise BusinessRuleError(
+                f"Cannot edit task in '{locked_task.status}' status. Task is closed."
+            )
+
         if locked_task.job.client and not locked_task.job.client.is_active:
             raise BusinessRuleError(
                 f"Cannot update task because client '{locked_task.job.client.client_name}' is deactivated by Admin. "
@@ -288,6 +344,7 @@ def update_task(*, user, task, data, request=None):
                 "title",
                 "description",
                 "priority",
+                "start_date",
                 "deadline",
                 "assignee",
             ],
@@ -305,12 +362,27 @@ def update_task(*, user, task, data, request=None):
         if "priority" in data:
             locked_task.priority = data["priority"]
 
-        if "deadline" in data:
-            validate_task_deadline(
+        if "start_date" in data or "deadline" in data:
+            new_start = _coerce_to_date(data.get("start_date", locked_task.start_date))
+            current_start = _coerce_to_date(locked_task.start_date)
+            new_deadline = _coerce_to_date(data.get("deadline", locked_task.deadline))
+
+            if "start_date" in data and new_start != current_start:
+                if locked_task.status in [Task.Status.IN_PROGRESS, Task.Status.REVIEWING]:
+                    raise BusinessRuleError(
+                        f"Cannot change start date because task is already in '{locked_task.status}' status."
+                    )
+
+            validate_task_dates(
                 job=locked_task.job,
-                deadline=data["deadline"],
+                start_date=new_start,
+                deadline=new_deadline,
+                is_create=False,
             )
-            locked_task.deadline = data["deadline"]
+            if "start_date" in data:
+                locked_task.start_date = new_start
+            if "deadline" in data:
+                locked_task.deadline = new_deadline
 
         if "assignee_id" in data:
             new_assignee = get_active_employee_or_error(data["assignee_id"], manager=user)
@@ -324,6 +396,7 @@ def update_task(*, user, task, data, request=None):
                 "title",
                 "description",
                 "priority",
+                "start_date",
                 "deadline",
                 "assignee",
                 "updated_at",

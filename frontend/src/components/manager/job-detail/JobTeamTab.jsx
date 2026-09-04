@@ -96,7 +96,7 @@ export default function JobTeamTab({ groupedTeamMembers = [], openTaskDrawer }) 
               {member.id && (
                 <div className="flex items-center justify-between pt-1 text-xs">
                   <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-[11px]">
-                    <span>{member.activeTasks || member.tasks.length} Tasks</span>
+                    <span>{member.tasks.length} Tasks</span>
                     <span className="text-slate-300">|</span>
                     <span>{member.activeJobs || 0} Jobs</span>
                   </div>

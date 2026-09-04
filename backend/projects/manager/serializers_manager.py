@@ -87,7 +87,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
         ]
 
     def get_team_size(self, obj):
-        """Calculate total count of unique team assignees and chat participants."""
+        """Calculate total count of unique team assignees and chat participants excluding manager."""
         from chat.models import ChatParticipant
         task_assignee_ids = set(obj.tasks.values_list("assignee_id", flat=True).distinct())
         team_participant_ids = set(
@@ -96,7 +96,7 @@ class ManagerJobListSerializer(serializers.ModelSerializer):
             .values_list('user_id', flat=True)
             .distinct()
         )
-        return len(task_assignee_ids | team_participant_ids)
+        return len((task_assignee_ids | team_participant_ids) - {obj.manager_id, None})
 
     def get_project_team(self, obj):
         """Return list of project team members with active task counts."""

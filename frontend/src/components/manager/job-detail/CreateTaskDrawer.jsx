@@ -47,7 +47,8 @@ const createTaskSchema = z.object({
     .max(255, 'Task title cannot exceed 255 characters.'),
   assignee_id: z.string().optional().or(z.literal('')),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('MEDIUM'),
-  deadline: z.string().optional().or(z.literal('')),
+  start_date: z.string().optional().or(z.literal('')),
+  deadline: z.string().min(1, 'Deadline is required.'),
   description: z.string().optional().or(z.literal('')),
 });
 
@@ -66,6 +67,7 @@ export default function CreateTaskDrawer({
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(createTaskSchema),
@@ -73,10 +75,13 @@ export default function CreateTaskDrawer({
       title: '',
       assignee_id: '',
       priority: 'MEDIUM',
+      start_date: '',
       deadline: '',
       description: '',
     },
   });
+
+  const watchedStartDate = watch('start_date');
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
@@ -110,12 +115,28 @@ export default function CreateTaskDrawer({
       return;
     }
     const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (data.start_date && data.start_date < todayStr) {
+      toast.error('Task start date cannot be in the past.');
+      return;
+    }
+    if (data.start_date && job?.start_date && data.start_date < job.start_date) {
+      toast.error(`Task start date cannot be earlier than project start date (${formatDateSafe(job.start_date)}).`);
+      return;
+    }
     if (data.deadline && data.deadline < todayStr) {
       toast.error('Task deadline cannot be in the past.');
       return;
     }
+    if (data.start_date && data.deadline && data.start_date > data.deadline) {
+      toast.error('Task start date cannot be later than task deadline.');
+      return;
+    }
     if (data.deadline && job?.deadline && data.deadline > job.deadline) {
       toast.error(`Task deadline cannot exceed project deadline (${formatDateSafe(job.deadline)}).`);
+      return;
+    }
+    if (data.start_date && job?.deadline && data.start_date > job.deadline) {
+      toast.error(`Task start date cannot exceed project deadline (${formatDateSafe(job.deadline)}).`);
       return;
     }
 
@@ -125,6 +146,7 @@ export default function CreateTaskDrawer({
       job_id: Number(job.id),
       assignee_id: data.assignee_id ? Number(data.assignee_id) : undefined,
       priority: data.priority,
+      start_date: data.start_date || undefined,
       deadline: data.deadline || undefined,
     };
 
@@ -151,65 +173,68 @@ export default function CreateTaskDrawer({
       isOpen={isOpen}
       onClose={handleClose}
       title="Create New Task"
+      size="xl"
     >
       <div className="space-y-5">
-        {/* 🌟 KHU VỰC THÔNG TIN DỰ ÁN TOÀN DIỆN (PROJECT OVERVIEW & TIMELINE HUB) */}
+        {/* 🌟 KHU VỰC THÔNG TIN DỰ ÁN TOÀN DIỆN (PROJECT OVERVIEW & TIMELINE HUB - LIGHT NEUMORPHISM) */}
         {job && (
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-4 shadow-md border border-slate-700/60 space-y-3.5">
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                  <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
                     Project Hub
                   </span>
-                  <span className="text-[11px] font-mono text-slate-300 font-semibold">
+                  <span className="text-[11px] font-mono text-slate-500 font-bold">
                     #JOB-{job.id} {job.job_code ? `(${job.job_code})` : ''}
                   </span>
                 </div>
-                <h3 className="text-sm font-extrabold text-white mt-1.5 leading-snug break-words">
+                <h3 className="text-sm font-extrabold text-slate-900 mt-1.5 leading-snug break-words">
                   {job.job_name}
                 </h3>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {job.status}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-50 text-amber-700 border border-amber-200">
                   {job.priority || 'MEDIUM'}
                 </span>
               </div>
             </div>
 
-            {/* Client & Assigned Team */}
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/60 text-xs">
-              <div className="flex items-center gap-2 text-slate-300 min-w-0">
-                <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span className="truncate">Client: <strong className="text-white">{job.client?.client_name || 'Internal'}</strong></span>
+            {/* Client & Assigned Team (Dạt ra 2 biên) */}
+            <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-100 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
+                <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="truncate">Client: <strong className="text-slate-900">{job.client?.client_name || 'Internal'}</strong></span>
               </div>
-              <div className="flex items-center gap-2 text-slate-300 min-w-0">
-                <Users className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span className="truncate">Team: <strong className="text-white">{job.project_team?.length || employeeOptions.length} members</strong></span>
+              <div className="flex items-center gap-1 text-slate-700 font-bold shrink-0">
+                <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>: {job.project_team?.length || employeeOptions.length} members</span>
               </div>
             </div>
 
             {/* Project Timeline & Constraints Bar */}
-            <div className="bg-slate-950/70 rounded-xl p-3 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
+            <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/70 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
                 <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-emerald-400" />
-                  <span>Start: <strong className="text-white">{formatDateSafe(job.start_date)}</strong></span>
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-slate-500 font-semibold">Start:</span>
+                  <span className="text-slate-900 font-mono">{formatDateSafe(job.start_date)}</span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-rose-400" />
-                  <span>Deadline: <strong className="text-white">{formatDateSafe(job.deadline)}</strong></span>
+                  <Clock className="w-3.5 h-3.5 text-rose-500" />
+                  <span className="text-slate-500 font-semibold">Deadline:</span>
+                  <span className="text-slate-900 font-mono">{formatDateSafe(job.deadline)}</span>
                 </span>
               </div>
-              <div className="relative w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div className="relative w-full bg-slate-200/70 h-1.5 rounded-full overflow-hidden">
                 <div className="bg-gradient-to-r from-emerald-500 via-blue-500 to-rose-500 h-full w-full rounded-full opacity-90" />
               </div>
-              <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                <Info className="w-3 h-3 text-blue-400 shrink-0" />
-                <span>Task deadline must be between Today ({format(new Date(), 'dd/MM/yyyy')}) and Project Deadline ({formatDateSafe(job.deadline)}).</span>
+              <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>Task dates must be within Project bounds ({formatDateSafe(job.start_date)} — {formatDateSafe(job.deadline)}).</span>
               </p>
             </div>
           </div>
@@ -261,7 +286,7 @@ export default function CreateTaskDrawer({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Controller
               name="priority"
               control={control}
@@ -281,12 +306,31 @@ export default function CreateTaskDrawer({
 
             <div>
               <label className="block font-bold text-slate-800 mb-1">
+                Start Date <span className="text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="date"
+                {...register('start_date')}
+                min={format(new Date(), 'yyyy-MM-dd')}
+                max={job?.deadline || undefined}
+                className={cn(
+                  'w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors shadow-2xs',
+                  errors.start_date ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30' : 'border-slate-300'
+                )}
+              />
+              {errors.start_date && (
+                <p className="mt-1 text-[11px] text-rose-500 font-semibold">{errors.start_date.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-800 mb-1">
                 Deadline <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
                 {...register('deadline')}
-                min={format(new Date(), 'yyyy-MM-dd')}
+                min={watchedStartDate || format(new Date(), 'yyyy-MM-dd')}
                 max={job?.deadline || undefined}
                 className={cn(
                   'w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors shadow-2xs',
