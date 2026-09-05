@@ -250,7 +250,7 @@ export default function ManagerProfilePage() {
                   required
                 />
 
-                <InputField label='Email Address' type='email' value={currentEmail} disabled helperText='Primary corporate email cannot be modified directly.' />
+                <InputField label='Email Address' type='email' value={currentEmail} disabled helperText='This is your sign-in ID and cannot be changed. Contact an administrator if the address must be replaced.' />
               </div>
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
