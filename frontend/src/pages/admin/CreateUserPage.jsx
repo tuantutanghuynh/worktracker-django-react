@@ -5,14 +5,23 @@ import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import { useAdminRoles, useAdminUsers, useCreateUser } from '../../hooks/queries/admin/useAdminUsers';
 import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
+import { applyServerFieldErrors } from '../../utils/errorMessages';
 
 // Same password-strength rules as ChangePasswordPage/ResetPasswordPage —
 // the backend's UserCreateSerializer.password has no strength validation
 // of its own, so this schema is the only thing enforcing it here.
 const createUserSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  // CustomUser.email max_length=155. trim() vi backend cung .strip().lower()
+  // truoc khi luu (accounts/admin/serializers.py::normalize_email).
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email is required')
+    .email('Invalid email address')
+    .max(155, 'Email must be 155 characters or fewer'),
   password: z.string()
     .min(8, 'At least 8 characters')
+    .max(128, 'Password must be 128 characters or fewer')
     .regex(/[a-z]/, 'Must contain a lowercase letter')
     .regex(/[A-Z]/, 'Must contain an uppercase letter')
     .regex(/[0-9]/, 'Must contain a number')
@@ -52,6 +61,7 @@ export function CreateUserPage() {
     handleSubmit,
     reset,
     control,
+    setError,
     formState: { errors },
   } = useForm({ resolver: zodResolver(createUserSchema) });
 
@@ -72,7 +82,12 @@ export function CreateUserPage() {
         department: data.department ? Number(data.department) : null,
         manager: isCreatingEmployee && data.manager ? Number(data.manager) : null,
       },
-      { onSuccess: () => reset({ email: '', password: '', role: '', department: '', manager: '' }) }
+      {
+        onSuccess: () => reset({ email: '', password: '', role: '', department: '', manager: '' }),
+        // Trung email chi backend biet — gan thang vao o Email thay vi toast.
+        onError: (err) =>
+          applyServerFieldErrors(err, setError, ['email', 'password', 'role', 'department', 'manager']),
+      }
     );
   }
 

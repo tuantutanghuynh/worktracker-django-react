@@ -266,7 +266,7 @@ class JobViewSet(viewsets.ModelViewSet):
         existing = cache.get(key)
         if existing and existing != request.user.id:
             return Response(
-                {'detail': 'Job sedang được sửa bởi người khác.'},
+                {'detail': 'This job is currently being edited by another admin. Try again in a few minutes.'},
                 status=status.HTTP_423_LOCKED,
             )
         cache.set(key, request.user.id, timeout=300)

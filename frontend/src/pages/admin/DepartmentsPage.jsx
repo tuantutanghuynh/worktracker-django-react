@@ -21,12 +21,23 @@ import {
   useDeleteDepartment,
 } from '../../hooks/queries/admin/useAdminDepartments';
 import { useAdminUsers } from '../../hooks/queries/admin/useAdminUsers';
+import { applyServerFieldErrors } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
+// max() khop max_length trong model Department (name=100). trim() de ten chi
+// gom khoang trang khong lot qua min(1).
 const departmentSchema = z.object({
-  name: z.string().min(1, 'Department name is required'),
-  description: z.string().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Department name must be at least 2 characters')
+    .max(100, 'Department name must be 100 characters or fewer'),
+  description: z
+    .string()
+    .trim()
+    .max(1000, 'Description must be 1000 characters or fewer')
+    .optional(),
   manager: z.string().optional(),
 });
 
@@ -73,6 +84,7 @@ export function DepartmentsPage() {
     handleSubmit,
     reset,
     control,
+    setError,
     formState: { errors },
   } = useForm({ resolver: zodResolver(departmentSchema) });
 
@@ -122,6 +134,8 @@ export function DepartmentsPage() {
     const mutation = modalState.mode === 'edit' ? updateMutation : createMutation;
     mutation.mutate(modalState.mode === 'edit' ? { id: modalState.department.id, payload } : payload, {
       onSuccess: () => setModalState(null),
+      // Gan loi backend ve dung o nhap (vd: ten phong ban da ton tai).
+      onError: (err) => applyServerFieldErrors(err, setError, Object.keys(payload)),
     });
   }
 

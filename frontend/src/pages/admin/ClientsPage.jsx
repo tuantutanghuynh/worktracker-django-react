@@ -13,6 +13,7 @@ import PaginationBar from '../../components/common/table/PaginationBar';
 import ExportButton from '../../components/common/table/ExportButton';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useOrdering } from '../../hooks/useOrdering';
+import { applyServerFieldErrors } from '../../utils/errorMessages';
 import {
   useAdminClients,
   useAdminClientDeepLink,
@@ -24,15 +25,59 @@ import {
 
 const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
+// Mirrors ClientSerializer on the backend (projects/admin/serializers.py).
+// Backend stays the source of truth; these rules only stop the user from
+// filling a whole form and losing it to a 400 on submit.
+//
+// Vietnamese tax code: 10 digits, optionally + a 3-digit branch suffix.
+const TAX_CODE_PATTERN = /^\d{10}(-\d{3})?$/;
+// Phone: allow the punctuation people actually type, then count the digits
+// underneath rather than pinning one layout.
+const PHONE_ALLOWED = /^[0-9+()\-.\s]+$/;
+const countDigits = (value) => (value.match(/\d/g) || []).length;
+
+// max() values match max_length in the Django models — without them the user
+// only learns the limit after the request round-trips and fails.
+const optionalText = (max, label) =>
+  z.string().trim().max(max, `${label} must be ${max} characters or fewer`).optional();
+
 const clientSchema = z.object({
-  client_name: z.string().min(1, 'Client name is required'),
-  tax_code: z.string().min(1, 'Tax code is required'),
-  contact_person: z.string().optional(),
-  contact_email: z.string().email('Invalid email address').optional().or(z.literal('')),
-  contact_phone: z.string().optional(),
-  address: z.string().optional(),
-  industry: z.string().optional(),
-  notes: z.string().optional(),
+  client_name: z
+    .string()
+    .trim()
+    .min(2, 'Client name must be at least 2 characters')
+    .max(255, 'Client name must be 255 characters or fewer'),
+  tax_code: z
+    .string()
+    .trim()
+    .min(1, 'Tax code is required')
+    .regex(
+      TAX_CODE_PATTERN,
+      'Tax code must be 10 digits, optionally followed by a 3-digit branch suffix (e.g. 0123456789 or 0123456789-001)'
+    ),
+  contact_person: optionalText(150, 'Contact person'),
+  contact_email: z
+    .string()
+    .trim()
+    .email('Invalid email address')
+    .max(155, 'Contact email must be 155 characters or fewer')
+    .optional()
+    .or(z.literal('')),
+  contact_phone: z
+    .string()
+    .trim()
+    .max(20, 'Contact phone must be 20 characters or fewer')
+    .refine((v) => !v || PHONE_ALLOWED.test(v), {
+      message: 'Phone may only contain digits and the characters + ( ) - . and spaces',
+    })
+    .refine((v) => !v || (countDigits(v) >= 8 && countDigits(v) <= 15), {
+      message: 'Phone must contain between 8 and 15 digits',
+    })
+    .optional()
+    .or(z.literal('')),
+  address: optionalText(255, 'Address'),
+  industry: optionalText(100, 'Industry'),
+  notes: z.string().trim().max(2000, 'Notes must be 2000 characters or fewer').optional(),
 });
 
 const EMPTY_FORM = {
@@ -84,6 +129,7 @@ export function ClientsPage() {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm({ resolver: zodResolver(clientSchema) });
 
@@ -144,6 +190,9 @@ export function ClientsPage() {
     const mutation = modalState.mode === 'edit' ? updateMutation : createMutation;
     mutation.mutate(modalState.mode === 'edit' ? { id: modalState.client.id, payload } : payload, {
       onSuccess: () => setModalState(null),
+      // Backend biet nhung luat trinh duyet khong biet: trung ten, trung ma
+      // so thue. Gan loi ve dung o nhap thay vi chi bao o toast roi bien mat.
+      onError: (err) => applyServerFieldErrors(err, setError, Object.keys(payload)),
     });
   }
 

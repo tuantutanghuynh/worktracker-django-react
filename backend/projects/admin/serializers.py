@@ -3,11 +3,46 @@ Module: projects.admin.serializers
 Description: Admin serializers for managing client organizations and master project jobs.
 """
 
+import re
+
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from ..models import Client, Job
 from tasks.models import Task
+
+
+# Vietnamese tax code: 10 digits for the head office, optionally followed by
+# a 3-digit branch suffix. Every real client in the system already matches
+# this; without the check "abcxyz" and "123" were both accepted.
+TAX_CODE_PATTERN = re.compile(r"^\d{10}(-\d{3})?$")
+
+# Phone numbers arrive in many shapes (+84 902 000 002, 0902-000-002,
+# (028) 3822 1234). Rather than pin one layout, allow the punctuation people
+# actually type and require a plausible number of digits underneath.
+PHONE_ALLOWED_CHARS = re.compile(r"^[0-9+()\-.\s]+$")
+PHONE_MIN_DIGITS = 8
+PHONE_MAX_DIGITS = 15
+
+
+def validate_phone_format(value, field_label="Phone number"):
+    """Reject phone values that are not plausibly a phone number."""
+    phone = (value or "").strip()
+    if not phone:
+        return phone
+
+    if not PHONE_ALLOWED_CHARS.match(phone):
+        raise serializers.ValidationError(
+            f"{field_label} may only contain digits and the characters + ( ) - . and spaces."
+        )
+
+    digits = re.sub(r"\D", "", phone)
+    if not (PHONE_MIN_DIGITS <= len(digits) <= PHONE_MAX_DIGITS):
+        raise serializers.ValidationError(
+            f"{field_label} must contain between {PHONE_MIN_DIGITS} and "
+            f"{PHONE_MAX_DIGITS} digits (found {len(digits)})."
+        )
+    return phone
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -49,9 +84,18 @@ class ClientSerializer(serializers.ModelSerializer):
             )
         return name
 
+    def validate_contact_phone(self, value):
+        """Reject contact phone values that are not plausibly a phone number."""
+        return validate_phone_format(value, "Contact phone")
+
     def validate_tax_code(self, value):
         """Validate case-insensitive tax code uniqueness across active and deactivated records."""
         code = (value or "").strip()
+        if code and not TAX_CODE_PATTERN.match(code):
+            raise serializers.ValidationError(
+                "Tax code must be 10 digits, optionally followed by a 3-digit "
+                "branch suffix (e.g. 0123456789 or 0123456789-001)."
+            )
         if not code:
             raise serializers.ValidationError("Tax code is required.")
 

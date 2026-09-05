@@ -25,17 +25,24 @@ import {
   useResetUserPassword,
 } from '../../hooks/queries/admin/useAdminUsers';
 import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
 const editUserSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email is required')
+    .email('Invalid email address')
+    .max(155, 'Email must be 155 characters or fewer'),
   role: z.string().min(1, 'Role is required'),
 });
 
 const resetPasswordSchema = z.object({
   new_password: z.string()
     .min(8, 'At least 8 characters')
+    .max(128, 'Password must be 128 characters or fewer')
     .regex(/[a-z]/, 'Must contain a lowercase letter')
     .regex(/[A-Z]/, 'Must contain an uppercase letter')
     .regex(/[0-9]/, 'Must contain a number')
@@ -56,6 +63,11 @@ export function SearchUserPage() {
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [managerFilter, setManagerFilter] = useState('');
+  // Hai dropdown Department va Manager luu NGAY khi chon, khong qua nut Save
+  // nen khong nam trong zodResolver cua form. Giu loi cua chung o state rieng
+  // de hien ngay duoi o nhap thay vi chi bao o toast roi bien mat.
+  const [departmentError, setDepartmentError] = useState(null);
+  const [managerError, setManagerError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [ordering, toggleSort] = useOrdering();
   const [page, setPage] = useState(1);
@@ -181,6 +193,9 @@ export function SearchUserPage() {
   }, [deepLinkedUser]);
 
   function openUser(user) {
+    // Xoa loi cua nguoi vua xem, neu khong no con dinh lai o nguoi moi mo.
+    setDepartmentError(null);
+    setManagerError(null);
     setSelectedUser(user);
     reset({ email: user.email, role: user.role_detail ? String(user.role_detail.id) : '' });
     resetPasswordForm({ new_password: '' });
@@ -212,22 +227,30 @@ export function SearchUserPage() {
 
   function onChangeDepartment(val) {
     const departmentId = val ? Number(val) : null;
+    setDepartmentError(null);
     departmentMutation.mutate(
       { id: selectedUser.id, departmentId },
       {
-        onSuccess: () =>
-          setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, department: departmentId } })),
+        onSuccess: () => {
+          setDepartmentError(null);
+          setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, department: departmentId } }));
+        },
+        onError: (err) => setDepartmentError(getErrorMessage(err, 'Could not change the department.')),
       }
     );
   }
 
   function onChangeManager(val) {
     const managerId = val ? Number(val) : null;
+    setManagerError(null);
     managerMutation.mutate(
       { id: selectedUser.id, managerId },
       {
-        onSuccess: () =>
-          setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, manager: managerId } })),
+        onSuccess: () => {
+          setManagerError(null);
+          setSelectedUser((prev) => ({ ...prev, profile: { ...prev.profile, manager: managerId } }));
+        },
+        onError: (err) => setManagerError(getErrorMessage(err, 'Could not change the manager.')),
       }
     );
   }
@@ -455,10 +478,13 @@ export function SearchUserPage() {
                 value={selectedUser.profile?.department ? String(selectedUser.profile.department) : ''}
                 onChange={onChangeDepartment}
                 disabled={departmentMutation.isPending}
+                error={departmentError}
               />
-              <p className="text-[11px] text-slate-400">
-                Select &quot;No Department&quot; to remove this user from their current department.
-              </p>
+              {!departmentError && (
+                <p className="text-[11px] text-slate-400">
+                  Select &quot;No Department&quot; to remove this user from their current department.
+                </p>
+              )}
             </div>
 
             {selectedUser.role_detail?.code === 'EMPLOYEE' && (
@@ -472,11 +498,14 @@ export function SearchUserPage() {
                   value={selectedUser.profile?.manager ? String(selectedUser.profile.manager) : ''}
                   onChange={onChangeManager}
                   disabled={managerMutation.isPending}
+                  error={managerError}
                 />
-                <p className="text-[11px] text-slate-400">
-                  The assigned Manager controls who can see this employee and give them
-                  tasks. Leave empty and no Manager will see them.
-                </p>
+                {!managerError && (
+                  <p className="text-[11px] text-slate-400">
+                    The assigned Manager controls who can see this employee and give them
+                    tasks. Leave empty and no Manager will see them.
+                  </p>
+                )}
               </div>
             )}
 
