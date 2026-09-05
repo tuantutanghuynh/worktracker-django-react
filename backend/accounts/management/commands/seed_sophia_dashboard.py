@@ -11,11 +11,21 @@ going through apply_transition()/the LogWork API — acceptable here only
 because this is offline seed data, not a real user action flowing
 through business rules (same pattern accounts/management/commands/
 seed_data.py already uses for the same reason).
+
+The 6 tasks this script logs hours against (marketing_task, task1, task16,
+task46, task61, task76) used to be looked up by hardcoded title prefix
+(e.g. "Design Database Schema #10.") — but seed_data.py assigns task
+templates/assignees with an unseeded random.choice(), so which task lands
+at that title/position is different on every `seed_data --reset`. Picked
+dynamically instead via pick_task_for_sophia() below: any task already
+assigned to her, or — if she doesn't have enough — any task in the DB,
+force-reassigned to her (fine here, same "offline seed data" pass as
+above). Variable names are historical, not literal titles.
 """
 from datetime import timedelta, datetime
 from decimal import Decimal
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -39,6 +49,29 @@ def next_order_index(job, status):
     return key_between(last, None)
 
 
+def pick_task_for_sophia(sophia, used_ids):
+    """Returns a Task belonging to sophia that hasn't been picked yet in
+    this run. Prefers one she's already assigned; falls back to grabbing
+    any other task and reassigning it to her if she doesn't have enough."""
+    task = (
+        Task.objects.filter(assignee=sophia)
+        .exclude(id__in=used_ids)
+        .exclude(status=Task.Status.CANCELLED)
+        .order_by("id")
+        .first()
+    )
+    if task is None:
+        task = Task.objects.exclude(id__in=used_ids).order_by("id").first()
+        if task is None:
+            raise CommandError(
+                "Not enough tasks in the DB to seed Sophia's dashboard demo — run seed_data first."
+            )
+        task.assignee = sophia
+        task.save(update_fields=["assignee"])
+    used_ids.add(task.id)
+    return task
+
+
 class Command(BaseCommand):
     help = "Seed richer, more diverse data for sophia.johnson@worktracker.vn (Dashboard/My Performance demo)"
 
@@ -54,7 +87,8 @@ class Command(BaseCommand):
             # -----------------------------------------------------------
             self.stdout.write("1. Diversifying existing task statuses...")
 
-            marketing_task = Task.objects.get(assignee=sophia, title__startswith="Design Database Schema #10.")
+            used_task_ids = set()
+            marketing_task = pick_task_for_sophia(sophia, used_task_ids)
             marketing_task.status = Task.Status.COMPLETED
             marketing_task.completed_at = timezone.now() - timedelta(days=4)
             marketing_task.save()
@@ -113,6 +147,8 @@ class Command(BaseCommand):
                 },
             )
 
+            used_task_ids.update({sec_task.id, web_task.id, hrm_task.id})
+
             for t in (sec_task, web_task, hrm_task):
                 TaskFollower.objects.get_or_create(task=t, user=manager)
                 TaskFollower.objects.get_or_create(task=t, user=sophia)
@@ -134,11 +170,11 @@ class Command(BaseCommand):
             # -----------------------------------------------------------
             self.stdout.write("3. Seeding LogWork across the last 14 days...")
 
-            task1 = Task.objects.get(assignee=sophia, title__startswith="Design Database Schema #1.")
-            task16 = Task.objects.get(assignee=sophia, title__startswith="Setup Redis Cache Cluster #2.")
-            task46 = Task.objects.get(assignee=sophia, title__startswith="Setup Redis Cache Cluster #5.")
-            task61 = Task.objects.get(assignee=sophia, title__startswith="Design Database Schema #7.")
-            task76 = Task.objects.get(assignee=sophia, title__startswith="Setup Redis Cache Cluster #8.")
+            task1 = pick_task_for_sophia(sophia, used_task_ids)
+            task16 = pick_task_for_sophia(sophia, used_task_ids)
+            task46 = pick_task_for_sophia(sophia, used_task_ids)
+            task61 = pick_task_for_sophia(sophia, used_task_ids)
+            task76 = pick_task_for_sophia(sophia, used_task_ids)
 
             # (day_offset_from_today, task, hours, review_status)
             # day_offset 13 = trend_start (today - 13), 0 = today.
@@ -151,7 +187,7 @@ class Command(BaseCommand):
                 (7, task61, "5.00", LogWork.ReviewStatus.PENDING),    # 08-11
                 (6, marketing_task, "3.00", LogWork.ReviewStatus.APPROVED),  # 08-12
                 (5, sec_task, "6.50", LogWork.ReviewStatus.APPROVED), # 08-13
-                # 08-14 already at the 24h daily cap from earlier manual testing — skip.
+                # day_offset 4 (08-14) deliberately skipped — another gap day.
                 (3, web_task, "2.00", LogWork.ReviewStatus.APPROVED), # 08-15, on top of the 9.5h already there
                 (2, task76, "8.00", LogWork.ReviewStatus.APPROVED),   # 08-16
                 (1, task1, "6.00", LogWork.ReviewStatus.APPROVED),    # 08-17
