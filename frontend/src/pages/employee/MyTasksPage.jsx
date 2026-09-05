@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
-import { RotateCcw, Lock, PauseCircle, ListChecks, PlayCircle, Eye, CalendarClock } from "lucide-react"
-import { differenceInCalendarDays, parseISO } from "date-fns"
+import { RotateCcw, Lock, PauseCircle, ListChecks, PlayCircle, Eye, CalendarClock, CalendarDays } from "lucide-react"
+import { differenceInCalendarDays, parseISO, format } from "date-fns"
 import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { FilterToolbar } from "../../components/common/table/FilterToolbar"
 import { DataTable } from "../../components/common/table/DataTable"
@@ -13,6 +13,7 @@ import { TaskSubmitReviewModal } from "../../components/employee/tasks/TaskSubmi
 import { useRecentTasksStore } from "../../stores/useRecentTasksStore"
 import { describeDeadline, DEADLINE_TONE_STYLES } from "../../utils/deadline"
 import { isTaskFrozen, isFrozenOpenTask } from "../../utils/taskFrozen"
+import { isUpcomingTask } from "../../utils/taskSchedule"
 
 // "Due Soon" = còn mở (chưa Completed/Cancelled), có deadline, còn 0-3
 // ngày nữa tới hạn — CHƯA quá hạn (đã quá hạn thì đây là "overdue",
@@ -46,7 +47,7 @@ const PRIORITY_RANK = { HIGH: 3, MEDIUM: 2, LOW: 1 }
 export function MyTasksPage() {
     const { tasks, loading, error, changeStatus } = useMyTasks()
     const { addRecentTask } = useRecentTasksStore()
-    const [activeTab, setActiveTab] = useState("active") // "active" | "frozen"
+    const [activeTab, setActiveTab] = useState("active") // "active" | "frozen" | "upcoming"
     const [searchQuery, setSearchQuery] = useState("")
     const [statusValue, setStatusValue] = useState("")
     const [priorityValue, setPriorityValue] = useState("")
@@ -59,11 +60,22 @@ export function MyTasksPage() {
     const [recallingTask, setRecallingTask] = useState(null)
     const [isRecalling, setIsRecalling] = useState(false)
 
-    // Tách trước theo tab — Active/Frozen là 2 rổ độc lập, các filter/sort
-    // bên dưới chỉ áp dụng bên trong đúng rổ đang xem.
+    // Tách trước theo tab — Active/Frozen/Upcoming là 3 rổ LOẠI TRỪ NHAU,
+    // các filter/sort bên dưới chỉ áp dụng bên trong đúng rổ đang xem.
+    // Ưu tiên Frozen trước Upcoming (task nào vừa bị Job đóng băng vừa
+    // được hẹn lịch tương lai thì lý do "Frozen" đáng chú ý hơn — đây là
+    // vấn đề ở Job, chặn CẢ SAU KHI qua ngày start_date; còn Upcoming chỉ
+    // đơn thuần là "chưa tới lúc", không phải bị chặn gì).
     const frozenTasks = useMemo(() => tasks.filter(isFrozenOpenTask), [tasks])
-    const activeTasks = useMemo(() => tasks.filter((t) => !isFrozenOpenTask(t)), [tasks])
-    const tabTasks = activeTab === "frozen" ? frozenTasks : activeTasks
+    const upcomingTasks = useMemo(
+        () => tasks.filter((t) => !isFrozenOpenTask(t) && isUpcomingTask(t)),
+        [tasks]
+    )
+    const activeTasks = useMemo(
+        () => tasks.filter((t) => !isFrozenOpenTask(t) && !isUpcomingTask(t)),
+        [tasks]
+    )
+    const tabTasks = activeTab === "frozen" ? frozenTasks : activeTab === "upcoming" ? upcomingTasks : activeTasks
 
     // Summary luôn tính trên TOÀN BỘ task (không đổi theo tab Active/Frozen
     // đang xem) — giống cách KPI ở My Team/My Performance không đổi theo
@@ -112,6 +124,9 @@ export function MyTasksPage() {
             result = [...result].sort((a, b) => {
                 if (sorting.key === "deadline") {
                     return dir * (new Date(a.deadline) - new Date(b.deadline))
+                }
+                if (sorting.key === "start_date") {
+                    return dir * (new Date(a.start_date || 0) - new Date(b.start_date || 0))
                 }
                 if (sorting.key === "priority") {
                     return dir * (PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])
@@ -203,6 +218,29 @@ export function MyTasksPage() {
             cell: (info) => <StatusBadge status={info.row.original.status} />,
         },
         {
+            accessorKey: "start_date",
+            header: "Start Date",
+            sortable: true,
+            cell: (info) => {
+                const task = info.row.original
+                if (!task.start_date) return <span className="text-slate-300">—</span>
+                const label = format(parseISO(task.start_date), "MMM d, yyyy")
+                if (!isUpcomingTask(task)) return <span className="text-slate-700">{label}</span>
+                // Chỉ task còn TODO + chưa tới ngày mới hiện "Starts in Xd" —
+                // task đã IN_PROGRESS/REVIEWING/COMPLETED thì start_date chỉ còn
+                // là mốc lịch sử, không cần đếm ngược nữa.
+                const days = differenceInCalendarDays(parseISO(task.start_date), new Date())
+                return (
+                    <div className="leading-tight">
+                        <p className="text-slate-700">{label}</p>
+                        <p className="text-[10px] font-semibold text-blue-500">
+                            Starts in {days} day{days !== 1 ? "s" : ""}
+                        </p>
+                    </div>
+                )
+            },
+        },
+        {
             accessorKey: "deadline",
             header: "Deadline",
             sortable: true,
@@ -251,6 +289,10 @@ export function MyTasksPage() {
                             </span>
                         )
                     }
+                    // Upcoming (start_date tương lai) không bị CHẶN start sớm ở
+                    // backend (chỉ là lịch Manager dự kiến, không phải hard rule)
+                    // — vẫn cho bấm Start Task bình thường, ngày hẹn đã có riêng
+                    // ở cột Start Date, không lặp lại ở đây nữa.
                     return (
                         <button
                             type="button"
@@ -340,6 +382,14 @@ export function MyTasksPage() {
                     <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
                     Frozen ({frozenTasks.length})
                 </button>
+                <button
+                    type="button"
+                    onClick={() => handleTabChange("upcoming")}
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 ${activeTab === "upcoming" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    <CalendarDays className="w-3.5 h-3.5 text-blue-500" />
+                    Upcoming ({upcomingTasks.length})
+                </button>
             </div>
 
             <FilterToolbar
@@ -372,7 +422,13 @@ export function MyTasksPage() {
                 columns={columns}
                 data={paginatedTasks}
                 isLoading={loading}
-                emptyMessage={activeTab === "frozen" ? "No frozen tasks — nothing is currently blocked." : "No tasks assigned yet."}
+                emptyMessage={
+                    activeTab === "frozen"
+                        ? "No frozen tasks — nothing is currently blocked."
+                        : activeTab === "upcoming"
+                            ? "No upcoming tasks — nothing scheduled for the future."
+                            : "No tasks assigned yet."
+                }
                 onRowClick={(task) => { setSelectedTask(task); addRecentTask(task) }}
                 sorting={sorting}
                 onSortChange={handleSortChange}
