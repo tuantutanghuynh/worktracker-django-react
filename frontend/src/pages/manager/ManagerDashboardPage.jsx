@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { useRecentJobsStore } from '../../stores/useRecentJobsStore';
 import { useUIStore } from '../../stores/useUIStore';
 
 // Subcomponents & Shared Components
@@ -18,7 +17,6 @@ import TaskDetailDrawer from '../../components/manager/TaskDetailDrawer';
 
 // TanStack Query Hooks
 import { useManagerDashboard } from '../../hooks/queries/manager/useManagerDashboard';
-import { useManagerJobs } from '../../hooks/queries/manager/useManagerJobs';
 import { useManagerTasks } from '../../hooks/queries/manager/useManagerTasks';
 import { useLogWorks } from '../../hooks/queries/manager/useManagerTimesheets';
 import { useManagerAuditLogs } from '../../hooks/queries/manager/useManagerAuditLogs';
