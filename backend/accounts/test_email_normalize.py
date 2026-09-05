@@ -106,27 +106,43 @@ class TestSuaUser:
             "accounts.CustomUser", email="cusan@demo.vn", role=roles["employee"], is_active=True
         )
 
-    def test_sua_email_sang_chu_hoa_van_luu_chu_thuong(self, admin_client, nguoi_dung):
+    def test_email_KHONG_doi_duoc_khi_sua(self, admin_client, nguoi_dung):
+        """
+        Email là ĐỊNH DANH ĐĂNG NHẬP nên bất biến sau khi tạo.
+
+        Đổi email nghĩa là người đó không còn đăng nhập được bằng địa chỉ cũ,
+        và mọi liên kết cũ (thư mời tài khoản, bản ghi PasswordReset, email
+        trong audit log) đều trỏ tới một địa chỉ không còn ai dùng.
+
+        Field để read_only nên DRF bỏ qua giá trị gửi lên thay vì báo lỗi —
+        đúng hành vi chuẩn, và phần còn lại của request vẫn được xử lý.
+        """
+        goc = nguoi_dung.email
         r = admin_client.patch(
             f"/api/auth/users/{nguoi_dung.id}/",
             {"email": "DoiTen.MOI@Demo.VN"},
             format="json",
         )
+
         assert r.status_code == 200
         nguoi_dung.refresh_from_db()
-        assert nguoi_dung.email == "doiten.moi@demo.vn"
+        assert nguoi_dung.email == goc
 
-    def test_sua_sang_email_nguoi_khac_khac_hoa_thuong_bi_chan(
+    def test_khong_the_chiem_email_cua_nguoi_khac_qua_luong_sua(
         self, admin_client, nguoi_dung, roles
     ):
+        """Read_only cung chan luon duong cuop email cua tai khoan khac."""
         baker.make("accounts.CustomUser", email="nguoikhac@demo.vn", role=roles["employee"])
-        r = admin_client.patch(
+        goc = nguoi_dung.email
+
+        admin_client.patch(
             f"/api/auth/users/{nguoi_dung.id}/",
             {"email": "NguoiKhac@Demo.VN"},
             format="json",
         )
-        assert r.status_code == 400
-        assert "email" in r.data
+
+        nguoi_dung.refresh_from_db()
+        assert nguoi_dung.email == goc
 
     def test_sua_chinh_no_giu_nguyen_email_khong_bi_chan(self, admin_client, nguoi_dung):
         """

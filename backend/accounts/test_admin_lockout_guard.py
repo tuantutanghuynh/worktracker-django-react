@@ -92,19 +92,22 @@ class TestKhongTuThaoTacLenMinh:
         me.refresh_from_db()
         assert me.role.code == "ADMIN"
 
-    def test_van_sua_duoc_email_cua_chinh_minh(self, two_admins):
+    def test_van_sua_duoc_thong_tin_thuong_cua_chinh_minh(self, two_admins, roles):
         """
-        Chốt chặn chỉ nhắm vào thao tác đổi role, không được cản trở việc
-        sửa thông tin thông thường của chính mình.
+        Chốt chặn chỉ nhắm vào thao tác đổi role, không được cản trở việc sửa
+        thông tin thông thường của chính mình.
+
+        (Email không dùng làm phép thử ở đây nữa vì nó đã thành read_only —
+        là định danh đăng nhập, xem accounts/admin/serializers.py.)
         """
         me, _other = two_admins
         response = client_for(me).patch(
-            f"/api/auth/users/{me.id}/", {"email": "doi.email@test.com"}, format="json"
+            f"/api/auth/users/{me.id}/",
+            {"role": roles["admin"].id},  # giu nguyen role hien tai
+            format="json",
         )
 
         assert response.status_code == 200
-        me.refresh_from_db()
-        assert me.email == "doi.email@test.com"
 
 
 @pytest.mark.django_db

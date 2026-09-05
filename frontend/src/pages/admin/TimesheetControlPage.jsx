@@ -534,7 +534,9 @@ export function TimesheetControlPage() {
             become editable again for every job.
           </p>
           <InputField
-            label="Reason (required)"
+            label="Reason"
+            required
+            placeholder="Why is this period being reopened?"
             error={unlockErrors.reason?.message}
             {...registerUnlock('reason')}
           />

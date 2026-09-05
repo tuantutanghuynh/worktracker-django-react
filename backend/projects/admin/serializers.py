@@ -119,10 +119,40 @@ class JobSerializer(serializers.ModelSerializer):
 
     project_team = serializers.SerializerMethodField(read_only=True)
     team_size = serializers.SerializerMethodField(read_only=True)
+    # validators=[] bo UniqueValidator ma DRF tu them tu unique=True. Validator
+    # do chi so khop CHINH XAC nen "job-erp-01" lot qua khi da co "JOB-ERP-01",
+    # va no khong xu ly duoc chuoi rong (xem validate_job_code ben duoi).
+    job_code = serializers.CharField(
+        max_length=20, required=False, allow_blank=True, allow_null=True, validators=[]
+    )
 
     class Meta:
         model = Job
         fields = '__all__'
+
+    def validate_job_code(self, value):
+        """Normalize blank job codes to NULL and enforce case-insensitive uniqueness."""
+        code = (value or "").strip()
+
+        # Job code de trong -> luu NULL chu KHONG phai chuoi rong.
+        #
+        # job_code co unique=True. Postgres cho phep nhieu NULL duoi mot rang
+        # buoc unique, nhung chuoi rong '' thi KHONG phai NULL — tao Job thu
+        # hai voi o Job Code bo trong se dung rang buoc va vo thanh loi 500
+        # kem nguyen traceback, thay vi mot thong bao 400 doc duoc.
+        if not code:
+            return None
+
+        duplicates = Job.objects.filter(job_code__iexact=code)
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        existing = duplicates.first()
+        if existing is not None:
+            raise serializers.ValidationError(
+                f"Job code '{existing.job_code}' is already used by '{existing.job_name}'. "
+                f"Job codes must be unique."
+            )
+        return code
 
     def get_team_size(self, obj):
         """Calculate total count of unique team assignees and chat participants."""

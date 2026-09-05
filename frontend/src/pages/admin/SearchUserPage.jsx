@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Search, Lock, Unlock } from 'lucide-react';
+import { Search, Lock, Unlock, Plus } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
@@ -23,21 +23,41 @@ import {
   useAssignUserDepartment,
   useAssignUserManager,
   useResetUserPassword,
+  useCreateUser,
 } from '../../hooks/queries/admin/useAdminUsers';
 import { useAdminDepartments } from '../../hooks/queries/admin/useAdminDepartments';
-import { getErrorMessage } from '../../utils/errorMessages';
+import { getErrorMessage, applyServerFieldErrors } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 10; // khớp AdminPageNumberPagination.page_size ở backend
 
+// Form SUA chi con Role. Email da bi go khoi form vi la dinh danh dang nhap.
 const editUserSchema = z.object({
+  role: z.string().min(1, 'Role is required'),
+});
+
+// Form TAO user. Tach rieng khoi editUserSchema vi tao thi bat buoc co mat
+// khau va email, con sua thi email khong doi duoc (dinh danh dang nhap).
+const createUserSchema = z.object({
   email: z
     .string()
     .trim()
     .min(1, 'Email is required')
     .email('Invalid email address')
     .max(155, 'Email must be 155 characters or fewer'),
+  password: z
+    .string()
+    .min(8, 'At least 8 characters')
+    .max(128, 'Password must be 128 characters or fewer')
+    .regex(/[a-z]/, 'Must contain a lowercase letter')
+    .regex(/[A-Z]/, 'Must contain an uppercase letter')
+    .regex(/[0-9]/, 'Must contain a number')
+    .regex(/[^A-Za-z0-9]/, 'Must contain a special symbol'),
   role: z.string().min(1, 'Role is required'),
+  department: z.string().optional(),
+  manager: z.string().optional(),
 });
+
+const EMPTY_CREATE_FORM = { email: '', password: '', role: '', department: '', manager: '' };
 
 const resetPasswordSchema = z.object({
   new_password: z.string()
@@ -69,6 +89,7 @@ export function SearchUserPage() {
   const [departmentError, setDepartmentError] = useState(null);
   const [managerError, setManagerError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [ordering, toggleSort] = useOrdering();
   const [page, setPage] = useState(1);
 
@@ -159,8 +180,51 @@ export function SearchUserPage() {
     setManagerFilter('');
   }
 
+  // Form TAO user — tach hoan toan khoi form SUA de hai form khong dam nhau
+  // (react-hook-form giu state rieng cho moi useForm).
   const {
-    register,
+    register: registerCreate,
+    handleSubmit: handleCreateSubmit,
+    reset: resetCreate,
+    control: controlCreate,
+    setError: setCreateError,
+    formState: { errors: createErrors },
+  } = useForm({ resolver: zodResolver(createUserSchema), defaultValues: EMPTY_CREATE_FORM });
+
+  // Chi EMPLOYEE moi co tuyen bao cao. So sanh theo id vi dropdown Role post
+  // id chu khong post code.
+  const createRoleId = useWatch({ control: controlCreate, name: 'role' });
+  const isCreatingEmployee =
+    roles.find((r) => String(r.id) === String(createRoleId))?.code === 'EMPLOYEE';
+
+  const createMutation = useCreateUser();
+
+  function openCreate() {
+    resetCreate(EMPTY_CREATE_FORM);
+    setIsCreateOpen(true);
+  }
+
+  function onSubmitCreate(data) {
+    createMutation.mutate(
+      {
+        email: data.email,
+        password: data.password,
+        role: Number(data.role),
+        department: data.department ? Number(data.department) : null,
+        manager: isCreatingEmployee && data.manager ? Number(data.manager) : null,
+      },
+      {
+        onSuccess: () => setIsCreateOpen(false),
+        // Trung email chi backend biet — gan thang vao o Email thay vi toast.
+        onError: (err) =>
+          applyServerFieldErrors(err, setCreateError, [
+            'email', 'password', 'role', 'department', 'manager',
+          ]),
+      }
+    );
+  }
+
+  const {
     handleSubmit,
     reset,
     control,
@@ -197,7 +261,7 @@ export function SearchUserPage() {
     setDepartmentError(null);
     setManagerError(null);
     setSelectedUser(user);
-    reset({ email: user.email, role: user.role_detail ? String(user.role_detail.id) : '' });
+    reset({ role: user.role_detail ? String(user.role_detail.id) : '' });
     resetPasswordForm({ new_password: '' });
   }
 
@@ -210,7 +274,8 @@ export function SearchUserPage() {
 
   function onSubmitEdit(data) {
     updateMutation.mutate(
-      { id: selectedUser.id, payload: { email: data.email, role: Number(data.role) } },
+      // Khong gui email: backend da read_only, gui len chi bi bo qua.
+      { id: selectedUser.id, payload: { role: Number(data.role) } },
       { onSuccess: (updated) => setSelectedUser((prev) => ({ ...prev, ...updated })) }
     );
   }
@@ -271,11 +336,20 @@ export function SearchUserPage() {
             {totalCount} account{totalCount === 1 ? '' : 's'} matching the current filters.
           </p>
         </div>
-        <ExportButton
-          url="/auth/users/export/"
-          params={listParams}
-          filename="worktracker_users.xlsx"
-        />
+        <div className="flex items-center gap-2">
+          <ExportButton
+            url="/auth/users/export/"
+            params={listParams}
+            filename="worktracker_users.xlsx"
+          />
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> New User
+          </button>
+        </div>
       </div>
 
       {/* Thanh search + filter: mọi giá trị ở đây được gửi y hệt sang endpoint
@@ -444,7 +518,16 @@ export function SearchUserPage() {
         {selectedUser && (
           <div className="space-y-5">
             <form onSubmit={handleSubmit(onSubmitEdit)} className="space-y-3">
-              <InputField label="Email" error={errors.email?.message} {...register('email')} />
+              {/* Email la DINH DANH DANG NHAP nen khong cho sua. Backend cung
+                  da dat read_only (accounts/admin/serializers.py) — day chi
+                  la lop hien thi cho ro rang. */}
+              <InputField
+                label="Email (login ID)"
+                value={selectedUser.email}
+                disabled
+                readOnly
+                helperText="The sign-in ID cannot be changed. Lock this account and create a new one if the address must change."
+              />
               <Controller
                 name="role"
                 control={control}
@@ -544,7 +627,8 @@ export function SearchUserPage() {
               <InputField
                 label="Reset Password"
                 type="password"
-                placeholder="New default password"
+                required
+                placeholder="Min 8 chars, A-Z, a-z, 0-9, symbol"
                 error={passwordErrors.new_password?.message}
                 {...registerPassword('new_password')}
               />
@@ -558,6 +642,115 @@ export function SearchUserPage() {
             </form>
           </div>
         )}
+      </BaseModal>
+
+      {/* Modal TAO user — thay cho trang /admin/users/create rieng, de giong
+          cach ClientsPage va DepartmentsPage lam. */}
+      <BaseModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title="New User"
+        description="The account will be required to change this password on first sign-in."
+      >
+        <form onSubmit={handleCreateSubmit(onSubmitCreate)} className="space-y-3">
+          <InputField
+            label="Email (login ID)"
+            type="email"
+            required
+            placeholder="name@company.com"
+            helperText="This becomes the sign-in ID and cannot be changed later."
+            error={createErrors.email?.message}
+            {...registerCreate('email')}
+          />
+
+          <InputField
+            label="Default Password"
+            type="password"
+            required
+            placeholder="Min 8 chars, A-Z, a-z, 0-9, symbol"
+            helperText="At least 8 characters, upper & lower case, a number, and a special symbol."
+            error={createErrors.password?.message}
+            {...registerCreate('password')}
+          />
+
+          <Controller
+            name="role"
+            control={controlCreate}
+            render={({ field }) => (
+              <SelectDropdown
+                theme="light"
+                label="Role"
+                required
+                placeholder="-- Select a role --"
+                options={roleOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={createErrors.role?.message}
+              />
+            )}
+          />
+
+          <Controller
+            name="department"
+            control={controlCreate}
+            render={({ field }) => (
+              <SelectDropdown
+                theme="light"
+                label="Department (optional)"
+                searchable
+                placeholder="Type to search..."
+                options={departmentOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={createErrors.department?.message}
+              />
+            )}
+          />
+
+          {isCreatingEmployee && (
+            <div className="space-y-1">
+              <Controller
+                name="manager"
+                control={controlCreate}
+                render={({ field }) => (
+                  <SelectDropdown
+                    theme="light"
+                    label="Manager"
+                    searchable
+                    placeholder="Type to search..."
+                    options={managerOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={createErrors.manager?.message}
+                  />
+                )}
+              />
+              {!createErrors.manager && (
+                <p className="text-[11px] text-amber-600">
+                  Assign one now. An employee without a Manager is invisible to every
+                  Manager and cannot be given any task.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(false)}
+              className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {createMutation.isPending ? 'Creating...' : 'Create User'}
+            </button>
+          </div>
+        </form>
       </BaseModal>
     </div>
   );

@@ -7,7 +7,6 @@ import {
   Clock,
   Lock,
   BarChart3,
-  Settings,
   ChevronLeft,
   ChevronRight,
   ListChecks,
@@ -18,7 +17,6 @@ import {
   MessageSquare,
   ShieldCheck,
   Building2,
-  UserPlus,
   FileText,
   Network,
   ScrollText,
@@ -109,7 +107,6 @@ const MENU_CONFIG = {
         label: 'People',
         items: [
           { path: '/admin/users/search', label: 'User List', icon: Users },
-          { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
           { path: '/admin/departments', label: 'Departments', icon: Network },
         ],
       },

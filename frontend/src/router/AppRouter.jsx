@@ -43,7 +43,6 @@ import AdminLayout from "../layouts/AdminLayout"
 const AdminDashboardPage = lazy(() => import("../pages/admin/DashboardPage").then((m) => ({ default: m.DashboardPage })))
 const AdminClientsPage = lazy(() => import("../pages/admin/ClientsPage").then((m) => ({ default: m.ClientsPage })))
 const AdminDepartmentsPage = lazy(() => import("../pages/admin/DepartmentsPage").then((m) => ({ default: m.DepartmentsPage })))
-const AdminCreateUserPage = lazy(() => import("../pages/admin/CreateUserPage").then((m) => ({ default: m.CreateUserPage })))
 const AdminSearchUserPage = lazy(() => import("../pages/admin/SearchUserPage").then((m) => ({ default: m.SearchUserPage })))
 const AdminJobsPage = lazy(() => import("../pages/admin/JobsPage").then((m) => ({ default: m.JobsPage })))
 const AdminAuditLogsPage = lazy(() => import("../pages/admin/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage })))
@@ -148,7 +147,6 @@ export function AppRouter() {
                                 <Route index element={<AdminDashboardPage />} />
                                 <Route path="clients" element={<AdminClientsPage />} />
                                 <Route path="departments" element={<AdminDepartmentsPage />} />
-                                <Route path="users/create" element={<AdminCreateUserPage />} />
                                 <Route path="users/search" element={<AdminSearchUserPage />} />
                                 <Route path="jobs" element={<AdminJobsPage />} />
                                 <Route path="audit-logs" element={<AdminAuditLogsPage />} />

@@ -53,16 +53,20 @@ class UserSerializer(serializers.ModelSerializer):
 
     profile = EmployeeProfileSerializer(read_only=True)
     role_detail = RoleSerializer(source='role', read_only=True)
-    email = serializers.EmailField(max_length=155, validators=[])
+    # Email la DINH DANH DANG NHAP, khong cho sua sau khi tao.
+    #
+    # Doi email nghia la nguoi do khong con dang nhap duoc bang email cu, va
+    # moi lien ket cu — thu moi tai khoan, ban ghi PasswordReset, email trong
+    # audit log — deu tro toi mot dia chi khong con ai dung. Muon doi thi
+    # khoa tai khoan cu roi tao tai khoan moi.
+    #
+    # read_only o day chan luon o tang API, khong chi an o giao dien.
+    email = serializers.EmailField(read_only=True)
 
     class Meta:
         model = CustomUser
         fields = ['id', 'email', 'role', 'role_detail', 'is_active', 'profile']
         extra_kwargs = {'role': {'write_only': True}}
-
-    def validate_email(self, value):
-        """Validate normalized email uniqueness excluding the current user instance."""
-        return normalize_email(value, instance=self.instance)
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -113,6 +117,27 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class DepartmentSerializer(serializers.ModelSerializer):
     """Serializer for managing organizational department entities."""
 
+    # validators=[] bo UniqueValidator mac dinh (chi so khop CHINH XAC) de
+    # tu kiem tra khong phan biet hoa thuong ben duoi.
+    name = serializers.CharField(max_length=100, validators=[])
+
     class Meta:
         model = Department
         fields = ['id', 'name', 'description', 'manager', 'created_at']
+
+    def validate_name(self, value):
+        """Enforce case-insensitive uniqueness so 'IT' and 'it' cannot coexist."""
+        name = (value or "").strip()
+        if not name:
+            raise serializers.ValidationError("Department name is required.")
+
+        duplicates = Department.objects.filter(name__iexact=name)
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        existing = duplicates.first()
+        if existing is not None:
+            raise serializers.ValidationError(
+                f"A department named '{existing.name}' already exists. "
+                f"Department names are case-insensitive, so '{value}' is the same department."
+            )
+        return name
