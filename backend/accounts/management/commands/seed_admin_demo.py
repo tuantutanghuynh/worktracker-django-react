@@ -297,11 +297,23 @@ class Command(BaseCommand):
 
     # ── time locks ───────────────────────────────────────────────────────
     def _seed_timelocks(self, count, admin_user, jobs):
+        # BUG THẬT đã tìm ra (xem accounts/test_seed_admin_demo_timelocks.py):
+        # công thức modulo-12 cũ `((today.month - 2 - i) % 12) + 1` chỉ đúng
+        # với tối đa 11 vòng lặp — count (mặc định 20, dùng chung với mọi
+        # loại demo data khác) khiến i chạy vượt 11, vòng lại trúng đúng
+        # THÁNG HIỆN TẠI (và lặp lại các tháng cũ ở i cao hơn) — Employee bị
+        # khoá Log Work ngay tháng đang làm việc. Thay bằng lùi ngày thật
+        # từng tháng một (không có trần 11 tháng), luôn xuất phát từ "tháng
+        # liền trước hôm nay" nên không bao giờ chạm tới tháng hiện tại/
+        # tương lai dù count lớn tuỳ ý.
         today = timezone.now().date()
         created = 0
-        for i in range(count):
-            month = ((today.month - 2 - i) % 12) + 1
-            year = today.year if month <= today.month else today.year - 1
+        year, month = today.year, today.month
+        for _ in range(count):
+            month -= 1
+            if month == 0:
+                month = 12
+                year -= 1
             _, was_created = TimeLock.objects.get_or_create(
                 lock_scope=TimeLock.LockScope.GLOBAL,
                 job=None,
