@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom"
+import { format, subDays } from "date-fns"
 import { useDashboard } from "../../hooks/queries/employee/useDashboard"
 import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
 import { useProfile } from "../../hooks/queries/employee/useProfile"
@@ -31,8 +32,26 @@ const STATUS_ROWS = [
 // QuickLogWorkFormCard here too, but that duplicated the exact same form
 // already on the Timesheet page — replaced with a "Log Work →" link so
 // logging work has 1 canonical place, not 2 in sync by coincidence.
+//
+// KPI window fixed to "last 30 days" (not user-selectable, unlike My
+// Performance's own preset picker) — before this, Total Tasks/Completion
+// Rate/Task Overview read all-time data with no window at all, so a
+// long-tenured employee's Completed count only ever grew and buried the
+// actually-actionable To Do/In Progress/Reviewing rows under a wall of
+// "Completed 95%". Dashboard now answers "how am I doing recently";
+// My Performance stays the place to inspect all-time or a custom range.
+const DASHBOARD_KPI_WINDOW_DAYS = 30
+
+function getDashboardKpiRange() {
+    const today = new Date()
+    return {
+        start_date: format(subDays(today, DASHBOARD_KPI_WINDOW_DAYS - 1), "yyyy-MM-dd"),
+        end_date: format(today, "yyyy-MM-dd"),
+    }
+}
+
 export function DashboardPage() {
-    const { data: kpi, isLoading: loading, error } = useDashboard()
+    const { data: kpi, isLoading: loading, error } = useDashboard(getDashboardKpiRange())
     const { tasks } = useMyTasks()
     const { profile } = useProfile()
 
@@ -119,7 +138,7 @@ export function DashboardPage() {
             <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold">Welcome back{firstName ? `, ${firstName}` : ""} 👋</h1>
-                    <p className="text-xs text-blue-100 mt-1">Here's your work summary for this week.</p>
+                    <p className="text-xs text-blue-100 mt-1">Here's your work summary for the last {DASHBOARD_KPI_WINDOW_DAYS} days.</p>
                 </div>
                 <Link
                     to="/employee/timesheet"
@@ -131,6 +150,9 @@ export function DashboardPage() {
 
             {/* Cùng màu với đúng các chỉ số này ở My Performance — nhất
                 quán xuyên trang, không phải màu mới. */}
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Last {DASHBOARD_KPI_WINDOW_DAYS} days
+            </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <EmployeeStatCard
                     icon={ListChecks} hex="#CBA37E" label="Total Tasks"
@@ -156,7 +178,10 @@ export function DashboardPage() {
 
             <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-slate-900">Task Overview</p>
+                    <div>
+                        <p className="text-sm font-medium text-slate-900">Task Overview</p>
+                        <p className="text-[11px] text-slate-400">Last {DASHBOARD_KPI_WINDOW_DAYS} days</p>
+                    </div>
                     <span className="text-xs text-slate-400">{total} task{total !== 1 ? "s" : ""}</span>
                 </div>
                 <div className="space-y-2.5">

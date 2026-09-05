@@ -12,10 +12,13 @@ export const dashboardKeys = {
 
 // Employee dashboard summary — Personal KPI, cached 1 minute (matches
 // Manager's useManagerDashboard.js pattern for a similar summary query).
-export function useDashboard() {
+// params (optional): { start_date, end_date } — DashboardPage passes a
+// fixed "last 30 days" range so the whole dashboard reads as "how am I
+// doing recently", distinct from My Performance's own selectable range.
+export function useDashboard(params = {}) {
     return useQuery({
-        queryKey: dashboardKeys.kpi(),
-        queryFn: () => getPersonalKPI(),
+        queryKey: dashboardKeys.kpi(params),
+        queryFn: () => getPersonalKPI(params),
         staleTime: 60 * 1000,
     })
 }

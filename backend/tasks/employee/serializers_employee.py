@@ -45,7 +45,7 @@ class EmployeeTaskListSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'id', 'title', 'description', 'status', 'priority',
-            'deadline', 'order_index', 'job_id', 'job_code', 'job_name',
+            'start_date', 'deadline', 'order_index', 'job_id', 'job_code', 'job_name',
             'job_status', 'job_client_is_active', 'job_client_name',
             'manager_name', 'created_at', 'updated_at', 'completed_at'
         ]
@@ -78,7 +78,7 @@ class EmployeeTaskDetailSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'id', 'title', 'description', 'status', 'priority',
-            'deadline', 'completed_at', 'order_index', 'job_id',
+            'start_date', 'deadline', 'completed_at', 'order_index', 'job_id',
             'job_code', 'job_name', 'job_status', 'job_client_is_active', 'job_client_name',
             'manager_name', 'manager_email',
             'attachments', 'comments', 'work_logs', 'created_at', 'updated_at'

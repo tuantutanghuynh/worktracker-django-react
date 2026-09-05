@@ -140,12 +140,11 @@ class PersonalKPIView(APIView):
             (completed_count / float(hours_logged_total)) if hours_logged_total > 0 else None
         )
 
-        status_counts = (
-            Task.objects.filter(assignee=user)
-            .exclude(status=Task.Status.CANCELLED)
-            .values("status")
-            .annotate(count=Count("id"))
-        )
+        # Reuse completion_tasks (already scoped by start_date/end_date above)
+        # instead of a fresh unfiltered queryset — otherwise this breakdown
+        # would silently drift out of sync with completion_rate whenever the
+        # date-range filter changes (same base filter, defined once).
+        status_counts = completion_tasks.values("status").annotate(count=Count("id"))
         task_status_breakdown = {row["status"]: row["count"] for row in status_counts}
 
         hours_by_project = list(
