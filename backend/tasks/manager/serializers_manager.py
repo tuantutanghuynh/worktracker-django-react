@@ -490,6 +490,15 @@ class ManagerTaskAttachmentSerializer(serializers.ModelSerializer):
 
     user = ManagerUserMiniSerializer(read_only=True)
 
+    # file_url tro toi /media/... — duong dan do KHONG con phuc vu duoc nua
+    # (chi con anh dai dien di qua /media/). Moi luot tai phai qua endpoint co
+    # kiem tra quyen nay. Giu lai file_url de khong lam vo cac man hinh cu.
+    download_url = serializers.SerializerMethodField(read_only=True)
+
+    def get_download_url(self, obj):
+        """Return the authenticated download endpoint for this attachment."""
+        return f"/api/attachments/{obj.id}/download/"
+
     class Meta:
         model = TaskAttachment
         fields = [
@@ -498,6 +507,7 @@ class ManagerTaskAttachmentSerializer(serializers.ModelSerializer):
             "user",
             "file_name",
             "file_url",
+            "download_url",
             "file_size",
             "uploaded_at",
         ]

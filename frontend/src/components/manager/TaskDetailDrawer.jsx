@@ -20,6 +20,8 @@ import TaskTimesheetsTab from './task-drawer/TaskTimesheetsTab';
 import TaskFollowersTab from './task-drawer/TaskFollowersTab';
 import {
   TaskRejectModal,
+  TaskReworkModal,
+  TaskRestoreModal,
   TaskCancelModal,
   TaskDeleteModal,
 } from './task-drawer/TaskWorkflowModals';
@@ -79,6 +81,11 @@ export default function TaskDetailDrawer() {
   // State cho Modals
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [reworkModalOpen, setReworkModalOpen] = useState(false);
+  const [reworkReason, setReworkReason] = useState('');
+  const [reworkTargetStatus, setReworkTargetStatus] = useState('IN_PROGRESS');
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [restoreReason, setRestoreReason] = useState('');
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -259,6 +266,51 @@ export default function TaskDetailDrawer() {
     );
   };
 
+  const handleReworkSubmit = (e) => {
+    e.preventDefault();
+    if (!reworkReason.trim()) {
+      toast.error('Please provide a reason for requesting task rework.');
+      return;
+    }
+
+    changeTaskStatusMutation.mutate(
+      {
+        id: selectedTaskId,
+        toStatus: reworkTargetStatus,
+        reason: reworkReason.trim(),
+      },
+      {
+        onSuccess: () => {
+          setReworkModalOpen(false);
+          setReworkReason('');
+          setReworkTargetStatus('IN_PROGRESS');
+        },
+      }
+    );
+  };
+
+  const handleRestoreSubmit = (e) => {
+    e.preventDefault();
+    if (!restoreReason.trim()) {
+      toast.error('Please provide a reason for reactivating this task.');
+      return;
+    }
+
+    changeTaskStatusMutation.mutate(
+      {
+        id: selectedTaskId,
+        toStatus: 'TODO',
+        reason: restoreReason.trim(),
+      },
+      {
+        onSuccess: () => {
+          setRestoreModalOpen(false);
+          setRestoreReason('');
+        },
+      }
+    );
+  };
+
   const handleCancelSubmit = (e) => {
     e.preventDefault();
     if (!cancelReason.trim()) {
@@ -358,6 +410,15 @@ export default function TaskDetailDrawer() {
             closeTaskDrawer={closeTaskDrawer}
             onChangeTaskStatus={(payload) => changeTaskStatusMutation.mutate({ id: selectedTaskId, ...payload })}
             isChangingStatus={changeTaskStatusMutation.isPending}
+            onOpenReworkModal={() => {
+              setReworkReason('');
+              setReworkTargetStatus('IN_PROGRESS');
+              setReworkModalOpen(true);
+            }}
+            onOpenRestoreModal={() => {
+              setRestoreReason('');
+              setRestoreModalOpen(true);
+            }}
           />
 
           {/* Navigation Tabs Bar */}
@@ -463,6 +524,30 @@ export default function TaskDetailDrawer() {
         setRejectionReason={setRejectionReason}
         onSubmit={handleRejectSubmit}
         isPending={rejectTaskMutation.isPending}
+      />
+
+      {/* Rework Modal (Reopen completed task) */}
+      <TaskReworkModal
+        isOpen={reworkModalOpen}
+        onClose={() => setReworkModalOpen(false)}
+        taskTitle={task?.title}
+        reworkReason={reworkReason}
+        setReworkReason={setReworkReason}
+        targetStatus={reworkTargetStatus}
+        setTargetStatus={setReworkTargetStatus}
+        onSubmit={handleReworkSubmit}
+        isPending={changeTaskStatusMutation.isPending}
+      />
+
+      {/* Restore Modal (Reactivate cancelled task) */}
+      <TaskRestoreModal
+        isOpen={restoreModalOpen}
+        onClose={() => setRestoreModalOpen(false)}
+        taskTitle={task?.title}
+        restoreReason={restoreReason}
+        setRestoreReason={setRestoreReason}
+        onSubmit={handleRestoreSubmit}
+        isPending={changeTaskStatusMutation.isPending}
       />
 
       {/* Cancel Modal */}

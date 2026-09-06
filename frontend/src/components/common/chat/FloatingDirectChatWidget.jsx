@@ -63,7 +63,17 @@ export default function FloatingDirectChatWidget({
         if (roomId) {
           const messagesRes = await chatService.getRoomMessages(roomId);
           if (isMounted) {
-            setDirectMessages(messagesRes.messages || []);
+            const rawMsgs = messagesRes.messages || [];
+            const uniqueMsgs = [];
+            const seenIds = new Set();
+            for (const m of rawMsgs) {
+              const idKey = String(m.id);
+              if (!seenIds.has(idKey)) {
+                seenIds.add(idKey);
+                uniqueMsgs.push(m);
+              }
+            }
+            setDirectMessages(uniqueMsgs);
           }
         }
       } catch (err) {
@@ -101,7 +111,7 @@ export default function FloatingDirectChatWidget({
           if (payload.type === "chat_message" && payload.data) {
             const newMsg = payload.data;
             setDirectMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              if (prev.some((m) => String(m.id) === String(newMsg.id))) return prev;
               return [...prev, newMsg];
             });
           }
@@ -137,7 +147,10 @@ export default function FloatingDirectChatWidget({
       const sentMsg = await chatService.sendMessage(roomId, {
         content: textToSend,
       });
-      setDirectMessages((prev) => [...prev, sentMsg]);
+      setDirectMessages((prev) => {
+        if (prev.some((m) => String(m.id) === String(sentMsg.id))) return prev;
+        return [...prev, { ...sentMsg, is_mine: true }];
+      });
     } catch (err) {
       toast.error("Failed to send message.");
       setChatMessage(textToSend);
@@ -193,14 +206,14 @@ export default function FloatingDirectChatWidget({
             No previous chat messages with {targetUserName}. Send a message below to ask about this task!
           </div>
         ) : (
-          directMessages.map((msg) => {
+          directMessages.map((msg, idx) => {
             const isMe =
               msg.is_mine !== undefined
                 ? msg.is_mine
-                : msg.sender?.id === currentUser?.id || msg.sender_id === currentUser?.id;
+                : String(msg.sender?.id || msg.sender_id) === String(currentUser?.id);
             return (
               <div
-                key={msg.id || Math.random()}
+                key={msg.id ? `msg-${msg.id}` : `msg-idx-${idx}`}
                 className={cn("flex items-start gap-2", isMe ? "justify-end" : "justify-start")}
               >
                 <div

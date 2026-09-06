@@ -23,7 +23,7 @@ export default function DonutChartCard({
   return (
     <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
       <p className="mb-3 text-sm font-medium text-slate-900">{title}</p>
-      <div className={`flex items-center ${sizeStyle.gap}`}>
+      <div className={`flex flex-col items-center sm:flex-row ${sizeStyle.gap}`}>
         <div className={`relative shrink-0 ${sizeStyle.chart}`}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -56,7 +56,7 @@ export default function DonutChartCard({
           )}
         </div>
 
-        <div className={`min-w-0 flex-1 space-y-1 ${sizeStyle.legend}`}>
+        <div className={`w-full min-w-0 flex-1 space-y-1 ${sizeStyle.legend}`}>
           {data.map((entry, index) => (
             <div key={entry.name} className="flex items-center justify-between gap-1.5">
               <div className="flex min-w-0 items-center gap-1.5">

@@ -225,3 +225,85 @@ class TestSuaKhachHangCu:
         )
         assert r.status_code == 400
         assert "client_name" in r.data
+
+
+@pytest.mark.django_db
+class TestDinhDangMaSoThue:
+    """
+    Mã số thuế Việt Nam: 10 chữ số cho trụ sở chính, có thể kèm hậu tố 3 chữ
+    số cho chi nhánh. Trước khi có kiểm tra này, "abcxyz" và "123" đều được
+    chấp nhận — dữ liệu rác lọt thẳng vào bảng khách hàng.
+    """
+
+    @pytest.mark.parametrize("ma", ["0123456789", "0123456780-001"])
+    def test_dung_chuan_thi_tao_duoc(self, admin_client, ma):
+        r = tao(admin_client, f"Cong Ty {ma}", ma)
+        assert r.status_code == 201
+
+    @pytest.mark.parametrize(
+        "ma", ["abcxyz", "123", "01234567890", "0123-456-789", "MST0123456789"]
+    )
+    def test_sai_chuan_thi_bi_chan(self, admin_client, ma):
+        r = tao(admin_client, "Cong Ty Sai Ma", ma)
+        assert r.status_code == 400
+        assert "tax_code" in r.data
+
+    def test_thong_bao_neu_ro_dinh_dang_dung(self, admin_client):
+        """Bao sai thoi chua du — phai chi ra dinh dang dung la gi."""
+        r = tao(admin_client, "Cong Ty Sai", "abc")
+        thong_bao = str(r.data["tax_code"][0])
+        assert "10 digits" in thong_bao
+        assert "0123456789" in thong_bao
+
+
+@pytest.mark.django_db
+class TestDinhDangSoDienThoai:
+    """
+    Số điện thoại có nhiều cách viết. Thay vì ép một khuôn cứng, cho phép
+    các ký tự người ta thực sự gõ rồi đếm số chữ số bên dưới.
+    """
+
+    def _tao_voi_phone(self, client, phone, ma="0199900001"):
+        return client.post(
+            "/api/admin/clients/",
+            {"client_name": f"CT {phone or 'trong'}", "tax_code": ma, "contact_phone": phone},
+            format="json",
+        )
+
+    @pytest.mark.parametrize(
+        "phone",
+        [
+            "+84 902 000 002",   # dang seed dang dung
+            "0902000002",
+            "(028) 3822-1234",
+            "028.3822.1234",
+            "",                  # khong bat buoc
+        ],
+    )
+    def test_dang_hop_le_thi_tao_duoc(self, admin_client, phone):
+        r = self._tao_voi_phone(admin_client, phone, ma=f"01999{abs(hash(phone)) % 100000:05d}")
+        assert r.status_code == 201, r.data
+
+    def test_chua_chu_thi_bi_chan(self, admin_client):
+        r = self._tao_voi_phone(admin_client, "khong-phai-so")
+        assert r.status_code == 400
+        assert "contact_phone" in r.data
+
+    def test_qua_it_chu_so_thi_bi_chan(self, admin_client):
+        r = self._tao_voi_phone(admin_client, "123")
+        assert r.status_code == 400
+        assert "8 and 15 digits" in str(r.data["contact_phone"][0])
+
+    def test_qua_nhieu_chu_so_thi_bi_chan(self, admin_client):
+        r = self._tao_voi_phone(admin_client, "1234567890123456")
+        assert r.status_code == 400
+
+    def test_sua_sang_phone_sai_dinh_dang_cung_bi_chan(self, admin_client, khach_cu):
+        """Luat phai ap ca o luong SUA, khong chi luc tao."""
+        r = admin_client.patch(
+            f"/api/admin/clients/{khach_cu.id}/",
+            {"contact_phone": "abc-def-ghij"},
+            format="json",
+        )
+        assert r.status_code == 400
+        assert "contact_phone" in r.data

@@ -7,7 +7,6 @@ import {
   Clock,
   Lock,
   BarChart3,
-  Settings,
   ChevronLeft,
   ChevronRight,
   ListChecks,
@@ -18,7 +17,6 @@ import {
   MessageSquare,
   ShieldCheck,
   Building2,
-  UserPlus,
   FileText,
   Network,
   ScrollText,
@@ -101,15 +99,15 @@ const MENU_CONFIG = {
       {
         label: 'Business',
         items: [
+          // Khong con muc Jobs rieng: Job luon thuoc ve mot Client, nen quan
+          // ly ngay trong trang Clients (nut "View jobs" o moi dong).
           { path: '/admin/clients', label: 'Clients', icon: Building2 },
-          { path: '/admin/jobs', label: 'Jobs', icon: Briefcase },
         ],
       },
       {
         label: 'People',
         items: [
           { path: '/admin/users/search', label: 'User List', icon: Users },
-          { path: '/admin/users/create', label: 'Create User', icon: UserPlus },
           { path: '/admin/departments', label: 'Departments', icon: Network },
         ],
       },

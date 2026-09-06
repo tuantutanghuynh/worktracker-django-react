@@ -28,6 +28,8 @@ export default function SideDrawer({
   showCloseButton = true,
   theme = 'light',
   className,
+  headerClassName,
+  bodyClassName,
 }) {
   // Handle ESC key press to close drawer
   useEffect(() => {
@@ -53,6 +55,8 @@ export default function SideDrawer({
     md: 'max-w-lg',        // ~512px
     lg: 'max-w-2xl',       // ~672px
     xl: 'max-w-4xl',       // ~896px
+    '2xl': 'max-w-5xl',    // ~1024px
+    '3xl': 'max-w-6xl',    // ~1152px
     full: 'max-w-full',
   };
 
@@ -87,7 +91,8 @@ export default function SideDrawer({
                 "flex items-center justify-between px-6 py-4 border-b backdrop-blur shrink-0",
                 isLight
                   ? "border-slate-100 bg-white/95"
-                  : "border-slate-800/80 bg-slate-900/90"
+                  : "border-slate-800/80 bg-slate-900/90",
+                headerClassName
               )}
             >
               <div>
@@ -131,7 +136,7 @@ export default function SideDrawer({
           )}
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+          <div className={cn("flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar", bodyClassName)}>
             {children}
           </div>
 

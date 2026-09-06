@@ -19,7 +19,7 @@ def get_results(response_data):
 
 def make_manager_with_perms(role, *permission_codes):
     """Tạo Manager và cấp các quyền được truyền vào."""
-    user = baker.make("accounts.CustomUser", role=role, is_active=True)
+    user = baker.make("accounts.CustomUser", role=role, is_active=True, must_change_password=False)
     for code in permission_codes:
         perm, _ = Permission.objects.get_or_create(code=code, defaults={"name": code})
         baker.make("accounts.RolePermission", role=role, permission=perm)
@@ -43,7 +43,7 @@ class TestManagerJobScoping:
         self.role_manager = baker.make("accounts.Role", code=MANAGER_ROLE_CODE)
         self.manager_A = make_manager_with_perms(self.role_manager, "task:view")
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
 
         self.client_db = baker.make("projects.Client")
@@ -103,10 +103,10 @@ class TestManagerTaskCreate:
             self.role_manager, "task:view", "task:create"
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
         # Tuyen bao cao co dinh: Manager chi giao viec duoc cho nhan vien
         # thuoc quyen minh (EmployeeProfile.manager). Khong gan thi
@@ -201,10 +201,10 @@ class TestManagerTaskUpdate:
             self.role_manager, "task:view", "task:update"
         )
         self.employee_1 = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
         self.employee_2 = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
         # Tuyen bao cao co dinh: Manager chi giao viec duoc cho nhan vien
         # thuoc quyen minh (EmployeeProfile.manager). Khong gan thi
@@ -361,7 +361,7 @@ class TestManagerTaskKanbanMove:
             status="ACTIVE",
         )
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
-        self.employee = baker.make("accounts.CustomUser", role=self.role_employee, is_active=True)
+        self.employee = baker.make("accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False)
 
         self.task_1 = baker.make("tasks.Task", job=self.job, assignee=self.employee, title="Task 1", status="TODO")
         self.task_2 = baker.make("tasks.Task", job=self.job, assignee=self.employee, title="Task 2", status="TODO")
@@ -419,7 +419,7 @@ class TestManagerTaskComment:
             self.role_manager, "task:view", "task:comment"
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
 
@@ -472,7 +472,7 @@ class TestManagerTaskFilters:
         self.manager = make_manager_with_perms(self.role_manager, "task:view")
 
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
         self.job = baker.make(

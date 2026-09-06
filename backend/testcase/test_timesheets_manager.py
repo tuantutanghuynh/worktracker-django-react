@@ -15,7 +15,7 @@ def get_results(response_data):
 
 def make_manager_with_perms(role, *permission_codes):
     """Tạo Manager và cấp quyền cho role."""
-    user = baker.make("accounts.CustomUser", role=role, is_active=True)
+    user = baker.make("accounts.CustomUser", role=role, is_active=True, must_change_password=False)
     for code in permission_codes:
         perm, _ = Permission.objects.get_or_create(code=code, defaults={"name": code})
         baker.make("accounts.RolePermission", role=role, permission=perm)
@@ -41,7 +41,7 @@ class TestManagerTimeLockCRUD:
             self.role_manager, "timelock:view", "timelock:lock"
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
 
@@ -138,7 +138,7 @@ class TestManagerTimeLockUnlock:
             self.role_manager, "timelock:view", "timelock:lock", "timelock:unlock"
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
 
@@ -215,10 +215,10 @@ class TestManagerLogWork:
             "timesheet:void",
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
 
         self.client_db = baker.make("projects.Client")
@@ -353,7 +353,7 @@ class TestManagerTimesheetFilters:
             self.role_manager, "timesheet:view", "timelock:view"
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
 
         self.client_db = baker.make("projects.Client")
@@ -502,7 +502,7 @@ class TestTimeLockServiceEdgeCases:
             self.role_manager, "timelock:view", "timelock:lock", "timelock:unlock", "timesheet:review"
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
 
         self.client_db = baker.make("projects.Client")

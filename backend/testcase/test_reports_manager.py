@@ -13,7 +13,7 @@ from system.security.permissions_manager import MANAGER_ROLE_CODE
 # ============================================================
 def make_manager_with_perms(role, *permission_codes):
     """Tạo Manager và cấp quyền cho role."""
-    user = baker.make("accounts.CustomUser", role=role, is_active=True)
+    user = baker.make("accounts.CustomUser", role=role, is_active=True, must_change_password=False)
     for code in permission_codes:
         # get_or_create để tránh lỗi UNIQUE constraint khi 2 manager
         # trong cùng 1 test cùng cần 1 permission code
@@ -90,7 +90,7 @@ class TestManagerDashboard:
 
         # Tạo Job cho Manager khác (không được tính)
         other_manager = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         baker.make("projects.Job", manager=other_manager, client=client_db, job_name="Job khác")
 
@@ -166,7 +166,7 @@ class TestManagerTaskSummaryReport:
         """Task Summary chỉ báo cáo Task trong Job của mình."""
         # Manager B và Job B không được tính
         manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         job_B = baker.make(
             "projects.Job",
@@ -217,7 +217,7 @@ class TestManagerTimesheetDetailReport:
             job_name="Job Timesheet",
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
         self.task = baker.make("tasks.Task", job=self.job, title="Task log")
 
@@ -268,7 +268,7 @@ class TestManagerTimesheetDetailReport:
     def test_timesheet_detail_scoped_to_own_jobs(self):
         """Timesheet chỉ báo cáo LogWork thuộc Job của mình."""
         manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         job_B = baker.make(
             "projects.Job",

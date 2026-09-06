@@ -4,6 +4,7 @@ Description: Custom DRF permission classes enforcing role-based and permission-c
 """
 
 from django.core.cache import cache
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
 
 from accounts.models import RolePermission
@@ -14,6 +15,23 @@ ADMIN_ROLE_CODE = "ADMIN"
 
 ROLE_PERMISSION_CACHE_KEY = "role_permissions:{role_id}"
 ROLE_PERMISSION_CACHE_TIMEOUT = 300
+
+
+def assert_password_changed(user):
+    """Block every API action until a forced password change has been completed."""
+    # He thong co HAI lop RBAC song song: accounts.permissions.HasPermission
+    # (dung cho cac endpoint Admin) va cac lop trong file nay (dung cho Manager
+    # va Employee). Truoc day chi lop kia kiem tra must_change_password, nen
+    # mot tai khoan vua duoc tao — dang bi buoc doi mat khau — van goi duoc
+    # toan bo API cua Manager binh thuong. Buoc doi mat khau chi con la mot goi
+    # y tren giao dien chu khong con la mot rang buoc.
+    #
+    # Doi mat khau (ChangePasswordView) va xem ho so dung IsAuthenticated cua
+    # DRF, khong di qua day, nen nguoi dung van thoat ra duoc.
+    if user is not None and getattr(user, "must_change_password", False):
+        raise PermissionDenied(
+            "You must change your password before performing this action."
+        )
 
 
 def get_user_role_code(user):
@@ -47,11 +65,10 @@ class IsActiveAuthenticated(BasePermission):
     def has_permission(self, request, view):
         """Check if request user is authenticated and active."""
         user = getattr(request, "user", None)
-        return bool(
-            user
-            and user.is_authenticated
-            and user.is_active
-        )
+        if not user or not user.is_authenticated or not user.is_active:
+            return False
+        assert_password_changed(user)
+        return True
 
 
 class IsManagerRole(BasePermission):
@@ -63,6 +80,7 @@ class IsManagerRole(BasePermission):
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
             return False
+        assert_password_changed(user)
         return get_user_role_code(user) == MANAGER_ROLE_CODE
 
 
@@ -75,6 +93,7 @@ class IsAdminRole(BasePermission):
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
             return False
+        assert_password_changed(user)
         return get_user_role_code(user) == ADMIN_ROLE_CODE
 
 
@@ -87,6 +106,7 @@ class IsAdminOrManagerRole(BasePermission):
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
             return False
+        assert_password_changed(user)
         return get_user_role_code(user) in {
             ADMIN_ROLE_CODE,
             MANAGER_ROLE_CODE,
@@ -103,6 +123,8 @@ class HasPermissionCode(BasePermission):
 
         if not user or not user.is_authenticated or not user.is_active:
             return False
+
+        assert_password_changed(user)
 
         role = getattr(user, "role", None)
         if role is None:

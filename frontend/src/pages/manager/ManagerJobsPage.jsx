@@ -381,6 +381,7 @@ export default function ManagerJobsPage() {
         formData={formData}
         setFormData={setFormData}
         clientOptions={clientOptions}
+        clientsList={Array.isArray(clientsData) ? clientsData : clientsData.results || []}
         myTeamEmployees={myTeamEmployees}
         onSubmit={handleDrawerFormSubmit}
         isPending={createJobMutation.isPending || updateJobMutation.isPending}

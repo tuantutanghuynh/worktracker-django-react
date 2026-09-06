@@ -1,6 +1,7 @@
 import React from 'react';
 import { Upload, Paperclip, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { downloadAttachment } from '../../../utils/downloadAttachment';
 
 function formatDateSafe(dateStr) {
   if (!dateStr) return 'No date';
@@ -67,15 +68,17 @@ export default function TaskAttachmentsTab({
                 </div>
               </div>
 
-              <a
-                href={att.file_url}
-                target="_blank"
-                rel="noreferrer"
-                className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-lg transition"
+              {/* Nut, khong phai the <a>: file dinh kem khong con tai duoc
+                  bang URL truc tiep, phai goi endpoint co kiem tra quyen kem
+                  header Authorization. */}
+              <button
+                type="button"
+                onClick={() => downloadAttachment(att)}
+                className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-lg transition cursor-pointer"
                 title="Download file"
               >
                 <Download className="w-4 h-4" />
-              </a>
+              </button>
             </div>
           ))
         )}

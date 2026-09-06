@@ -32,6 +32,8 @@ export default function TaskDrawerHeader({
   closeTaskDrawer,
   onChangeTaskStatus,
   isChangingStatus,
+  onOpenReworkModal,
+  onOpenRestoreModal,
 }) {
   const navigate = useNavigate();
   if (!task) return null;
@@ -133,12 +135,7 @@ export default function TaskDrawerHeader({
 
           <button
             type="button"
-            onClick={() =>
-              onChangeTaskStatus({
-                toStatus: 'IN_PROGRESS',
-                reason: 'Reopened for additional rework by Manager',
-              })
-            }
+            onClick={onOpenReworkModal}
             disabled={isChangingStatus}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-lg border border-slate-200 text-xs shadow-2xs transition cursor-pointer disabled:opacity-50 shrink-0"
           >
@@ -162,12 +159,7 @@ export default function TaskDrawerHeader({
 
           <button
             type="button"
-            onClick={() =>
-              onChangeTaskStatus({
-                toStatus: 'TODO',
-                reason: 'Task reactivated to To Do by Manager',
-              })
-            }
+            onClick={onOpenRestoreModal}
             disabled={isChangingStatus}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-2xs transition cursor-pointer disabled:opacity-50 shrink-0"
           >

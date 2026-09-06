@@ -207,8 +207,18 @@ export const getErrorMessage = (err, fallback = ERROR_DICTIONARY.DEFAULT_ERROR) 
     return isHtml ? STATUS_FALLBACK[status] || fallback : translate(data);
   }
 
+  // 3. Body la MANG. DRF sinh ra dang nay khi view goi
+  //    raise ValidationError("mot chuoi") — vi du assign-manager tra ve
+  //    ["Cannot assign to a locked Manager."]. Mang cung la object trong JS
+  //    nen neu khong bat truoc, vong lap theo field ben duoi se coi chi so
+  //    "0" la ten field va hien "0: Cannot assign to a locked Manager."
+  if (Array.isArray(data)) {
+    const message = firstString(data);
+    return message ? translate(message) : STATUS_FALLBACK[status] || fallback;
+  }
+
   if (data && typeof data === 'object') {
-    // 3. 429 — DRF trả "Request was throttled. Expected available in N
+    // 4. 429 — DRF trả "Request was throttled. Expected available in N
     //    seconds." Giữ lại con số giây vì đó là thứ người dùng cần biết,
     //    nhưng viết lại cho dễ hiểu thay vì dùng chữ "throttled".
     if (status === 429) {
@@ -219,17 +229,17 @@ export const getErrorMessage = (err, fallback = ERROR_DICTIONARY.DEFAULT_ERROR) 
         : STATUS_FALLBACK[429];
     }
 
-    // 4. `detail` — khoá chuẩn của DRF cho lỗi cấp request.
+    // 5. `detail` — khoá chuẩn của DRF cho lỗi cấp request.
     //    Xử lý TRƯỚC lỗi cấp field, nếu không nó sẽ bị ghép thành
     //    "detail: ..." như bug cũ.
     const detail = firstString(data.detail);
     if (detail) return translate(detail);
 
-    // 5. non_field_errors — lỗi của serializer không thuộc field nào.
+    // 6. non_field_errors — lỗi của serializer không thuộc field nào.
     const nonField = firstString(data.non_field_errors);
     if (nonField) return translate(nonField);
 
-    // 6. Lỗi theo từng field. Bỏ qua các khoá dành riêng ở trên.
+    // 7. Lỗi theo từng field. Bỏ qua các khoá dành riêng ở trên.
     for (const key of Object.keys(data)) {
       if (RESERVED_KEYS.has(key)) continue;
       const message = firstString(data[key]);
@@ -244,8 +254,46 @@ export const getErrorMessage = (err, fallback = ERROR_DICTIONARY.DEFAULT_ERROR) 
     }
   }
 
-  // 7. Body rỗng hoặc không đọc được -> dựa vào mã HTTP.
+  // 8. Body rỗng hoặc không đọc được -> dựa vào mã HTTP.
   return STATUS_FALLBACK[status] || fallback;
+};
+
+/**
+ * Gắn lỗi validate của backend vào đúng từng ô nhập của react-hook-form.
+ *
+ * Vì sao cần: zod chỉ bắt được lỗi kiểm tra được ở trình duyệt (định dạng,
+ * độ dài). Những luật chỉ backend biết — trùng tên khách hàng, trùng mã số
+ * thuế, trùng email, Manager đã bị khoá — trước đây chỉ hiện ở toast góc
+ * màn hình rồi biến mất, còn ô nhập gây lỗi thì không có dấu hiệu gì. Người
+ * dùng phải tự đoán mình sai ở đâu.
+ *
+ * DRF trả lỗi theo field dưới dạng { tax_code: ["..."], email: ["..."] } —
+ * khớp đúng tên field trong form, nên map thẳng được.
+ *
+ * @param {Error} err       lỗi axios
+ * @param {Function} setError  hàm setError của react-hook-form
+ * @param {string[]} [fields]  danh sách tên field của form. Truyền vào để
+ *        bỏ qua những khoá backend trả về mà form không có ô tương ứng —
+ *        setError cho field không tồn tại sẽ chặn submit vĩnh viễn mà không
+ *        hiện gì cả.
+ * @returns {boolean} true nếu đã gắn được ít nhất một lỗi vào field
+ */
+export const applyServerFieldErrors = (err, setError, fields) => {
+  const data = err?.response?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+
+  let daGan = false;
+  for (const key of Object.keys(data)) {
+    if (RESERVED_KEYS.has(key)) continue;
+    if (fields && !fields.includes(key)) continue;
+
+    const message = firstString(data[key]);
+    if (!message) continue;
+
+    setError(key, { type: 'server', message: translate(message) });
+    daGan = true;
+  }
+  return daGan;
 };
 
 export default getErrorMessage;

@@ -5,9 +5,11 @@ import axiosClient from "./axiosClient"
 // managerReportService.js, which hits the Manager-only /manager/system/
 // notifications/ routes and would 403 for an Employee.
 
-export async function getNotifications() {
-    const { data } = await axiosClient.get("/notifications/")
-    return data
+// useNotificationStore da tu xu ly ca hai dang (mang tran lan {results}), nen
+// endpoint nay phan trang khong lam vo gi. Van boc o day cho nhat quan.
+export async function getNotifications(params = {}) {
+    const { data } = await axiosClient.get("/notifications/", { params })
+    return Array.isArray(data) ? data : data?.results ?? []
 }
 
 export async function markNotificationRead(id) {

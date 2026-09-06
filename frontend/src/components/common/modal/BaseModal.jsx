@@ -24,12 +24,16 @@ export default function BaseModal({
         {/* Khung chứa Modal */}
         <Dialog.Content
           className={cn(
-            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-visible focus:outline-none transition-all animate-in zoom-in-95 duration-200',
+            // max-h + flex-col: modal cao hon man hinh thi phan than tu cuon,
+            // thay vi tran ra ngoai khung nhin lam mat ca tieu de o tren lan
+            // nut Save o duoi (man hinh laptop 768px, modal Edit Job cao hon
+            // 900px la khong bam duoc Save nua).
+            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 focus:outline-none transition-all animate-in zoom-in-95 duration-200',
             maxWidth
           )}
         >
           {/* Header Modal */}
-          <div className="flex items-start justify-between p-5 border-b border-slate-100 rounded-t-2xl">
+          <div className="flex shrink-0 items-start justify-between p-5 border-b border-slate-100 rounded-t-2xl">
             <div>
               <Dialog.Title className="text-base font-bold text-slate-900 leading-snug">
                 {title}
@@ -50,11 +54,11 @@ export default function BaseModal({
           </div>
 
           {/* Nội dung bên trong Modal */}
-          <div className="p-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-5">{children}</div>
 
           {/* Footer Modal */}
           {footer && (
-            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-2xl">
+            <div className="shrink-0 px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-2xl">
               {footer}
             </div>
           )}

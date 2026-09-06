@@ -13,9 +13,13 @@ from rest_framework.exceptions import ValidationError
 
 MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
 
+# .svg CO CHU DICH bi loai bo. File SVG la XML, cho phep nhung <script> ben
+# trong, va trinh duyet thi thuc thi no khi mo truc tiep. Cho phep tai .svg len
+# roi phuc vu lai chinh no la tu mo mot duong nap ma JavaScript vao he thong.
+# Muon dinh kem anh vector thi xuat ra PDF hoac PNG.
 ALLOWED_EXTENSIONS = {
     ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt",
-    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+    ".jpg", ".jpeg", ".png", ".gif", ".webp",
     ".zip", ".rar", ".7z",
 }
 

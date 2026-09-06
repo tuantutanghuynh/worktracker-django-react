@@ -7,6 +7,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -14,7 +15,8 @@ from rest_framework import status
 from accounts.permissions import HasPermission
 from timesheets.employee.serializers_employee import EmployeeLogWorkSerializer, EmployeeLogWorkListSerializer
 from system.services.audit_manager_service import snapshot, log_action
-from timesheets.services.daily_total_manager_service import rebuild_daily_user_timesheet, assert_daily_total_not_exceed_24
+from system.pagination import SelfServicePageNumberPagination
+from timesheets.services.daily_total_manager_service import rebuild_daily_user_timesheet, assert_daily_total_not_exceed_8
 from timesheets.services.timelock_manager_service import assert_period_open_for_job
 from timesheets.models import LogWork
 
@@ -132,7 +134,7 @@ class EmployeeEditLogWorkView(APIView):
             )
 
             if hours_spent is not None:
-                assert_daily_total_not_exceed_24(
+                assert_daily_total_not_exceed_8(
                     user_id=log_work.user_id,
                     work_date=log_work.work_date,
                     new_hours=hours_spent,
@@ -169,17 +171,19 @@ class EmployeeEditLogWorkView(APIView):
         return Response(EmployeeLogWorkSerializer(log_work).data, status=status.HTTP_200_OK)
 
 
-class EmployeeMyLogWorkListView(APIView):
-    """Retrieve chronologically ordered work log history created by the authenticated employee."""
+class EmployeeMyLogWorkListView(ListAPIView):
+    """Retrieve a paginated, chronologically ordered work log history created by the authenticated employee."""
+    # Doi tu APIView sang ListAPIView de co phan trang: truoc day view nay tra
+    # ve TOAN BO lich su cham cong cua nguoi dung, khong gioi han.
     permission_classes = [HasPermission]
     required_permission = "timesheet:view"
+    serializer_class = EmployeeLogWorkListSerializer
+    pagination_class = SelfServicePageNumberPagination
 
-    def get(self, request):
-        """Return full list of personal work logs ordered by work date descending."""
-        log_works = (
-            LogWork.objects.filter(user=request.user)
+    def get_queryset(self):
+        """Return personal work logs ordered by work date descending."""
+        return (
+            LogWork.objects.filter(user=self.request.user)
             .select_related("task", "task__job")
             .order_by("-work_date", "-created_at")
         )
-        serializer = EmployeeLogWorkListSerializer(log_works, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)

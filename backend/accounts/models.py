@@ -5,6 +5,7 @@ Description: Defines core data models for IAM, RBAC, users, departments, and emp
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 
 class Role(models.Model):
@@ -206,6 +207,14 @@ class Department(models.Model):
 
     class Meta:
         db_table = "departments"
+        constraints = [
+            # Cung ly do voi Client.client_name: unique=True chi so khop chinh
+            # xac nen "IT" va "it" van tao duoc thanh hai phong ban khac nhau.
+            models.UniqueConstraint(
+                Lower(Trim("name")),
+                name="unique_department_name_case_insensitive",
+            ),
+        ]
 
     def __str__(self):
         """Returns the department name."""

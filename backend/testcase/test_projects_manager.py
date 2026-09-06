@@ -34,10 +34,10 @@ class TestManagerJobCRUD:
             baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager_A = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
 
@@ -138,10 +138,10 @@ class TestManagerJobStatusChange:
             baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager_A = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
 
@@ -194,7 +194,7 @@ class TestManagerKanban:
         baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
         self.job = baker.make(
@@ -242,7 +242,7 @@ class TestManagerJobFilters:
         baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.client_db = baker.make("projects.Client")
 

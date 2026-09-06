@@ -37,6 +37,13 @@ export default function AuditDiffViewer({
   ipAddress: propIpAddress,
   summary: propSummary,
   theme = 'dark',
+  // compact: xếp các trường thay đổi thành lưới 1/2/3 cột thay vì mỗi trường
+  // một hàng ngang. Hàng ngang cần rất nhiều chiều cao nên bản ghi nhiều
+  // trường là phải cuộn; lưới nhét vừa gấp ba trong cùng khung nhìn.
+  //
+  // Mặc định TẮT: component này còn dùng ở trang Audit Log của Manager và
+  // Employee, đổi thẳng bố cục ở đó là đụng vào phần của người khác.
+  compact = false,
   className
 }) {
   const [showUnchanged, setShowUnchanged] = useState(false);
@@ -208,7 +215,90 @@ export default function AuditDiffViewer({
         </div>
       </div>
 
-      {/* Comparison Diff Table (Synchronized 12-Column Grid Header & Body) */}
+      {/* Bản compact: lưới thẻ tới 4 cột, mỗi thẻ chỉ cao 2 dòng.
+          Bố cục "Before ở trên / After ở dưới" với hai ô viền to tốn khoảng
+          bảy dòng cho MỘT trường, nên một bản ghi vài chục trường là phải cuộn
+          rất nhiều. Ở đây giá trị nằm ngay trên một dòng, và với trường vừa
+          được TẠO thì bỏ hẳn phần "Before" — nó luôn là "chưa có gì", lặp lại
+          chỉ tổ chiếm chỗ. */}
+      {compact ? (
+        filteredItems.length === 0 ? (
+          <div
+            className={cn(
+              'rounded-xl border p-8 text-center text-xs',
+              isLight ? 'border-slate-200 text-slate-400' : 'border-slate-800 text-slate-500'
+            )}
+          >
+            No data changes recorded or all fields are identical.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {filteredItems.map(({ key, oldVal, newVal, status }) => {
+              const badge = {
+                modified: { label: 'Changed', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-300' },
+                added: { label: 'New', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/20 text-emerald-300' },
+                removed: { label: 'Cleared', cls: isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/20 text-rose-300' },
+                unchanged: { label: 'Same', cls: isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-700/50 text-slate-400' },
+              }[status];
+
+              // Chỉ hiện giá trị cũ khi nó thực sự mang thông tin: trường mới
+              // tạo thì "trước đây" luôn rỗng, in ra chỉ thêm nhiễu.
+              const hienGiaTriCu = status === 'modified' || status === 'removed';
+
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-2',
+                    isLight ? 'border-slate-200 bg-white' : 'border-slate-800 bg-slate-950/40'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span
+                      className={cn('truncate text-[11px] font-bold', isLight ? 'text-slate-700' : 'text-slate-200')}
+                      title={getFieldLabel(key)}
+                    >
+                      {getFieldLabel(key)}
+                    </span>
+                    <span className={cn('shrink-0 rounded px-1 py-0.5 text-[9px] font-bold', badge.cls)}>
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs">
+                    {hienGiaTriCu && (
+                      <>
+                        <span
+                          className={cn(
+                            'break-all line-through',
+                            isLight ? 'text-rose-500' : 'text-rose-300/90'
+                          )}
+                        >
+                          {renderValue(key, oldVal)}
+                        </span>
+                        <ArrowRight
+                          className={cn('h-3 w-3 shrink-0', isLight ? 'text-slate-400' : 'text-slate-500')}
+                        />
+                      </>
+                    )}
+                    <span
+                      className={cn(
+                        'break-all font-semibold',
+                        status === 'unchanged'
+                          ? isLight ? 'text-slate-500' : 'text-slate-300'
+                          : isLight ? 'text-emerald-700' : 'text-emerald-300'
+                      )}
+                    >
+                      {renderValue(key, newVal)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : (
+      /* Comparison Diff Table (Synchronized 12-Column Grid Header & Body) */
       <div className={cn('border rounded-xl overflow-hidden', isLight ? 'border-slate-200 bg-white' : 'border-slate-800 bg-slate-950/40')}>
         {/* Table Header */}
         <div className={cn(
@@ -295,6 +385,7 @@ export default function AuditDiffViewer({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
