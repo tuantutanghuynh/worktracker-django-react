@@ -10,7 +10,10 @@ import { getErrorMessage } from "../../../utils/errorMessages"
 function resolveAvatarUrl(url) {
     if (!url) return null
     if (url.startsWith("http")) return url
-    return `${import.meta.env.VITE_API_BASE_URL}${url}`
+    const raw = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000"
+    const base = raw.replace(/\/api\/?$/, "").replace(/\/$/, "")
+    const cleanPath = url.startsWith("/") ? url : `/${url}`
+    return `${base}${cleanPath}`
 }
 
 export const profileKeys = {

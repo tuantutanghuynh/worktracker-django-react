@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '../../../utils/cn';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const RAW_API = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = RAW_API.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 /**
  * Chuẩn hóa URL ảnh avatar từ Backend Django

@@ -7,7 +7,8 @@ import RoleBadge from "../../components/common/badges/RoleBadge";
 import { useAuthStore } from "../../stores/authStore";
 import { useProfile, useUpdateProfile, useUploadAvatar } from "../../hooks/queries/common/useProfile";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const RAW_API = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = RAW_API.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
 function getFullAvatarUrl(url) {
   /** Resolve avatar path safely against API base domain. */

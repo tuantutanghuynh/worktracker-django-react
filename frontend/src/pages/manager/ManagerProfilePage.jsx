@@ -12,7 +12,8 @@ import { useProfile, useUpdateProfile, useUploadAvatar } from "../../hooks/queri
  * Description: Clean, balanced two-column profile management page for managers with quick navigation to system password change.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const RAW_API = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = RAW_API.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
 function getFullAvatarUrl(url) {
   /** Resolve avatar path safely against API base domain. */

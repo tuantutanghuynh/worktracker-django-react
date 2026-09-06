@@ -16,10 +16,23 @@ export function useWebSocket() {
   const wsHook = typeof useReactWebSocket === 'function' ? useReactWebSocket : useNamedWebSocket;
 
   const token = useAuthStore.getState().accessToken;
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsHost = window.location.host;
+  const envWs = import.meta.env.VITE_WS_URL;
+  const rawApi = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  
+  let wsBase = '';
+  if (envWs) {
+    wsBase = envWs.replace(/\/$/, '');
+  } else if (rawApi) {
+    const cleanHost = rawApi.replace(/^https?:\/\//, '').replace(/\/api\/?$/, '').replace(/\/$/, '');
+    const wsProto = rawApi.startsWith('https') || window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsBase = `${wsProto}//${cleanHost}`;
+  } else {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsBase = `${wsProto}//${window.location.host}`;
+  }
+
   const socketUrl = user && token && typeof wsHook === 'function' 
-    ? `${wsProtocol}//${wsHost}/ws/notifications/?token=${token}` 
+    ? `${wsBase}/ws/notifications/?token=${token}` 
     : null;
 
   const { lastJsonMessage, readyState } = (typeof wsHook === 'function' ? wsHook : () => ({}))(socketUrl, {
