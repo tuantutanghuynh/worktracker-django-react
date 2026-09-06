@@ -200,14 +200,21 @@ export default function MyTeamPage() {
 function StatCard({ icon: Icon, label, value, hex }) {
   return (
     <div
-      className="p-4 rounded-2xl border shadow-2xs space-y-2"
-      style={{ backgroundImage: `linear-gradient(135deg, ${hex}66 0%, ${hex}26 100%)`, borderColor: `${hex}99` }}
+      className="p-4 rounded-2xl border border-l-4 shadow-2xs space-y-2"
+      style={{
+        backgroundImage: `linear-gradient(135deg, ${hex}B3 0%, ${hex}4D 100%)`,
+        borderColor: `${hex}CC`,
+        borderLeftColor: hex,
+      }}
     >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{label}</span>
         <div
-          className="w-6 h-6 rounded-lg flex items-center justify-center shadow-sm"
-          style={{ backgroundImage: `linear-gradient(135deg, ${hex} 0%, ${hex}CC 100%)` }}
+          className="w-6 h-6 rounded-lg flex items-center justify-center"
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${hex} 0%, ${hex}CC 100%)`,
+            boxShadow: `0 4px 10px -2px ${hex}80`,
+          }}
         >
           <Icon className="w-3.5 h-3.5 text-white" />
         </div>

@@ -45,17 +45,21 @@ export default function EmployeeStatCard({
 
   return (
     <div
-      className={clsx('rounded-xl border shadow-sm', sizeStyle.container, className)}
+      className={clsx('rounded-xl border shadow-sm border-l-4', sizeStyle.container, className)}
       style={{
-        backgroundImage: `linear-gradient(135deg, ${hex}66 0%, ${hex}26 100%)`,
-        borderColor: `${hex}99`,
+        backgroundImage: `linear-gradient(135deg, ${hex}B3 0%, ${hex}4D 100%)`,
+        borderColor: `${hex}CC`,
+        borderLeftColor: hex,
       }}
     >
       <div className="flex items-center justify-between">
         {Icon && (
           <div
-            className={clsx('flex items-center justify-center rounded-lg shadow-sm', sizeStyle.icon)}
-            style={{ backgroundImage: `linear-gradient(135deg, ${hex} 0%, ${hex}CC 100%)` }}
+            className={clsx('flex items-center justify-center rounded-lg', sizeStyle.icon)}
+            style={{
+              backgroundImage: `linear-gradient(135deg, ${hex} 0%, ${hex}CC 100%)`,
+              boxShadow: `0 4px 10px -2px ${hex}80`,
+            }}
           >
             <Icon className={clsx(sizeStyle.iconGlyph, 'text-white')} />
           </div>
