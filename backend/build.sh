@@ -13,6 +13,6 @@ python manage.py migrate --no-input
 
 echo "==> [4/4] Seeding Roles, Permissions & Master Dataset..."
 python manage.py seed_roles || echo "seed_roles completed"
-python manage.py seed_data || echo "seed_data completed"
+python manage.py seed_data --reset || echo "seed_data completed"
 
 echo "==> Build completed successfully!"
