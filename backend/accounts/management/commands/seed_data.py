@@ -536,7 +536,7 @@ class Command(BaseCommand):
                     "is_locked": True,
                     "locked_by": admin_user,
                     "locked_at": timezone.now() - timedelta(days=6),
-                    "lock_reason": "Chốt sổ tài chính kế toán Tháng 08/2026 toàn công ty",
+                    "lock_reason": "The Lock work schedule for the project has been finalized.",
                 }
             )
 

@@ -24,15 +24,11 @@ from timesheets.services.timelock_manager_service import (
 logger = logging.getLogger(__name__)
 
 AUTO_LOCK_JOB_REASON = (
-    "Automatically locked by the system on Day 1 (Manager scope): "
-    "the month ended and the timesheet period was closed for employee logging. "
-    "Manager review window is open until Day 5."
+    "Automatically locked: Day 1 Manager review window (open until Day 5)."
 )
 
 AUTO_LOCK_GLOBAL_REASON = (
-    "Automatically locked by the system on Day 5 (Admin scope): "
-    "the grace review period ended and the timesheet period was closed "
-    "globally for payroll."
+    "Automatically locked: Day 5 Admin global payroll freeze."
 )
 
 AUTO_LOCK_REASON = AUTO_LOCK_GLOBAL_REASON

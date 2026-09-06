@@ -26,6 +26,7 @@ export default function TimeLockTable({
   isCurrentPeriod = false,
   isGloballyLocked = false,
   onOpenUnlockModal,
+  onOpenDetailModal,
   onDirectLock,
   isLocking = false,
   onNavigateTimesheet,
@@ -120,14 +121,15 @@ export default function TimeLockTable({
     {
       header: 'Lock Audit Trail',
       accessorKey: 'lock_reason',
-      className: 'w-[30%] min-w-[200px]',
+      className: 'w-[28%] min-w-[180px] max-w-[240px]',
       cell: (row) => {
         const actorName = row.locked_by?.full_name || row.locked_by?.email || (row.lock_type === 'GLOBAL_LOCKED' ? 'System Admin' : 'Manager');
         const lockedTimeStr = row.locked_at ? formatDateSafe(row.locked_at) : (row.lock_type === 'GLOBAL_LOCKED' ? 'Active Policy' : 'Open');
         const reasonText = row.lock_reason || (row.lock_type === 'GLOBAL_LOCKED' ? 'Company-wide payroll lock by Admin' : 'Open for timesheet submissions');
+        const displayText = row.unlocked_reason ? `Unlocked: ${row.unlocked_reason}` : reasonText;
 
         return (
-          <div className="space-y-0.5 text-xs">
+          <div className="space-y-0.5 text-xs max-w-[220px]">
             <div className="flex items-center gap-1.5 text-slate-700 font-semibold truncate">
               <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               <span className="truncate">{actorName}</span>
@@ -135,12 +137,24 @@ export default function TimeLockTable({
                 • {lockedTimeStr}
               </span>
             </div>
-            <p
-              className="text-[11px] text-slate-500 italic truncate"
-              title={row.unlocked_reason ? `Unlocked note: ${row.unlocked_reason}` : reasonText}
-            >
-              {row.unlocked_reason ? `Unlocked: ${row.unlocked_reason}` : reasonText}
-            </p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p
+                className="text-[11px] text-slate-500 italic truncate flex-1"
+                title={displayText}
+              >
+                {displayText}
+              </p>
+              {(row.is_locked || row.lock_type === 'GRACE_UNLOCKED' || row.lock_type === 'GLOBAL_LOCKED') && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDetailModal?.(row)}
+                  className="shrink-0 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                  title="View full audit trail details"
+                >
+                  Detail
+                </button>
+              )}
+            </div>
           </div>
         );
       },
@@ -190,14 +204,24 @@ export default function TimeLockTable({
           );
         }
 
-        // TRƯỜNG HỢP 3: THÁNG HIỆN TẠI ĐANG DIỄN RA
-        if (isCurrentPeriod) {
+        // TRƯỜNG HỢP 3: THÁNG ĐÃ ĐƯỢC MANAGER UNLOCK TRƯỚC ĐÓ (GRACE UNLOCKED) -> CHO PHÉP RE-LOCK
+        if (row.lock_type === 'GRACE_UNLOCKED' || row.unlocked_reason) {
           return (
             <div className="flex items-center gap-2">
               <button
+                onClick={() => onDirectLock(row)}
+                disabled={isLocking}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                title="Re-lock this period after adjustments"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Re-lock</span>
+              </button>
+
+              <button
                 onClick={() => onNavigateTimesheet(row.job_id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
-                title="Review timesheet entries in progress"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
+                title="Review timesheets before re-locking"
               >
                 <FileText className="w-3.5 h-3.5 text-blue-600" />
                 <span>Timesheet</span>
@@ -206,23 +230,13 @@ export default function TimeLockTable({
           );
         }
 
-        // TRƯỜNG HỢP 4: THÁNG ĐÃ QUA & CHƯA KHÓA -> CHO PHÉP MANAGER KHÓA
+        // TRƯỜNG HỢP 4: THÁNG ĐANG DIỄN RA HOẶC CHƯA TỰ ĐỘNG KHÓA (OPEN) -> CHỈ XEM TIMESHEET, KHÔNG CÓ NÚT KHÓA TAY
         return (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onDirectLock(row)}
-              disabled={isLocking}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
-              title={row.unlocked_reason ? "Re-lock this period after adjustments" : "Lock this project for this period"}
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Re-lock</span>
-            </button>
-
-            <button
               onClick={() => onNavigateTimesheet(row.job_id)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
-              title="Review pending timesheets before locking"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
+              title="Review timesheet entries"
             >
               <FileText className="w-3.5 h-3.5 text-blue-600" />
               <span>Timesheet</span>

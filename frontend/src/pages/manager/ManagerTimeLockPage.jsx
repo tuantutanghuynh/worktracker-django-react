@@ -9,6 +9,7 @@ import TimeLockStatCards from '../../components/manager/timelock/TimeLockStatCar
 import TimeLockFilterToolbar from '../../components/manager/timelock/TimeLockFilterToolbar';
 import TimeLockTable from '../../components/manager/timelock/TimeLockTable';
 import UnlockJobModal from '../../components/manager/timelock/UnlockJobModal';
+import TimeLockDetailModal from '../../components/manager/timelock/TimeLockDetailModal';
 
 import {
   useTimeLocks,
@@ -59,6 +60,7 @@ export default function ManagerTimeLockPage() {
 
   // Modal State
   const [unlockTarget, setUnlockTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
   const [isBatchLocking, setIsBatchLocking] = useState(false);
 
   // 🚀 TANSTACK REACT QUERY HOOKS
@@ -387,6 +389,7 @@ export default function ManagerTimeLockPage() {
         isCurrentPeriod={isCurrentPeriod}
         isGloballyLocked={isGloballyLocked}
         onOpenUnlockModal={setUnlockTarget}
+        onOpenDetailModal={setDetailTarget}
         onDirectLock={handleDirectLock}
         isLocking={createLockMutation.isPending}
         onNavigateTimesheet={(jobId) =>
@@ -401,6 +404,13 @@ export default function ManagerTimeLockPage() {
         target={unlockTarget}
         onConfirm={handleConfirmUnlock}
         isPending={unlockMutation.isPending || createLockMutation.isPending}
+      />
+
+      {/* ℹ️ Modal Xem Chi Tiết Khóa Kỳ Công */}
+      <TimeLockDetailModal
+        isOpen={Boolean(detailTarget)}
+        onClose={() => setDetailTarget(null)}
+        target={detailTarget}
       />
     </div>
   );
