@@ -98,7 +98,7 @@ ASGI_APPLICATION = 'worktracker_core.asgi.application'
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL and dj_database_url:
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=0, ssl_require=True)
     }
 else:
     DATABASES = {
@@ -220,20 +220,25 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 REDIS_URL = os.environ.get("REDIS_URL")
 if REDIS_URL:
+    redis_opts = {
+        "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        "IGNORE_EXCEPTIONS": True,
+        "SOCKET_CONNECT_TIMEOUT": 5,
+        "SOCKET_TIMEOUT": 5,
+    }
+    if REDIS_URL.startswith("rediss://"):
+        redis_opts["CONNECTION_POOL_KWARGS"] = {"ssl_cert_reqs": None}
+
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": REDIS_URL,
-            "OPTIONS": {
-                "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            }
+            "OPTIONS": redis_opts,
         },
         "blacklist": {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": REDIS_URL, 
-            "OPTIONS": {
-                "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            }
+            "OPTIONS": redis_opts,
         }
     }
     CHANNEL_LAYERS = {
