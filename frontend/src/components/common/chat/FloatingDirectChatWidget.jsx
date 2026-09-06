@@ -8,6 +8,7 @@ import { chatService } from "../../../services/common/chatService";
 import { useAuth } from "../../../hooks/useAuth";
 import { useAuthStore } from "../../../stores/authStore";
 import { cn } from "../../../utils/cn";
+import { getWebSocketBaseUrl } from "../../../utils/wsUrl";
 
 function formatDateSafe(dateStr, pattern = "HH:mm") {
   if (!dateStr) return "";
@@ -96,11 +97,10 @@ export default function FloatingDirectChatWidget({
     if (!isOpen || !roomId) return;
 
     const token = useAuthStore.getState().accessToken;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
+    const wsBase = getWebSocketBaseUrl();
     const wsUrl = token
-      ? `${protocol}//${host}/ws/chat/${roomId}/?token=${token}`
-      : `${protocol}//${host}/ws/chat/${roomId}/`;
+      ? `${wsBase}/ws/chat/${roomId}/?token=${token}`
+      : `${wsBase}/ws/chat/${roomId}/`;
 
     let socket = null;
     try {

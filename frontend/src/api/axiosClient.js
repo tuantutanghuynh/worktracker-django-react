@@ -6,8 +6,15 @@ import { useAuthStore } from '../stores/authStore';
 // refreshing the token. Callers just use axiosClient like plain axios
 // and never have to think about tokens themselves.
 
-const RAW_HOST = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const BASE_HOST = RAW_HOST.endsWith('/api') ? RAW_HOST.slice(0, -4) : RAW_HOST;
+const RAW_HOST = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+let BASE_HOST;
+if (RAW_HOST) {
+  BASE_HOST = RAW_HOST.endsWith('/api') ? RAW_HOST.slice(0, -4) : RAW_HOST;
+} else if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app')) {
+  BASE_HOST = 'https://worktracker-api-ccvj.onrender.com';
+} else {
+  BASE_HOST = 'http://localhost:8000';
+}
 const API_BASE_URL = `${BASE_HOST.replace(/\/$/, '')}/api`;
 
 // 1. Khởi tạo Axios Instance dùng chung với Timeout 15 giây

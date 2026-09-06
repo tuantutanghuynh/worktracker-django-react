@@ -35,6 +35,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { cn } from '../../../utils/cn';
 import UserAvatar from '../avatar/UserAvatar';
 import { getErrorMessage } from '../../../utils/errorMessages';
+import { getWebSocketBaseUrl } from '../../../utils/wsUrl';
 
 /**
  * Format timestamp hiển thị trong danh sách tin nhắn
@@ -229,11 +230,10 @@ export default function ChatContainer({
     // 3. THIẾT LẬP KẾT NỐI WEBSOCKET REALTIME CHO PHÒNG ĐANG CHỌN
     // ============================================================
     const token = useAuthStore.getState().accessToken;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
+    const wsBase = getWebSocketBaseUrl();
     const wsUrl = token
-      ? `${protocol}//${host}/ws/chat/${activeRoom.id}/?token=${token}`
-      : `${protocol}//${host}/ws/chat/${activeRoom.id}/`;
+      ? `${wsBase}/ws/chat/${activeRoom.id}/?token=${token}`
+      : `${wsBase}/ws/chat/${activeRoom.id}/`;
 
     if (wsRef.current) {
       wsRef.current.close();

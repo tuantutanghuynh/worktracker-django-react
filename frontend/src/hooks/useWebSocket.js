@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
 import { useAuthStore } from '../stores/authStore';
+import { getWebSocketBaseUrl } from '../utils/wsUrl';
 
 /**
  * Custom Hook: Real-time WebSocket connection to Django Channels ws/notifications/
@@ -16,20 +17,7 @@ export function useWebSocket() {
   const wsHook = typeof useReactWebSocket === 'function' ? useReactWebSocket : useNamedWebSocket;
 
   const token = useAuthStore.getState().accessToken;
-  const envWs = import.meta.env.VITE_WS_URL;
-  const rawApi = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
-  
-  let wsBase = '';
-  if (envWs) {
-    wsBase = envWs.replace(/\/$/, '');
-  } else if (rawApi) {
-    const cleanHost = rawApi.replace(/^https?:\/\//, '').replace(/\/api\/?$/, '').replace(/\/$/, '');
-    const wsProto = rawApi.startsWith('https') || window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    wsBase = `${wsProto}//${cleanHost}`;
-  } else {
-    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    wsBase = `${wsProto}//${window.location.host}`;
-  }
+  const wsBase = getWebSocketBaseUrl();
 
   const socketUrl = user && token && typeof wsHook === 'function' 
     ? `${wsBase}/ws/notifications/?token=${token}` 

@@ -3,6 +3,7 @@ import managerReportService from '../services/manager/managerReportService';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notificationApi';
 import { useAuthStore } from './authStore';
 import { queryClient } from '../lib/queryClient';
+import { getWebSocketBaseUrl } from '../utils/wsUrl';
 
 // Picks the right backend depending on role — Manager's notification
 // routes live under /manager/system/notifications/ and are role-gated;
@@ -167,9 +168,8 @@ export const useNotificationStore = create((set, get) => ({
     const token = useAuthStore.getState().accessToken;
     if (!token) return;
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = wsUrlOverride || `${wsProtocol}//${host}/ws/notifications/?token=${token}`;
+    const wsBase = getWebSocketBaseUrl();
+    const wsUrl = wsUrlOverride || `${wsBase}/ws/notifications/?token=${token}`;
 
     // Tự động lắng nghe sự kiện Tab Focus / Visibility để bù đắp dữ liệu khi user quay lại tab
     if (!lifecycleAttached && typeof window !== 'undefined') {
