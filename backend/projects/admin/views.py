@@ -5,7 +5,7 @@ Description: Administrative viewsets for client partner management and master pr
 
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -35,12 +35,24 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Retrieve filtered and ordered client records."""
-        qs = Client.objects.order_by('-created_at')
+        qs = Client.objects.annotate(
+            job_count=Count('jobs', distinct=True),
+            active_job_count=Count(
+                'jobs',
+                filter=Q(jobs__status__in=['PLANNING', 'ACTIVE', 'ON_HOLD']),
+                distinct=True,
+            ),
+        ).order_by('-created_at')
         params = self.request.query_params
         if name := params.get('name'):
             qs = qs.filter(client_name__icontains=name)
         if (is_active := params.get('is_active')) not in (None, ''):
             qs = qs.filter(is_active=is_active.lower() == 'true')
+        # ?industry=<ten nganh> — so khop chinh xac (khong phan biet hoa thuong)
+        # vi danh sach lua chon o frontend duoc dung tu chinh gia tri dang co
+        # trong DB, khong phai nguoi dung go tay.
+        if industry := params.get('industry'):
+            qs = qs.filter(industry__iexact=industry)
         if search := params.get('search'):
             qs = qs.filter(
                 Q(client_name__icontains=search) |
@@ -177,7 +189,17 @@ class JobViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Retrieve filtered job list with client and manager relations."""
         qs = Job.objects.select_related('client', 'manager').order_by('-created_at')
-        if search := self.request.query_params.get('search'):
+        # ?client=<id> — dung cho man hinh "Jobs of this client" mo tu trang
+        # Clients. Loc o backend chu khong tai het roi loc tren trinh duyet,
+        # de phan trang van dung so luong.
+        params = self.request.query_params
+        if client_id := params.get('client'):
+            qs = qs.filter(client_id=client_id)
+        if status_code := params.get('status'):
+            qs = qs.filter(status=status_code)
+        if priority := params.get('priority'):
+            qs = qs.filter(priority=priority)
+        if search := params.get('search'):
             qs = qs.filter(
                 Q(job_name__icontains=search) |
                 Q(client__client_name__icontains=search) |

@@ -7,7 +7,10 @@ chuỗi rỗng '' KHÔNG phải NULL — nên tạo Job thứ hai với ô Job C
 sẽ đụng ràng buộc và vỡ thành lỗi 500 kèm nguyên traceback, thay vì một
 thông báo 400 đọc được.
 """
+from datetime import timedelta
+
 import pytest
+from django.utils import timezone
 from model_bakery import baker
 from rest_framework.test import APIClient
 
@@ -38,6 +41,12 @@ def boi_canh(db):
     }
 
 
+# Ngay phai tinh theo hom nay chu khong hardcode: JobSerializer.validate()
+# chan start_date som hon ngay tao Client, ma Client trong fixture duoc tao
+# ngay luc chay test.
+HOM_NAY = timezone.localdate()
+
+
 def tao_job(client, boi_canh, ten, code=None):
     payload = {
         "job_name": ten,
@@ -45,8 +54,8 @@ def tao_job(client, boi_canh, ten, code=None):
         "manager": boi_canh["manager"].id,
         "priority": "MEDIUM",
         "status": "PLANNING",
-        "start_date": "2026-09-01",
-        "deadline": "2026-12-01",
+        "start_date": str(HOM_NAY),
+        "deadline": str(HOM_NAY + timedelta(days=90)),
     }
     if code is not None:
         payload["job_code"] = code
@@ -197,3 +206,87 @@ class TestDepartmentTrungTen:
         with pytest.raises(IntegrityError):
             with transaction.atomic():
                 Department.objects.create(name="phong ky thuat")
+
+
+@pytest.mark.django_db
+class TestJobTheoClient:
+    """
+    Man hinh "Jobs of this client" mo tu trang Clients: loc bang ?client=<id>
+    o backend chu khong tai het roi loc tren trinh duyet — neu loc o frontend
+    thi so trang va tong so dem deu sai.
+    """
+
+    def test_chi_tra_ve_job_cua_dung_client_do(self, admin_client, boi_canh):
+        khach_khac = baker.make("projects.Client", client_name="Khach Hang B", tax_code="0100000002")
+        tao_job(admin_client, boi_canh, "Job Cua A")
+
+        r = admin_client.get(f"/api/admin/jobs/?client={boi_canh['client'].id}")
+        assert r.status_code == 200
+        assert r.data["count"] == 1
+        assert r.data["results"][0]["job_name"] == "Job Cua A"
+
+        r2 = admin_client.get(f"/api/admin/jobs/?client={khach_khac.id}")
+        assert r2.data["count"] == 0
+
+    def test_khong_truyen_client_thi_tra_ve_het(self, admin_client, boi_canh):
+        tao_job(admin_client, boi_canh, "Job Mot")
+        tao_job(admin_client, boi_canh, "Job Hai")
+
+        assert admin_client.get("/api/admin/jobs/").data["count"] == 2
+
+
+@pytest.mark.django_db
+class TestStartDateSoVoiNgayTaoClient:
+    """
+    Job khong the bat dau TRUOC khi khach hang ton tai trong he thong.
+    """
+
+    def test_start_date_truoc_ngay_tao_client_bi_chan(self, admin_client, boi_canh):
+        r = admin_client.post(
+            "/api/admin/jobs/",
+            {
+                "job_name": "Job Qua Khu",
+                "client": boi_canh["client"].id,
+                "manager": boi_canh["manager"].id,
+                "priority": "MEDIUM",
+                "start_date": str(HOM_NAY - timedelta(days=1)),
+                "deadline": str(HOM_NAY + timedelta(days=30)),
+            },
+            format="json",
+        )
+        assert r.status_code == 400
+        assert "start_date" in r.data
+
+    def test_dung_ngay_tao_client_thi_tao_duoc(self, admin_client, boi_canh):
+        assert tao_job(admin_client, boi_canh, "Job Dung Ngay").status_code == 201
+
+    def test_sua_job_cu_vi_pham_van_khong_bi_chan(self, admin_client, boi_canh):
+        """
+        Du lieu cu (seed) co the co start_date som hon ngay tao client. Neu
+        bat moi lan update thi nhung job do bi khoa cung — doi status hay doi
+        manager cung 400 trong khi nguoi dung khong he dong vao ngay.
+        """
+        job = baker.make(
+            "projects.Job",
+            client=boi_canh["client"],
+            manager=boi_canh["manager"],
+            job_name="Job Seed Cu",
+            status="PLANNING",
+            start_date=HOM_NAY - timedelta(days=365),
+            deadline=HOM_NAY + timedelta(days=30),
+        )
+
+        r = admin_client.patch(
+            f"/api/admin/jobs/{job.id}/", {"status": "ACTIVE"}, format="json"
+        )
+        assert r.status_code == 200
+
+    def test_sua_start_date_sang_gia_tri_moi_van_bi_chan(self, admin_client, boi_canh):
+        r = tao_job(admin_client, boi_canh, "Job Goc")
+        r2 = admin_client.patch(
+            f"/api/admin/jobs/{r.data['id']}/",
+            {"start_date": str(HOM_NAY - timedelta(days=10))},
+            format="json",
+        )
+        assert r2.status_code == 400
+        assert "start_date" in r2.data

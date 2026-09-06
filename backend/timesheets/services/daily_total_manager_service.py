@@ -74,8 +74,6 @@ def assert_daily_total_not_exceed_8(
     return final_total
 
 
-assert_daily_total_not_exceed_24 = assert_daily_total_not_exceed_8
-
 
 def rebuild_daily_user_timesheet(user_id, work_date):
     """Recalculate and update the daily user timesheet summary record for a specific date."""

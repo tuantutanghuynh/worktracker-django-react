@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { X, ListChecks, ShieldAlert, UserPen, Lock, Database, ChevronRight } from 'lucide-react';
 import AuditDiffViewer from '../../components/common/drawer/AuditDiffViewer';
-import SideDrawer from '../../components/common/drawer/SideDrawer';
+import BaseModal from '../../components/common/modal/BaseModal';
 import SeverityBadge from '../../components/common/badges/SeverityBadge';
+import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
 import ExportButton from '../../components/common/table/ExportButton';
@@ -13,6 +15,7 @@ import StatCard from '../../components/common/cards/StatCard';
 import { useOrdering } from '../../hooks/useOrdering';
 import {
   useAdminAuditLogs,
+  useAdminAuditLogDeepLink,
   useAdminAuditLogFilterOptions,
   useAdminAuditLogSummary,
 } from '../../hooks/queries/admin/useAdminAuditLogs';
@@ -40,6 +43,7 @@ const SEVERITY_OPTIONS = [
 // persistent-detail-panel format from origin/LongNguyen's admin audit log
 // mockup, adapted to read from this branch's actual API shape.
 export function AuditLogsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [roleTab, setRoleTab] = useState('ADMIN');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedLog, setSelectedLog] = useState(null);
@@ -117,18 +121,51 @@ export function AuditLogsPage() {
     })),
   ];
 
+  // Deep-link ?log=<id> — Dashboard bam vao mot su kien bao mat thi nhay sang
+  // day va mo dung ngan chi tiet cua no.
+  //
+  // Phai doi CA hai: ban ghi log va danh sach user. Tab dang xem duoc quyet
+  // dinh boi VAI TRO cua nguoi thuc hien, ma AuditLogSerializer chi tra ve id
+  // cua ho — khong doi user thi bang ben duoi lai loc theo mot vai tro khac han
+  // voi ban ghi vua mo.
+  //
+  // Chinh state ngay trong luc render (dung pattern "Adjusting state based on
+  // a prop change" cua React, giong cho reset ve trang 1 o cac trang list) chu
+  // khong dung useEffect — useEffect o day chi tao them mot vong render thua.
+  const deepLinkId = searchParams.get('log');
+  const { data: deepLinkedLog } = useAdminAuditLogDeepLink(deepLinkId);
+  const [appliedLogId, setAppliedLogId] = useState(null);
+  if (deepLinkedLog && users.length > 0 && appliedLogId !== deepLinkedLog.id) {
+    setAppliedLogId(deepLinkedLog.id);
+    const actorRole = userById[deepLinkedLog.user]?.role_detail?.code;
+    if (actorRole) setRoleTab(actorRole);
+    setSelectedLog(deepLinkedLog);
+  }
+
+  // Dong ngan chi tiet thi bo luon ?log= khoi URL — neu khong, roi trang xong
+  // quay lai la no tu mo lai ban ghi cu.
+  function closeDetail() {
+    setSelectedLog(null);
+    if (searchParams.has('log')) {
+      setSearchParams((prev) => {
+        prev.delete('log');
+        return prev;
+      });
+    }
+  }
+
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900">Audit Logs</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Track sensitive system actions and data changes across WorkTracker.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
+      <AdminPageHeader
+        icon={ListChecks}
+        title="Audit Logs"
+        subtitle="Track sensitive system actions and data changes across WorkTracker."
+        count={totalCount}
+        countLabel="entry"
+        actions={
+          <>
           <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
             {ROLE_TABS.map((tab) => (
               <button
@@ -156,8 +193,9 @@ export function AuditLogsPage() {
             }}
             filename="worktracker_audit_logs.xlsx"
           />
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
@@ -255,7 +293,8 @@ export function AuditLogsPage() {
       {/* table-fixed + width theo % nên bảng luôn vừa khung; cột Actor rộng
           hơn để email dài hiện đủ, không bị cắt "...". */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px] table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
               <SortableHeader label="Time" sortKey="created_at" ordering={ordering} onSort={handleSort} className="w-[10%]" />
@@ -309,6 +348,7 @@ export function AuditLogsPage() {
             ))}
           </tbody>
         </table>
+        </div>
 
         <PaginationBar
           page={page}
@@ -319,14 +359,22 @@ export function AuditLogsPage() {
         />
       </div>
 
-      <SideDrawer
+      {/* Trước đây là SideDrawer nền tối trượt từ bên phải — lạc lõng giữa các
+          màn hình còn lại vốn là modal sáng ở giữa. `compact` xếp các trường
+          thay đổi thành lưới tới 3 cột nên bản ghi nhiều trường vẫn nằm gọn
+          trong một khung nhìn thay vì phải cuộn. */}
+      <BaseModal
         isOpen={!!selectedLog}
-        onClose={() => setSelectedLog(null)}
+        onClose={closeDetail}
         title="Audit Log Detail"
-        size="lg"
+        description={selectedLog ? getActionLabel(selectedLog.action) : undefined}
+        maxWidth="max-w-7xl"
       >
         {selectedLog && (
           <AuditDiffViewer
+            theme="light"
+            compact
+            className="border-0 p-0"
             action={selectedLog.action}
             recordId={selectedLog.record_id}
             timestamp={selectedLog.created_at}
@@ -338,7 +386,7 @@ export function AuditLogsPage() {
             newValues={selectedLog.new_values}
           />
         )}
-      </SideDrawer>
+      </BaseModal>
     </div>
   );
 }

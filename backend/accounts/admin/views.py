@@ -375,16 +375,16 @@ class UserViewSet(viewsets.ModelViewSet):
         manager_id = request.data.get("manager")
 
         if user.role and user.role.code != "EMPLOYEE":
-            raise ValidationError("Only EMPLOYEE accounts can have an assigned Manager.")
+            raise ValidationError("Only Employee accounts report to a Manager. Change the role to Employee first.")
 
         if manager_id is not None:
             manager = CustomUser.objects.filter(id=manager_id).select_related("role").first()
             if manager is None:
-                raise ValidationError("Manager does not exist.")
+                raise ValidationError("That manager account no longer exists.")
             if not manager.is_active:
-                raise ValidationError("Cannot assign to a locked Manager.")
+                raise ValidationError("That manager account is locked. Unlock it, or pick another manager.")
             if not manager.role or manager.role.code != "MANAGER":
-                raise ValidationError("The assigned user must have the MANAGER role.")
+                raise ValidationError("The person you picked is not a Manager, so employees cannot report to them.")
 
         try:
             old_manager_id = user.profile.manager_id
@@ -431,7 +431,18 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Retrieve ordered and search-filtered department list."""
         qs = Department.objects.select_related("manager").order_by("-created_at")
-        if search := self.request.query_params.get("search"):
+        params = self.request.query_params
+
+        # ?manager=<id> hoac ?manager=none. "none" la truong hop dang quan tam
+        # nhat: phong ban khong co truong phong thi khong ai duyet cong cho ca
+        # phong do, nen Admin can loc ra duoc chung mot cach nhanh.
+        if manager := params.get("manager"):
+            if manager == "none":
+                qs = qs.filter(manager__isnull=True)
+            else:
+                qs = qs.filter(manager_id=manager)
+
+        if search := params.get("search"):
             qs = qs.filter(
                 Q(name__icontains=search) | Q(manager__email__icontains=search)
             )

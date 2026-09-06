@@ -32,10 +32,10 @@ class TestManagerEmployeeList:
         baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.employee = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
 
         # Tạo profile cho employee (bắt buộc vì view dùng select_related profile)

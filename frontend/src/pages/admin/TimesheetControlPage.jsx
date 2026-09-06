@@ -3,14 +3,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { Lock, Search, ChevronRight, Unlock } from 'lucide-react';
+import { Lock, Search, ChevronRight, Unlock, CalendarClock } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
-import SideDrawer from '../../components/common/drawer/SideDrawer';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
 import ExportButton from '../../components/common/table/ExportButton';
+import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import {
   useAdminTimesheetEmployees,
   useAdminTimesheetEmployeeDetail,
@@ -211,9 +211,12 @@ export function TimesheetControlPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-lg font-bold text-slate-900">Timesheet Control</h1>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+      <AdminPageHeader
+        icon={CalendarClock}
+        title="Timesheet Control"
+        subtitle="Compliance across the company for the selected period, and the period lock."
+        actions={
+          <>
         <ExportButton
           url="/admin/timesheets/employees/export/"
           params={{
@@ -239,8 +242,9 @@ export function TimesheetControlPage() {
           {isPeriodLocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           {isPeriodLocked ? 'Unlock Period' : 'Lock Period'}
         </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -314,7 +318,8 @@ export function TimesheetControlPage() {
       {/* Không dùng overflow-x-auto: table-fixed + width theo % nên bảng luôn
           co vừa khung, không bao giờ phải kéo ngang. */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
               <SortableHeader label="Employee" sortKey="full_name" ordering={ordering} onSort={toggleSort} className="w-[21%]" />
@@ -394,6 +399,7 @@ export function TimesheetControlPage() {
             ))}
           </tbody>
         </table>
+        </div>
 
         <PaginationBar
           page={page}
@@ -404,83 +410,92 @@ export function TimesheetControlPage() {
         />
       </div>
 
-      <SideDrawer
+      {/* Trước đây đây là SideDrawer nên trượt từ bên phải với nền tối — lạc
+          lõng giữa những màn hình còn lại vốn là modal sáng ở giữa. Đổi về
+          BaseModal cho đồng bộ; bảng màu sáng thì các con số cũng rõ hơn hẳn. */}
+      <BaseModal
         isOpen={!!selectedEmployeeId}
         onClose={() => setSelectedEmployeeId(null)}
         title="Compliance Overview"
-        subtitle={selectedEmployeeRow?.full_name}
-        size="md"
+        description={selectedEmployeeRow?.full_name}
+        maxWidth="max-w-xl"
       >
         {employeeDetail && selectedEmployeeRow && (
-          <div className="space-y-5 text-slate-100">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700">
-                <span className="text-slate-400 text-[10px] block">Monthly Hours</span>
-                <span className="font-extrabold text-slate-100 text-sm">{employeeDetail.month_hours}h</span>
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-medium text-slate-500">Monthly Hours</span>
+                <span className="text-base font-extrabold text-slate-900">{employeeDetail.month_hours}h</span>
               </div>
-              <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700">
-                <span className="text-slate-400 text-[10px] block">Working Days</span>
-                <span className="font-extrabold text-slate-100 text-sm">{employeeDetail.working_days} Days</span>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-medium text-slate-500">Working Days</span>
+                <span className="text-base font-extrabold text-slate-900">{employeeDetail.working_days} days</span>
               </div>
-              <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700">
-                <span className="text-slate-400 text-[10px] block">Average / Day</span>
-                <span className="font-extrabold text-slate-100 text-sm">{employeeDetail.avg_per_day}h</span>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-medium text-slate-500">Average / Day</span>
+                <span className="text-base font-extrabold text-slate-900">{employeeDetail.avg_per_day}h</span>
               </div>
-              <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700">
-                <span className="text-slate-400 text-[10px] block">Edited Records</span>
-                <span className="font-extrabold text-amber-400 text-sm">{employeeDetail.edited_records}</span>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-medium text-slate-500">Edited Records</span>
+                <span
+                  className={`text-base font-extrabold ${
+                    employeeDetail.edited_records > 0 ? 'text-amber-600' : 'text-slate-900'
+                  }`}
+                >
+                  {employeeDetail.edited_records}
+                </span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Compliance Checks</h5>
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between p-2 rounded bg-slate-800/60">
-                  <span className="text-slate-300 font-medium">Daily hours over limit</span>
-                  <span className={employeeDetail.daily_over_limit_count > 0 ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
-                    {employeeDetail.daily_over_limit_count} day(s)
+              <h5 className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Compliance Checks</h5>
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 text-xs">
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <span className="font-medium text-slate-700">Days over the daily hour limit</span>
+                  <span className={employeeDetail.daily_over_limit_count > 0 ? 'shrink-0 font-bold text-amber-600' : 'shrink-0 font-bold text-emerald-600'}>
+                    {employeeDetail.daily_over_limit_count === 0 ? 'None' : `${employeeDetail.daily_over_limit_count} day(s)`}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-800/60">
-                  <span className="text-slate-300 font-medium">Daily 24h hard cap hit</span>
-                  <span className={employeeDetail.daily_hard_limit_count > 0 ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
-                    {employeeDetail.daily_hard_limit_count} day(s)
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <span className="font-medium text-slate-700">Days that hit the 24-hour ceiling</span>
+                  <span className={employeeDetail.daily_hard_limit_count > 0 ? 'shrink-0 font-bold text-rose-600' : 'shrink-0 font-bold text-emerald-600'}>
+                    {employeeDetail.daily_hard_limit_count === 0 ? 'None' : `${employeeDetail.daily_hard_limit_count} day(s)`}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-800/60">
-                  <span className="text-slate-300 font-medium">Locked period edits</span>
-                  <span className={employeeDetail.locked_period_edits > 0 ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <span className="font-medium text-slate-700">Entries changed after the period was closed</span>
+                  <span className={employeeDetail.locked_period_edits > 0 ? 'shrink-0 font-bold text-rose-600' : 'shrink-0 font-bold text-emerald-600'}>
                     {employeeDetail.locked_period_edits > 0 ? employeeDetail.locked_period_edits : 'None'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-800/60">
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
                   <span
-                    className="text-slate-300 font-medium"
+                    className="font-medium text-slate-700"
                     title="Working days that have passed with no logged hours. Leave and public holidays are not tracked yet, so days off are counted here too."
                   >
-                    Working days without a log
+                    Working days with nothing logged
                   </span>
-                  <span className={employeeDetail.missing_days > 0 ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
-                    {employeeDetail.missing_days} day(s)
+                  <span className={employeeDetail.missing_days > 0 ? 'shrink-0 font-bold text-amber-600' : 'shrink-0 font-bold text-emerald-600'}>
+                    {employeeDetail.missing_days === 0 ? 'None' : `${employeeDetail.missing_days} day(s)`}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl space-y-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-purple-300">Period Lock Status</span>
+            <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-slate-700">Period Lock Status</span>
                 <span
-                  className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                     employeeDetail.global_lock?.is_locked
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-slate-700 text-slate-300'
+                      ? 'border-rose-200 bg-rose-50 text-rose-600'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-600'
                   }`}
                 >
-                  {employeeDetail.global_lock?.is_locked ? 'LOCKED' : 'UNLOCKED'}
+                  {employeeDetail.global_lock?.is_locked ? 'Locked' : 'Open for edits'}
                 </span>
               </div>
-              <p className="text-[11px] text-purple-200">
+              <p className="text-[11px] text-slate-500">
                 {employeeDetail.global_lock
                   ? `${employeeDetail.global_lock.is_locked ? 'Locked' : 'Unlocked'} by ${
                       employeeDetail.global_lock.is_locked
@@ -499,7 +514,7 @@ export function TimesheetControlPage() {
             </div>
           </div>
         )}
-      </SideDrawer>
+      </BaseModal>
 
       <BaseModal isOpen={lockModalOpen} onClose={() => setLockModalOpen(false)} title="Lock Timesheet Period">
         <form onSubmit={handleLockSubmit(onSubmitLock)} className="space-y-3">

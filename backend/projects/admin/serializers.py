@@ -24,6 +24,22 @@ PHONE_ALLOWED_CHARS = re.compile(r"^[0-9+()\-.\s]+$")
 PHONE_MIN_DIGITS = 8
 PHONE_MAX_DIGITS = 15
 
+# Ma trang thai trong DB -> ten nguoi dung doc duoc. Thong bao loi la thu nguoi
+# dung doc, khong phai lap trinh vien: "ON_HOLD" gach duoi viet hoa la hang
+# enum, khong phai tieng Anh.
+STATUS_DISPLAY_NAMES = {
+    'PLANNING': 'Planning',
+    'ACTIVE': 'Active',
+    'ON_HOLD': 'On Hold',
+    'COMPLETED': 'Completed',
+    'CANCELLED': 'Cancelled',
+}
+
+
+def status_label(code):
+    """Return the human-readable name of a job status code."""
+    return STATUS_DISPLAY_NAMES.get(code, code)
+
 
 def validate_phone_format(value, field_label="Phone number"):
     """Reject phone values that are not plausibly a phone number."""
@@ -49,6 +65,10 @@ class ClientSerializer(serializers.ModelSerializer):
     """Serializer managing client organization profiles and unique tax code validation."""
 
     tax_code = serializers.CharField(max_length=50, validators=[])
+    # So job cua khach hang nay, do ClientViewSet.get_queryset() annotate san.
+    # Dem o DB bang mot cau JOIN thay vi goi them mot request cho tung dong.
+    job_count = serializers.IntegerField(read_only=True, default=0)
+    active_job_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Client
@@ -192,16 +212,16 @@ class JobSerializer(serializers.ModelSerializer):
     def validate_client(self, value):
         """Ensure assigned client account is active."""
         if not value.is_active:
-            raise serializers.ValidationError("Cannot assign job to an inactive client.")
+            raise serializers.ValidationError("This client has been deactivated, so no new work can be assigned to them.")
         return value
 
     def validate_manager(self, value):
         """Ensure assigned project manager is active and holds appropriate role."""
         if not value.is_active:
-            raise serializers.ValidationError("Cannot assign an inactive user as project manager.")
+            raise serializers.ValidationError("That account is locked, so it cannot be put in charge of a job.")
         role_code = getattr(getattr(value, 'role', None), 'code', None)
         if role_code not in ['MANAGER', 'ADMIN']:
-            raise serializers.ValidationError("Project manager must have an active MANAGER or ADMIN role.")
+            raise serializers.ValidationError("Only a Manager or an Administrator can be put in charge of a job.")
         return value
     
     ALLOWED_TRANSITIONS = {
@@ -218,8 +238,15 @@ class JobSerializer(serializers.ModelSerializer):
             current = self.instance.status
             allowed = self.ALLOWED_TRANSITIONS.get(current, [])
             if value != current and value not in allowed:
+                allowed_names = ", ".join(status_label(a) for a in allowed)
+                huong_dan = (
+                    f"From {status_label(current)} it can only move to: {allowed_names}."
+                    if allowed
+                    else f"A job in {status_label(current)} cannot change status any more."
+                )
                 raise serializers.ValidationError(
-                    f"Cannot transition from '{current}' to '{value}'."
+                    f"A job cannot go straight from {status_label(current)} to "
+                    f"{status_label(value)}. {huong_dan}"
                 )
         return value
         
@@ -234,6 +261,27 @@ class JobSerializer(serializers.ModelSerializer):
 
         if start_date and deadline and deadline < start_date:
             raise serializers.ValidationError({'deadline': 'Deadline must be on or after start date.'})
+
+        # Du an khong the bat dau TRUOC khi khach hang ton tai trong he thong.
+        # Ngay tao Client la moc som nhat hop le — nhap truoc do nghia la go
+        # nham nam, hoac gan job vao nham khach hang.
+        #
+        # Chi kiem tra khi start_date THUC SU thay doi. Du lieu cu (seed, job
+        # tao truoc khi co luat nay) co the dang vi pham — neu bat moi lan
+        # update thi nhung job do bi khoa cung, doi status hay doi manager
+        # cung 400, trong khi nguoi dung khong he dong vao ngay.
+        client = data.get('client', self.instance.client if self.instance else None)
+        start_date_doi = self.instance is None or start_date != self.instance.start_date
+        if start_date_doi and start_date and client and client.created_at:
+            client_since = timezone.localtime(client.created_at).date()
+            if start_date < client_since:
+                raise serializers.ValidationError({
+                    'start_date': (
+                        f"Start date cannot be before the client was created "
+                        f"({client_since}). '{client.client_name}' was added to the "
+                        f"system on that date."
+                    )
+                })
         return data
 
     def create(self, validated_data):

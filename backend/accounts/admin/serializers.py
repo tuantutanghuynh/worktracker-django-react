@@ -96,7 +96,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         role = attrs.get('role')
         if manager and role and getattr(role, 'code', None) != 'EMPLOYEE':
             raise serializers.ValidationError(
-                {'manager': 'Only EMPLOYEE accounts can have an assigned Manager.'}
+                {'manager': 'Only Employee accounts report to a Manager. Change the role to Employee first.'}
             )
         return attrs
 

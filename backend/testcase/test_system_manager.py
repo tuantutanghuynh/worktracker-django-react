@@ -11,7 +11,7 @@ from system.security.permissions_manager import MANAGER_ROLE_CODE
 # ============================================================
 def make_manager(role, *permission_codes):
     """Tạo Manager user và cấp các quyền cho role."""
-    user = baker.make("accounts.CustomUser", role=role, is_active=True)
+    user = baker.make("accounts.CustomUser", role=role, is_active=True, must_change_password=False)
     for code in permission_codes:
         perm = baker.make("accounts.Permission", code=code)
         baker.make("accounts.RolePermission", role=role, permission=perm)
@@ -36,10 +36,10 @@ class TestManagerAuthorization:
         self.role_employee = baker.make("accounts.Role", code="EMPLOYEE")
 
         self.manager_user = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.employee_user = baker.make(
-            "accounts.CustomUser", role=self.role_employee, is_active=True
+            "accounts.CustomUser", role=self.role_employee, is_active=True, must_change_password=False
         )
 
         self.url = "/api/manager/system/notifications/"
@@ -83,10 +83,10 @@ class TestManagerNotification:
         baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager_A = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
         self.manager_B = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
 
         # Tạo 2 thông báo: 1 của Manager A, 1 của Manager B
@@ -153,7 +153,7 @@ class TestManagerAuditLog:
         baker.make("accounts.RolePermission", role=self.role_manager, permission=perm)
 
         self.manager = baker.make(
-            "accounts.CustomUser", role=self.role_manager, is_active=True
+            "accounts.CustomUser", role=self.role_manager, is_active=True, must_change_password=False
         )
 
         # Tạo 1 AuditLog gắn với Manager này

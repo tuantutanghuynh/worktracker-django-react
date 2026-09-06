@@ -10,6 +10,7 @@ from django.conf import settings
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 from system.employee.views_employee import EmployeeAuditLogListView
+from tasks.views_attachments import TaskAttachmentDownloadView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -42,12 +43,34 @@ urlpatterns = [
     # Chat and realtime messaging routes
     path("api/chat/", include("chat.urls")),
 
+    # Tai file dinh kem: diem vao duy nhat, co kiem tra quyen theo du an.
+    path(
+        "api/attachments/<int:attachment_id>/download/",
+        TaskAttachmentDownloadView.as_view(),
+        name="task-attachment-download",
+    ),
+
     # API Documentation schemas
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]
 
+# /media/ CHI con phuc vu anh dai dien.
+#
+# Truoc day dong nay phuc vu ca thu muc MEDIA_ROOT ma khong xac thuc gi, nen
+# moi file dinh kem cua moi du an deu tai duoc bang mot URL doan ra — khong can
+# dang nhap. Gio file dinh kem chi di qua TaskAttachmentDownloadView, noi co
+# kiem tra nguoi goi co thuoc du an do khong.
+#
+# Anh dai dien van de mo: no do chinh nguoi dung tu tai len de hien cong khai
+# trong he thong, ten file la UUID nen khong do duoc, va no duoc nhung bang
+# <img src> o hang chuc cho — bat xac thuc se phai doi toan bo cho do sang tai
+# bang blob, doi lai rat it.
 urlpatterns += [
-    re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
+    re_path(
+        r"^media/(?P<path>avatars/.*)$",
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
 ]

@@ -64,7 +64,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Build and return filtered audit log queryset based on query parameters."""
-        queryset = AuditLog.objects.all().order_by('-created_at')
+        queryset = AuditLog.objects.select_related('user', 'user__profile').order_by('-created_at')
 
         actor = self.request.query_params.get('actor')
         if actor:
@@ -188,7 +188,7 @@ class DashboardView(APIView):
             'password_reset':   audit_today.filter(action='RESET_PASSWORD', table_name='users').count(),
         }
 
-        recent_security_events = AuditLog.objects.select_related('user').filter(
+        recent_security_events = AuditLog.objects.select_related('user', 'user__profile').filter(
             severity__in=[AuditLog.Severity.CRITICAL, AuditLog.Severity.WARNING]
         ).order_by('-created_at')[:9]
 

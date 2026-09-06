@@ -69,6 +69,14 @@ export const FIELD_LABELS = {
   must_change_password: 'Force Password Change',
   role: 'Role',
   role_id: 'Role',
+  role_detail: 'Role',
+  role_code: 'Role',
+  profile: 'Employee Profile',
+  client_detail: 'Client',
+  manager_detail: 'Manager',
+  manager_email: 'Manager',
+  department_detail: 'Department',
+  department_name: 'Department',
   department: 'Department',
   department_id: 'Department',
   manager: 'Manager',
@@ -118,6 +126,7 @@ export const FIELD_LABELS = {
 
 // Các trường nhạy cảm hoặc kỹ thuật nội bộ không cần hiển thị cho người dùng
 const HIDDEN_FIELDS = new Set([
+  'id',
   'password',
   'token',
   'refresh_token',
@@ -219,6 +228,37 @@ function sanitizeSummaryString(str) {
 /**
  * Tạo câu tóm tắt hành động ngắn gọn, chuẩn ngữ nghĩa nghiệp vụ người dùng.
  */
+/**
+ * Tên của ĐỐI TƯỢNG bị tác động, lấy từ chính ảnh chụp dữ liệu đã lưu trong
+ * bản ghi audit.
+ *
+ * "changed role for user account #5" bắt người đọc phải tự đi tra #5 là ai —
+ * vô dụng với một nhật ký kiểm toán. Ảnh chụp old_values/new_values đã mang
+ * sẵn tên (full_name, email, job_name, client_name...), nên lấy từ đó là
+ * không tốn thêm một truy vấn nào.
+ *
+ * Trả về chuỗi rỗng khi không tìm được, để nơi gọi tự lùi về "#id".
+ */
+export function getTargetLabel(log) {
+  const snapshot = log?.new_values || log?.old_values;
+  if (!snapshot || typeof snapshot !== 'object') return '';
+
+  // Thứ tự ưu tiên: tên người/vật thể trước, mã định danh sau.
+  const candidates = [
+    snapshot.full_name,
+    snapshot.profile?.full_name,
+    snapshot.job_name,
+    snapshot.client_name,
+    snapshot.title,
+    snapshot.name,
+    snapshot.email,
+    snapshot.job_code,
+    snapshot.task_code,
+  ];
+  const found = candidates.find((v) => typeof v === 'string' && v.trim());
+  return found ? found.trim() : '';
+}
+
 export function summarizeLog(log) {
   if (!log) return 'Activity recorded';
   if (log.summary && typeof log.summary === 'string' && log.summary.trim()) {
@@ -226,7 +266,13 @@ export function summarizeLog(log) {
   }
 
   const moduleLabel = getModuleLabel(log.table_name);
-  const ref = log.record_id && log.record_id !== 0 ? ` #${log.record_id}` : '';
+  // Ưu tiên TÊN; chỉ khi không moi được tên nào mới lùi về số hiệu bản ghi.
+  const targetName = getTargetLabel(log);
+  const ref = targetName
+    ? ` "${targetName}"`
+    : log.record_id && log.record_id !== 0
+      ? ` #${log.record_id}`
+      : '';
   const actor = log.actor_name || log.actor_email || 'User';
 
   switch (log.action) {
@@ -327,7 +373,11 @@ export function formatAuditValue(key, value) {
   }
 
   // Xử lý Foreign Key ID
-  if (typeof value === 'number' && key.endsWith('_id')) {
+  const FK_FIELDS = new Set([
+    'client', 'manager', 'job', 'task', 'assignee', 'department', 'role',
+    'locked_by', 'unlocked_by', 'user', 'actor',
+  ]);
+  if (typeof value === 'number' && (key.endsWith('_id') || FK_FIELDS.has(key))) {
     return `#${value}`;
   }
 
@@ -349,6 +399,33 @@ export function formatAuditValue(key, value) {
   }
 
   if (typeof value === 'object') {
+    // Object chỉ TRỎ tới một bản ghi khác (role, client, manager...) thì chỉ
+    // in tên của bản ghi đó.
+    //
+    // Đổ hết mọi khoá ra sẽ thành "Code: Employee, Name: Employee, Active
+    // Status: Active" — ba mẩu nói cùng một chuyện, người đọc phải tự lọc xem
+    // mẩu nào mới là thứ đã đổi.
+    //
+    // Điều kiện MỌI khoá đều thuộc nhóm định danh là bắt buộc, không phải cho
+    // chặt chẽ suông: một object như `profile` còn mang department, manager,
+    // joined_date... Rút gọn nó về mỗi họ tên thì khi ai đó đổi phòng ban, cả
+    // giá trị cũ lẫn mới đều in ra cùng một cái tên — thay đổi thật bị giấu
+    // mất, đúng thứ mà nhật ký kiểm toán không được phép làm.
+    const IDENTITY_KEYS = new Set([
+      'id', 'code', 'name', 'is_active', 'email', 'full_name', 'title',
+      'client_name', 'job_name', 'job_code', 'task_code', 'avatar_url',
+    ]);
+    const chiLaThamChieu = Object.keys(value).every((k) => IDENTITY_KEYS.has(k));
+    const displayName =
+      value.name || value.full_name || value.title ||
+      value.client_name || value.job_name || value.email;
+    if (chiLaThamChieu && typeof displayName === 'string' && displayName.trim()) {
+      // Chỉ nói thêm khi bản ghi KHÔNG còn hiệu lực — im lặng nghĩa là bình
+      // thường, còn dán nhãn "Active" lên mọi dòng thì thành nhiễu.
+      const ngungHoatDong = value.is_active === false;
+      return ngungHoatDong ? `${displayName.trim()} (deactivated)` : displayName.trim();
+    }
+
     const parts = Object.entries(value)
       .filter(([k, v]) => !isHiddenField(k) && v !== null && v !== '')
       .map(([k, v]) => `${getFieldLabel(k)}: ${formatAuditValue(k, v) || v}`);

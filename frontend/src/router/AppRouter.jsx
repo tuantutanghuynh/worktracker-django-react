@@ -44,7 +44,6 @@ const AdminDashboardPage = lazy(() => import("../pages/admin/DashboardPage").the
 const AdminClientsPage = lazy(() => import("../pages/admin/ClientsPage").then((m) => ({ default: m.ClientsPage })))
 const AdminDepartmentsPage = lazy(() => import("../pages/admin/DepartmentsPage").then((m) => ({ default: m.DepartmentsPage })))
 const AdminSearchUserPage = lazy(() => import("../pages/admin/SearchUserPage").then((m) => ({ default: m.SearchUserPage })))
-const AdminJobsPage = lazy(() => import("../pages/admin/JobsPage").then((m) => ({ default: m.JobsPage })))
 const AdminAuditLogsPage = lazy(() => import("../pages/admin/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage })))
 const AdminTimesheetControlPage = lazy(() => import("../pages/admin/TimesheetControlPage").then((m) => ({ default: m.TimesheetControlPage })))
 const AdminNotificationsPage = lazy(() => import("../pages/admin/NotificationsPage").then((m) => ({ default: m.NotificationsPage })))
@@ -148,7 +147,6 @@ export function AppRouter() {
                                 <Route path="clients" element={<AdminClientsPage />} />
                                 <Route path="departments" element={<AdminDepartmentsPage />} />
                                 <Route path="users/search" element={<AdminSearchUserPage />} />
-                                <Route path="jobs" element={<AdminJobsPage />} />
                                 <Route path="audit-logs" element={<AdminAuditLogsPage />} />
                                 <Route path="timesheets" element={<AdminTimesheetControlPage />} />
                                 <Route path="support" element={<AdminSupportDeskPage />} />

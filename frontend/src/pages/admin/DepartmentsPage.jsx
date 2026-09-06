@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Trash2, Search, Network } from 'lucide-react';
 import BaseModal from '../../components/common/modal/BaseModal';
 import ConfirmModal from '../../components/common/modal/ConfirmModal';
 import InputField from '../../components/common/forms/InputField';
 import SelectDropdown from '../../components/common/forms/SelectDropdown';
+import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import SortableHeader from '../../components/common/table/SortableHeader';
 import PaginationBar from '../../components/common/table/PaginationBar';
 import ExportButton from '../../components/common/table/ExportButton';
@@ -49,24 +50,30 @@ export function DepartmentsPage() {
   const [modalState, setModalState] = useState(null); // null | { mode: 'create' } | { mode: 'edit', department }
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [search, setSearch] = useState('');
+  const [managerFilter, setManagerFilter] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const [ordering, toggleSort] = useOrdering();
   const [page, setPage] = useState(1);
 
   // Adjusting state during render instead of a useEffect — see the same
   // comment on ClientsPage for why.
-  const filterKey = `${debouncedSearch}|${ordering}`;
+  const filterKey = `${debouncedSearch}|${managerFilter}|${ordering}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setPage(1);
   }
 
-  const { data, isLoading } = useAdminDepartments({
+  // Moi tham so o day deu la filter DepartmentViewSet.get_queryset() hieu san,
+  // nen dua nguyen cuc nay cho endpoint export thi file tai ve khop dung nhung
+  // gi dang hien tren man hinh.
+  const listParams = {
     search: debouncedSearch || undefined,
+    manager: managerFilter || undefined,
     ordering: ordering || undefined,
-    page,
-  });
+  };
+
+  const { data, isLoading } = useAdminDepartments({ ...listParams, page });
   const departments = data?.results || [];
   const totalCount = data?.count || 0;
 
@@ -78,6 +85,13 @@ export function DepartmentsPage() {
   const managers = managersPage?.results || [];
   const managerOptions = managers.map((m) => ({ value: String(m.id), label: m.email }));
   const managerEmailById = Object.fromEntries(managers.map((m) => [m.id, m.email]));
+  // Muc "No manager assigned" la thu dang quan tam nhat: phong ban khong co
+  // truong phong thi khong ai duyet cong cho ca phong do.
+  const managerFilterOptions = [
+    { value: '', label: 'All managers' },
+    { value: 'none', label: 'No manager assigned' },
+    ...managers.map((m) => ({ value: String(m.id), label: m.email })),
+  ];
 
   const {
     register,
@@ -141,38 +155,57 @@ export function DepartmentsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-slate-900">Departments</h1>
-        <div className="flex items-center gap-2">
-          <ExportButton
-            url="/auth/departments/export/"
-            params={{ search: debouncedSearch || undefined, ordering: ordering || undefined }}
-            filename="worktracker_departments.xlsx"
-          />
-          <button
-            type="button"
-            onClick={openCreate}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" /> New Department
-          </button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={Network}
+        title="Departments"
+        subtitle="Organisational units and the manager accountable for each one."
+        count={totalCount}
+        countLabel="department"
+        actions={
+          <>
+            <ExportButton
+              url="/auth/departments/export/"
+              params={listParams}
+              filename="worktracker_departments.xlsx"
+            />
+            <button
+              type="button"
+              onClick={openCreate}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" /> New Department
+            </button>
+          </>
+        }
+      />
 
-      <div className="relative max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, manager..."
-          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-        />
+      <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, manager..."
+            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        </div>
+        <div className="w-full sm:w-64">
+          <SelectDropdown
+            theme="light"
+            searchable
+            options={managerFilterOptions}
+            value={managerFilter}
+            onChange={setManagerFilter}
+            placeholder="All managers"
+          />
+        </div>
       </div>
 
       {/* table-fixed + width theo % nên bảng luôn vừa khung, không kéo ngang. */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] table-fixed text-left text-xs">
           <thead className="bg-slate-50">
             <tr>
               <SortableHeader label="Name" sortKey="name" ordering={ordering} onSort={toggleSort} className="w-[25%]" />
@@ -197,8 +230,19 @@ export function DepartmentsPage() {
               </tr>
             )}
             {departments.map((dept) => (
-              <tr key={dept.id}>
-                <td className="px-3 py-2 font-medium text-slate-900 truncate" title={dept.name}>{dept.name}</td>
+              <tr key={dept.id} className="transition-colors hover:bg-slate-50/70">
+                {/* Bam vao TEN de mo the sua — cot Actions chi con thao tac
+                    xoa, dung nham la mat du lieu chu khong chi mo mot modal. */}
+                <td className="px-3 py-2 font-medium text-slate-900 truncate">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(dept)}
+                    className="max-w-full truncate text-left hover:text-blue-600 hover:underline cursor-pointer"
+                    title={dept.name}
+                  >
+                    {dept.name}
+                  </button>
+                </td>
                 <td className="px-3 py-2 text-slate-500 truncate" title={dept.description || ''}>
                   {dept.description || '—'}
                 </td>
@@ -209,13 +253,7 @@ export function DepartmentsPage() {
                   <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
-                      onClick={() => openEdit(dept)}
-                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
+                      title="Delete department"
                       onClick={() => setDeleteTarget(dept)}
                       className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                     >
@@ -227,6 +265,7 @@ export function DepartmentsPage() {
             ))}
           </tbody>
         </table>
+        </div>
 
         <PaginationBar
           page={page}

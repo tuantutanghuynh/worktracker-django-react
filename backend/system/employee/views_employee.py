@@ -4,6 +4,7 @@ Description: Employee-facing API views for managing personal notifications and r
 """
 
 from django.shortcuts import get_object_or_404
+from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -12,20 +13,20 @@ from rest_framework import status
 from system.models import Notification, AuditLog
 from system.employee.serializers_employee import NotificationSerializer, EmployeeAuditLogSerializer
 from accounts.permissions import HasPermission
+from system.pagination import SelfServicePageNumberPagination
 
 
-class NotificationListView(APIView):
-    """Retrieve list of notification messages destined for the authenticated employee."""
+class NotificationListView(ListAPIView):
+    """Retrieve a paginated list of notification messages destined for the authenticated employee."""
+    # Doi tu APIView sang ListAPIView de co phan trang: truoc day view nay tra
+    # ve TOAN BO thong bao cua nguoi dung, khong gioi han.
     permission_classes = [IsAuthenticated]
+    serializer_class = NotificationSerializer
+    pagination_class = SelfServicePageNumberPagination
 
-    def get(self, request):
+    def get_queryset(self):
         """Return personal notifications ordered by creation date descending."""
-        notifications = Notification.objects.filter(
-            user=request.user
-        ).order_by("-created_at")
-
-        serializer = NotificationSerializer(notifications, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Notification.objects.filter(user=self.request.user).order_by("-created_at")
 
 
 class NotificationMarkReadView(APIView):
@@ -66,13 +67,17 @@ class NotificationMarkAllReadView(APIView):
         return self.patch(request)
 
 
-class EmployeeAuditLogListView(APIView):
-    """Retrieve audit log records representing actions performed strictly by the employee."""
+class EmployeeAuditLogListView(ListAPIView):
+    """Retrieve a paginated audit log of actions performed strictly by the employee."""
     permission_classes = [HasPermission]
     required_permission = "audit:view"
+    serializer_class = EmployeeAuditLogSerializer
+    pagination_class = SelfServicePageNumberPagination
 
-    def get(self, request):
+    def get_queryset(self):
         """Return self-audit logs ordered by creation date descending."""
-        logs = AuditLog.objects.filter(user=request.user).order_by("-created_at")
-        serializer = EmployeeAuditLogSerializer(logs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return (
+            AuditLog.objects.filter(user=self.request.user)
+            .select_related("user", "user__profile")
+            .order_by("-created_at")
+        )

@@ -43,6 +43,7 @@ export default function SelectDropdown({
   const selectedOption = options.find(o => String(o.value) === String(value));
 
   const [openUpward, setOpenUpward] = useState(false);
+  const menuRef = useRef(null);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -55,17 +56,43 @@ export default function SelectDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Tự động tính toán hướng mở (lật lên trên nếu phía dưới không đủ 250px)
-  useEffect(() => {
-    if (isOpen && dropdownRef.current) {
-      const rect = dropdownRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      if (spaceBelow < 250 && rect.top > 250) {
-        setOpenUpward(true);
-      } else {
-        setOpenUpward(false);
-      }
+  // Tìm khối cha gần nhất có thể cuộn dọc (thân modal, panel, ...).
+  // null nghĩa là dropdown nằm thẳng trên trang, không có khối cuộn nào.
+  const timKhoiCuon = (el) => {
+    for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) {
+      const overflowY = window.getComputedStyle(p).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') return p;
     }
+    return null;
+  };
+
+  // Tự động tính toán hướng mở.
+  //
+  // Khi dropdown nằm trong một khối cuộn được (điển hình: thân modal), LUÔN mở
+  // xuống dưới rồi cuộn khối đó để lộ menu ra. Lật lên trên trong modal là sai:
+  // menu đè lên chính những ô nhập phía trên nó — bấm đổi Manager thì ô Name bị
+  // che mất, đúng lỗi đang gặp. Menu tràn khỏi đáy khối cuộn chỉ làm khối đó
+  // cuộn được thêm, không mất gì.
+  //
+  // Ngoài khối cuộn (trang phẳng) thì giữ nguyên cách cũ: lật lên nếu phía dưới
+  // không đủ 250px mà phía trên thì đủ — ở đó cuộn không cứu được vì menu sẽ
+  // nằm ngoài khung nhìn thật.
+  useEffect(() => {
+    if (!isOpen || !dropdownRef.current) return;
+
+    const khoiCuon = timKhoiCuon(dropdownRef.current);
+    if (khoiCuon) {
+      setOpenUpward(false);
+      // Đợi menu render xong mới cuộn, nếu không chiều cao đo được vẫn là 0.
+      const id = requestAnimationFrame(() => {
+        menuRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+      return () => cancelAnimationFrame(id);
+    }
+
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setOpenUpward(spaceBelow < 250 && rect.top > 250);
   }, [isOpen]);
 
   const stripAccents = (str) => {
@@ -154,7 +181,7 @@ export default function SelectDropdown({
 
       {/* Dropdown Menu Panel */}
       {isOpen && !disabled && (
-        <div className={cn(
+        <div ref={menuRef} className={cn(
           "absolute left-0 right-0 z-50 border rounded-xl shadow-2xl overflow-hidden",
           openUpward ? "bottom-full mb-1 animate-slide-in-bottom" : "top-full mt-1 animate-slide-in-top",
           isLight ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"

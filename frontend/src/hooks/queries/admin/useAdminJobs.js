@@ -11,10 +11,11 @@ export const adminJobKeys = {
   list: (params = {}) => [...adminJobKeys.all, 'list', params],
 };
 
-export function useAdminJobs(params = {}) {
+export function useAdminJobs(params = {}, options = {}) {
   return useQuery({
     queryKey: adminJobKeys.list(params),
     queryFn: () => listJobs(params),
+    ...options,
   });
 }
 

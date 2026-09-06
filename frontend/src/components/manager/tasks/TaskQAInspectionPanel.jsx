@@ -18,8 +18,8 @@ import { format, parseISO } from "date-fns";
 
 import UserAvatar from "../../common/avatar/UserAvatar";
 import { cn } from "../../../utils/cn";
+import { downloadAttachment } from '../../../utils/downloadAttachment';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 function formatDateSafe(dateStr, pattern = "dd MMM yyyy") {
   if (!dateStr) return "—";
@@ -28,12 +28,6 @@ function formatDateSafe(dateStr, pattern = "dd MMM yyyy") {
   } catch {
     return dateStr;
   }
-}
-
-function getFileDownloadUrl(fileUrl) {
-  if (!fileUrl) return "#";
-  if (fileUrl.startsWith("http")) return fileUrl;
-  return `${API_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 }
 
 /**
@@ -257,16 +251,15 @@ export default function TaskQAInspectionPanel({
                         </div>
                       </div>
 
-                      <a
-                        href={getFileDownloadUrl(file.file_url || file.file)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
+                      {/* Nut, khong phai the <a>: xem TaskAttachmentsTab. */}
+                      <button
+                        type="button"
+                        onClick={() => downloadAttachment(file)}
                         className="p-1.5 bg-white hover:bg-purple-600 text-purple-600 hover:text-white border border-purple-200 rounded-lg transition shadow-2xs cursor-pointer"
                         title="Download Deliverable"
                       >
                         <Download className="w-3.5 h-3.5" />
-                      </a>
+                      </button>
                     </div>
                   ))}
                 </div>
