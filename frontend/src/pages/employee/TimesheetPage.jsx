@@ -99,7 +99,7 @@ export function TimesheetPage() {
             .reduce((sum, e) => sum + Number(e.hours_spent), 0)
     }, [entries])
 
-    const [view, setView] = useState("list")
+    const [view, setView] = useState("week")
     const [weekOffset, setWeekOffset] = useState(0)
 
     function handleClearFilters() {
