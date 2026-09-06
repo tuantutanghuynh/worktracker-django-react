@@ -343,6 +343,7 @@ export default function ManagerJobDetailPage() {
         onClose={() => setCreateTaskDrawerOpen(false)}
         job={job}
         employeeOptions={employeeOptions}
+        employeesList={Array.isArray(employeesResponse) ? employeesResponse : employeesResponse?.results || []}
       />
 
       {/* Modal: Đổi trạng thái Job */}
