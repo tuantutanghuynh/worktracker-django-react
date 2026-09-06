@@ -41,6 +41,7 @@ TuDocs/
 .DS_Store
 .vscode/*
 .claude/*
+.agents/
 !.vscode/extensions.json
 .idea/
 
