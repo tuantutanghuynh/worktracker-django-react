@@ -80,116 +80,15 @@ class Command(BaseCommand):
                                 pass
 
             # -----------------------------------------------------------------
-            # 1. ROLES, PERMISSIONS & RBAC MAPPINGS
+            # 1. ROLES, PERMISSIONS & RBAC MAPPINGS (Single Source of Truth: seed_roles)
             # -----------------------------------------------------------------
-            self.stdout.write("1. Setting up Roles, Permissions & RBAC mappings...")
-            role_admin, _ = Role.objects.get_or_create(code="ADMIN", defaults={"name": "System Administrator", "description": "Full enterprise system administration"})
-            role_manager, _ = Role.objects.get_or_create(code="MANAGER", defaults={"name": "Project Manager", "description": "Project scoping, team management & task approvals"})
-            role_employee, _ = Role.objects.get_or_create(code="EMPLOYEE", defaults={"name": "Specialist / Engineer", "description": "Task execution and time logging"})
+            self.stdout.write("1. Setting up Roles, Permissions & RBAC mappings via seed_roles...")
+            from django.core.management import call_command
+            call_command('seed_roles')
 
-            permissions_data = [
-                # User & Team Management
-                {'code': 'user:view', 'name': 'View employee account list and details'},
-                {'code': 'user:create', 'name': 'Create new employee accounts'},
-                {'code': 'user:update', 'name': 'Edit employee account info and profile'},
-                {'code': 'user:lock', 'name': 'Lock or unlock an employee account'},
-                {'code': 'user:assign_role', 'name': 'Change the role assigned to an employee account'},
-                {'code': 'user:reset_password', 'name': 'Reset password for an employee account'},
-                {'code': 'team:view', 'name': 'View employee list for task assignment'},
-                {'code': 'team:assign_department', 'name': 'Assign employee to department'},
-
-                # Client Management
-                {'code': 'client:view', 'name': 'View client list and details'},
-                {'code': 'client:create', 'name': 'Add new clients to the system'},
-                {'code': 'client:update', 'name': 'Edit client information'},
-                {'code': 'client:delete', 'name': 'Soft-delete a client by setting is_active to False'},
-                {'code': 'client:export', 'name': 'Export client list to Excel or CSV'},
-
-                # Job Management
-                {'code': 'job:view', 'name': 'View project list and details'},
-                {'code': 'job:create', 'name': 'Create a new project and assign a manager'},
-                {'code': 'job:update', 'name': 'Edit project info such as name, deadline, and status'},
-                {'code': 'job:change_status', 'name': 'Change project status (Planning, Active, Completed)'},
-                {'code': 'job:delete', 'name': 'Cancel a project by setting its status to CANCELLED'},
-                {'code': 'job:export', 'name': 'Export project list to Excel or CSV'},
-                {'code': 'job:assign_manager', 'name': 'Change the manager responsible for a project'},
-
-                # Task Management
-                {'code': 'task:view', 'name': 'View task list and details within a project'},
-                {'code': 'task:create', 'name': 'Create new tasks and assign them to employees'},
-                {'code': 'task:update', 'name': 'Edit task info such as title, deadline, and priority'},
-                {'code': 'task:change_status', 'name': 'Change task status on Kanban board'},
-                {'code': 'task:delete', 'name': 'Delete a task'},
-                {'code': 'task:review', 'name': 'Approve or reject a completed task submission'},
-                {'code': 'task:cancel', 'name': 'Cancel a task'},
-                {'code': 'task:comment', 'name': 'Add comments to task discussion'},
-                {'code': 'task:attachment', 'name': 'Manage task file attachments'},
-                {'code': 'task:follow', 'name': 'Follow or unfollow a task'},
-
-                # Timesheet Control & TimeLock
-                {'code': 'timesheet:view', 'name': 'View employee timesheets and work hour logs'},
-                {'code': 'timesheet:lock', 'name': 'Lock a monthly timesheet period to finalize data'},
-                {'code': 'timesheet:unlock', 'name': 'Unlock a previously locked timesheet period for corrections'},
-                {'code': 'timesheet:export', 'name': 'Export timesheet reports to Excel or PDF'},
-                {'code': 'timesheet:review', 'name': 'Approve or reject employee work log entries'},
-                {'code': 'timesheet:correct', 'name': 'Correct hours spent on employee work log'},
-                {'code': 'timesheet:create', 'name': 'Log new work hours onto a task'},
-                {'code': 'timesheet:void', 'name': 'Void an erroneous work log entry'},
-                {'code': 'timesheet:edit', 'name': "Edit hours/description on your own pending work log"},
-                {'code': 'timesheet:manage', 'name': 'Handle work hour violations such as over-limit or missing'},
-                {'code': 'timelock:view', 'name': 'View locked timesheet periods'},
-                {'code': 'timelock:lock', 'name': 'Lock timesheet period for a specific job'},
-                {'code': 'timelock:unlock', 'name': 'Unlock timesheet period for a specific job'},
-                {'code': 'timelock:global_manage', 'name': 'Lock or unlock the timesheet period company-wide'},
-
-                # Audit, Notification, Reports, Department
-                {'code': 'audit:view', 'name': 'View system audit trail and action history'},
-                {'code': 'audit:export', 'name': 'Export audit logs to file for archiving or reporting'},
-                {'code': 'notification:view', 'name': 'View and manage personal notifications'},
-                {'code': 'report:view', 'name': 'View company-wide performance and summary reports'},
-                {'code': 'report:export', 'name': 'Export reports to PDF, Excel, or CSV'},
-                {'code': 'department:view', 'name': 'View departments in the system'},
-                {'code': 'department:create', 'name': 'Create a new department in the system'},
-                {'code': 'department:update', 'name': 'Edit department information'},
-                {'code': 'department:delete', 'name': 'Delete a department from the system'},
-                {'code': 'role:manage', 'name': 'Add or edit roles and assign permissions to them'},
-            ]
-
-            perm_objects = {}
-            for item in permissions_data:
-                perm, _ = Permission.objects.get_or_create(code=item['code'], defaults={'name': item['name']})
-                perm_objects[item['code']] = perm
-
-            # Map permissions to roles
-            # 1. Admin gets all
-            for perm in perm_objects.values():
-                RolePermission.objects.get_or_create(role=role_admin, permission=perm)
-
-            # 2. Manager permissions
-            manager_perm_codes = [
-                'user:view', 'team:view', 'team:assign_department',
-                'client:view', 'client:export',
-                'job:view', 'job:create', 'job:update', 'job:change_status', 'job:export',
-                'task:view', 'task:create', 'task:update', 'task:change_status', 'task:review', 'task:cancel', 'task:comment', 'task:attachment', 'task:follow',
-                'timesheet:view', 'timesheet:review', 'timesheet:correct', 'timesheet:create', 'timesheet:edit', 'timesheet:void', 'timesheet:export',
-                'timelock:view', 'timelock:lock', 'timelock:unlock',
-                'audit:view', 'audit:export', 'notification:view',
-                'report:view', 'report:export', 'department:view',
-            ]
-            for code in manager_perm_codes:
-                if code in perm_objects:
-                    RolePermission.objects.get_or_create(role=role_manager, permission=perm_objects[code])
-
-            # 3. Employee permissions
-            employee_perm_codes = [
-                'job:view',
-                'task:view', 'task:change_status', 'task:comment', 'task:attachment', 'task:follow',
-                'timesheet:create', 'timesheet:edit', 'timesheet:view',
-                'notification:view',
-            ]
-            for code in employee_perm_codes:
-                if code in perm_objects:
-                    RolePermission.objects.get_or_create(role=role_employee, permission=perm_objects[code])
+            role_admin = Role.objects.get(code="ADMIN")
+            role_manager = Role.objects.get(code="MANAGER")
+            role_employee = Role.objects.get(code="EMPLOYEE")
 
             # -----------------------------------------------------------------
             # 2. DEPARTMENTS SETUP

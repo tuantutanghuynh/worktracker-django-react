@@ -11,7 +11,8 @@ python manage.py collectstatic --no-input
 echo "==> [3/4] Running Database Migrations..."
 python manage.py migrate --no-input
 
-echo "==> [4/4] Seeding Master Enterprise Dataset..."
-python manage.py seed_data || echo "Seed completed or skipped"
+echo "==> [4/4] Seeding Roles, Permissions & Master Dataset..."
+python manage.py seed_roles || echo "seed_roles completed"
+python manage.py seed_data || echo "seed_data completed"
 
 echo "==> Build completed successfully!"
