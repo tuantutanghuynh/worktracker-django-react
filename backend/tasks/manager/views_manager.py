@@ -179,7 +179,11 @@ class TaskViewSet(viewsets.ModelViewSet):
         """Update mutable task metadata or reassign responsible employee."""
         task = self.get_object()
 
-        serializer = ManagerTaskUpdateSerializer(data=request.data)
+        serializer = ManagerTaskUpdateSerializer(
+            instance=task,
+            data=request.data,
+            partial=True,
+        )
         serializer.is_valid(raise_exception=True)
 
         updated_task = update_task(

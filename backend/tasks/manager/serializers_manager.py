@@ -366,12 +366,12 @@ class ManagerTaskUpdateSerializer(serializers.Serializer):
         effective_start = start_date if start_date is not None else getattr(self.instance, "start_date", None)
         effective_deadline = deadline if deadline is not None else getattr(self.instance, "deadline", None)
 
-        if deadline and deadline < today:
+        if deadline and (self.instance is None or deadline != self.instance.deadline) and deadline < today:
             raise serializers.ValidationError(
                 {"deadline": f"Task deadline cannot be in the past (must be on or after {today})."}
             )
 
-        if start_date and start_date < today:
+        if start_date and (self.instance is None or start_date != self.instance.start_date) and start_date < today:
             raise serializers.ValidationError(
                 {"start_date": f"Task start date cannot be in the past (must be on or after {today})."}
             )
