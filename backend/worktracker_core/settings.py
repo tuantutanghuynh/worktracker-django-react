@@ -9,6 +9,17 @@ from pathlib import Path
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
+
+try:
+    import whitenoise
+    WHITENOISE_AVAILABLE = True
+except ImportError:
+    WHITENOISE_AVAILABLE = False
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
@@ -50,6 +61,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+]
+if WHITENOISE_AVAILABLE:
+    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
+
+MIDDLEWARE.extend([
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -57,7 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-]
+])
 
 ROOT_URLCONF = 'worktracker_core.urls'
 
@@ -79,16 +95,22 @@ TEMPLATES = [
 WSGI_APPLICATION = 'worktracker_core.wsgi.application'
 ASGI_APPLICATION = 'worktracker_core.asgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME':     os.environ.get('DB_NAME'),
-        'USER':     os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST':     os.environ.get('DB_HOST'),
-        'PORT':     os.environ.get('DB_PORT'),
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL and dj_database_url:
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME':     os.environ.get('DB_NAME'),
+            'USER':     os.environ.get('DB_USER'),
+            'PASSWORD': os.environ.get('DB_PASSWORD'),
+            'HOST':     os.environ.get('DB_HOST'),
+            'PORT':     os.environ.get('DB_PORT'),
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -104,6 +126,18 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if WHITENOISE_AVAILABLE
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        ),
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -171,53 +205,93 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5174',
 ]
 
+extra_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+if extra_cors:
+    CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in extra_cors.split(",") if origin.strip()])
+
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+if FRONTEND_URL and FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
 
-REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
-REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/.*\.vercel\.app$",
+    r"^https:\/\/.*\.onrender\.com$",
+]
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2?protocol=2",
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
-    },
-    "blacklist": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1?protocol=2", 
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+REDIS_URL = os.environ.get("REDIS_URL")
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
+        },
+        "blacklist": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL, 
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
         }
     }
-}
-
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [
-                {
-                    "address": f"redis://{REDIS_HOST}:{REDIS_PORT}/4?protocol=2",
-                    "socket_timeout": None,
-                    "socket_connect_timeout": 5,
-                    "socket_keepalive": True,
-                    "health_check_interval": 30,
-                }
-            ],
-            "prefix": "worktracker",
-            "capacity": 1500,
-            "expiry": 60,
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+                "prefix": "worktracker",
+                "capacity": 1500,
+                "expiry": 60,
+            },
         },
-    },
-}
+    }
+    CELERY_BROKER_URL = REDIS_URL
+else:
+    REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
+    REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2?protocol=2",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
+        },
+        "blacklist": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1?protocol=2", 
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
+        }
+    }
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [
+                    {
+                        "address": f"redis://{REDIS_HOST}:{REDIS_PORT}/4?protocol=2",
+                        "socket_timeout": None,
+                        "socket_connect_timeout": 5,
+                        "socket_keepalive": True,
+                        "health_check_interval": 30,
+                    }
+                ],
+                "prefix": "worktracker",
+                "capacity": 1500,
+                "expiry": 60,
+            },
+        },
+    }
+    CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/2'
 
 WORK_DAYS_PER_WEEK = int(os.environ.get("WORK_DAYS_PER_WEEK", 6))
 DAILY_WORKING_HOURS = int(os.environ.get("DAILY_WORKING_HOURS", 8))
 TIMESHEET_WARNING_THRESHOLD = float(os.environ.get("TIMESHEET_WARNING_THRESHOLD", 0.8))
 
-CELERY_BROKER_URL        = f'redis://{REDIS_HOST}:{REDIS_PORT}/2'
 CELERY_RESULT_BACKEND    = 'django-db'
 CELERY_CACHE_BACKEND     = 'django-cache'
 CELERY_ACCEPT_CONTENT    = ['json']
