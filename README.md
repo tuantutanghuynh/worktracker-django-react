@@ -6,8 +6,8 @@
 
 ## Team Members
 
-Tang Huynh Tuan Tu - Student1685504
-Tran Le Minh Anh    -   Student1686151
+Tang Huynh Tuan Tu - Student1685504  
+Tran Le Minh Anh    -   Student1686151  
 Nguyen Duc Long    -  Student1685473
 
 ## Project Overview
@@ -23,51 +23,61 @@ Every state-changing action (task transitions, timesheet edits, account changes,
 ## Screenshots
 
 ### Sign In
-![Sign In](docs/screenshots/login/sign-in.png)
 
-### Shared Across Roles — Profile, Team Chat & Notifications
-![Profile](docs/screenshots/common/profile.png)
-![Team Chat](docs/screenshots/common/team-chat.png)
-![Notifications](docs/screenshots/common/notifications.png)
+<p align="center"><img src="docs/screenshots/login/sign-in.png" width="600"></p>
 
-### Admin — Dashboard
-![Admin Dashboard](docs/screenshots/admin/dashboard.png)
+### Shared Across Roles
 
-### Admin — User List
-![Admin User List](docs/screenshots/admin/user-list.png)
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/screenshots/common/profile.png" width="260"><br><sub><b>Profile</b></sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/common/team-chat.png" width="260"><br><sub><b>Team Chat</b></sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/common/notifications.png" width="260"><br><sub><b>Notifications</b></sub></td>
+</tr>
+</table>
 
-### Admin — Clients
-![Admin Clients](docs/screenshots/admin/clients.png)
+### Admin
 
-### Admin — Audit Logs
-![Admin Audit Logs](docs/screenshots/admin/audit-logs.png)
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/admin/dashboard.png" width="400"><br><sub><b>Dashboard</b></sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/admin/user-list.png" width="400"><br><sub><b>User List</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/admin/clients.png" width="400"><br><sub><b>Clients</b></sub></td>
+<td align="center"><img src="docs/screenshots/admin/audit-logs.png" width="400"><br><sub><b>Audit Logs</b></sub></td>
+</tr>
+</table>
 
-### Manager — Dashboard
-![Manager Dashboard](docs/screenshots/manager/dashboard.png)
+### Manager
 
-### Manager — Create Project (2-column enterprise form)
-![Manager Create Project](docs/screenshots/manager/create-project.png)
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/manager/dashboard.png" width="400"><br><sub><b>Dashboard</b></sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/manager/create-project.png" width="400"><br><sub><b>Create Project (2-column enterprise form)</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/manager/kanban-board.png" width="400"><br><sub><b>Kanban Board</b></sub></td>
+<td align="center"><img src="docs/screenshots/manager/qa-review-queue.png" width="400"><br><sub><b>QA Review Queue</b></sub></td>
+</tr>
+</table>
 
-### Manager — Kanban Board
-![Manager Kanban Board](docs/screenshots/manager/kanban-board.png)
+### Employee
 
-### Manager — QA Review Queue
-![Manager QA Review Queue](docs/screenshots/manager/qa-review-queue.png)
-
-### Employee — Dashboard
-![Employee Dashboard](docs/screenshots/employee/dashboard.png)
-
-### Employee — My Tasks
-![Employee My Tasks](docs/screenshots/employee/my-tasks.png)
-
-### Employee — Task Detail Drawer
-![Employee Task Detail Drawer](docs/screenshots/employee/task-detail-drawer.png)
-
-### Employee — Timesheet (Week View)
-![Employee Timesheet Week View](docs/screenshots/employee/timesheet-week-view.png)
-
-### Employee — My Performance
-![Employee My Performance](docs/screenshots/employee/my-performance.png)
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/employee/dashboard.png" width="400"><br><sub><b>Dashboard</b></sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/employee/my-tasks.png" width="400"><br><sub><b>My Tasks</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/employee/task-detail-drawer.png" width="400"><br><sub><b>Task Detail Drawer</b></sub></td>
+<td align="center"><img src="docs/screenshots/employee/timesheet-week-view.png" width="400"><br><sub><b>Timesheet (Week View)</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/employee/my-performance.png" width="400"><br><sub><b>My Performance</b></sub></td>
+<td></td>
+</tr>
+</table>
 
 ## API Documentation
 
