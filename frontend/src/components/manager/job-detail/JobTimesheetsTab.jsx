@@ -128,7 +128,7 @@ export default function JobTimesheetsTab({
             <Clock className='w-4 h-4 text-blue-600' />
           </div>
           <div className='text-2xl font-extrabold text-slate-900 font-mono'>
-            {timesheetsMetrics.totalHours} <span className='text-xs font-normal text-slate-400'>hrs</span>
+            {timesheetsMetrics.totalHours || "0.0"} <span className='text-xs font-normal text-slate-400'>hrs</span>
           </div>
         </div>
 
@@ -138,7 +138,7 @@ export default function JobTimesheetsTab({
             <CheckCircle2 className='w-4 h-4 text-emerald-600' />
           </div>
           <div className='text-2xl font-extrabold text-emerald-600 font-mono'>
-            {timesheetsMetrics.approvedHours} <span className='text-xs font-normal text-slate-400'>hrs</span>
+            {timesheetsMetrics.approvedHours || "0.0"} <span className='text-xs font-normal text-slate-400'>hrs</span>
           </div>
         </div>
 
@@ -148,7 +148,7 @@ export default function JobTimesheetsTab({
             <AlertCircle className='w-4 h-4 text-amber-600' />
           </div>
           <div className='text-2xl font-extrabold text-amber-600 font-mono'>
-            {timesheetsMetrics.pendingHours} <span className='text-xs font-normal text-slate-400'>hrs</span>
+            {timesheetsMetrics.pendingHours || "0.0"} <span className='text-xs font-normal text-slate-400'>hrs</span>
           </div>
         </div>
       </div>

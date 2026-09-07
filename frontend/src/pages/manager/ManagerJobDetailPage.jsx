@@ -189,6 +189,16 @@ export default function ManagerJobDetailPage() {
       : timesheetsData?.results || [];
 
     const totalHours = rawList.reduce((acc, log) => acc + (parseFloat(log.hours_spent) || 0), 0);
+    const approvedHours = rawList
+      .filter((log) => log.review_status === 'APPROVED')
+      .reduce((acc, log) => acc + (parseFloat(log.hours_spent) || 0), 0);
+    const pendingHours = rawList
+      .filter((log) => log.review_status === 'PENDING')
+      .reduce((acc, log) => acc + (parseFloat(log.hours_spent) || 0), 0);
+    const rejectedHours = rawList
+      .filter((log) => log.review_status === 'REJECTED')
+      .reduce((acc, log) => acc + (parseFloat(log.hours_spent) || 0), 0);
+
     const pendingReview = rawList.filter((log) => log.review_status === 'PENDING').length;
     const approved = rawList.filter((log) => log.review_status === 'APPROVED').length;
     const rejected = rawList.filter((log) => log.review_status === 'REJECTED').length;
@@ -197,6 +207,9 @@ export default function ManagerJobDetailPage() {
       timesheetsList: rawList,
       timesheetsMetrics: {
         totalHours: totalHours.toFixed(1),
+        approvedHours: approvedHours.toFixed(1),
+        pendingHours: pendingHours.toFixed(1),
+        rejectedHours: rejectedHours.toFixed(1),
         totalLogs: rawList.length,
         pendingReview,
         approved,
