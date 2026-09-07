@@ -1,7 +1,3 @@
-Trần Lê Minh Anh — Admin scope
-Nguyễn Đức Long — Manager scope
-Tăng Huỳnh Tuấn Tú — Auth & Employee scope
-
 # WorkTracker Pro
 
 ### FPT Aptech — Capstone Project
@@ -10,11 +6,9 @@ Tăng Huỳnh Tuấn Tú — Auth & Employee scope
 
 ## Team Members
 
-| Member | Scope |
-|---|---|
-| Trần Lê Minh Anh | Admin portal |
-| Nguyễn Đức Long | Manager portal |
-| Tăng Huỳnh Tuấn Tú | Authentication & Employee portal |
+Tang Huynh Tuan Tu - Student1685504
+Tran Le Minh Anh    -   Student1686151
+Nguyen Duc Long    -  Student1685473
 
 ## Project Overview
 
@@ -30,6 +24,11 @@ Every state-changing action (task transitions, timesheet edits, account changes,
 
 ### Sign In
 ![Sign In](docs/screenshots/login/sign-in.png)
+
+### Shared Across Roles — Profile, Team Chat & Notifications
+![Profile](docs/screenshots/common/profile.png)
+![Team Chat](docs/screenshots/common/team-chat.png)
+![Notifications](docs/screenshots/common/notifications.png)
 
 ### Admin — Dashboard
 ![Admin Dashboard](docs/screenshots/admin/dashboard.png)
@@ -214,12 +213,3 @@ echo "VITE_API_BASE_URL=http://localhost:8000" > .env
 
 npm run dev
 ```
-
-## Testing & Quality Assurance
-
-- **394 automated tests**, 100% passing (`pytest`, `pytest-django`, `model-bakery`)
-- **76% overall backend code coverage**
-
-## License
-
-MIT
