@@ -1,158 +1,225 @@
-# worktracker-django-react
+Trần Lê Minh Anh — Admin scope
+Nguyễn Đức Long — Manager scope
+Tăng Huỳnh Tuấn Tú — Auth & Employee scope
 
-> A role-based work management system for teams — built with Django REST Framework & React.
+# WorkTracker Pro
 
-WorkTracker Pro helps companies manage projects, assign tasks, track working hours, and review team performance — all within a structured, permission-controlled environment across three roles: **Admin**, **Manager**, and **Employee**.
+### FPT Aptech — Capstone Project
 
----
+**Tech Stack**: Django 5.2, Django REST Framework 3.17, PostgreSQL, Django Channels + Daphne, Celery + Redis, React 19 (Vite), TanStack Query & Table, Zustand, Tailwind CSS v4
 
-## ✨ Features
+## Team Members
 
-### 🌐 Public & Core Auth
-- **JWT Authentication** — Access & Refresh Token authentication via `rest_framework_simplejwt`
-- **Immediate Account Revocation** — `CachedIsActiveJWTAuthentication` validates user status against Redis on every request for instant token invalidation upon account locking
-- **Forgot / Reset Password** — Secure email-based reset flow via SMTP / SendGrid
-- **Role-Based Redirect** — Post-login routing based on assigned role (Admin / Manager / Employee)
-- **API Documentation** — Auto-generated Swagger UI / OpenAPI 3.0 documentation via `drf-spectacular` at `/api/docs/`
-
-### 🛡️ Admin — System Control Center
-- **Global Dashboard** — Company-wide KPIs: active clients, running jobs, total logged hours
-- **Client Management** — Full CRUD with soft-delete only (`is_active=False`, full history preserved)
-- **Job Management** — Create and assign jobs to clients and managers
-- **Identity & Access Management** — Create user accounts, assign roles, and revoke access instantly
-- **Audit Trail** — System-wide logging tracking all sensitive actions (who changed what, when)
-
-### 📋 Manager — Orchestration & Review Center
-- **Manager Dashboard & Heatmap** — Scoped KPIs: overdue rate, task completion rate, and productivity heatmap of logged work hours
-- **Team Data Isolation** — Strict row-level scoping (`scoped_jobs`, `scoped_tasks`, `scoped_logworks`) ensuring managers only access data belonging to their assigned jobs (`jobs.manager_id`)
-- **Kanban Board with Lexicographical Reordering** — Drag-and-drop task management powered by base-62 **Lexicographical String Indexing** (`order_index_manager_service.py`) for sub-millisecond task reordering without bulk DB updates
-- **Task Management & Followers** — Create, assign tasks to team members with deadline, job context, priority settings (Low / Medium / High / Urgent), and assign multiple task followers
-- **Media & File Attachments** — Physical media upload with a 20MB limit, file format filtering, UUID filename storage to prevent directory traversal, and automatic disk rollback if DB saving fails
-- **Review / Reject Workflow** — Approve submitted tasks (`IN_REVIEW` → `COMPLETED`) or reject them with mandatory rejection reason back to `IN_PROGRESS`
-- **Timesheet Review & Post-Audit Workflow** — Review team timesheets, approve (`APPROVED`), reject (`REJECTED`), correct/adjust logged hours (`CORRECTED`), or void invalid logs (`VOIDED`) preserving immutable audit history
-- **Timesheet Locking (Time Lock)** — Lock/unlock monthly timesheet periods by Job scope (`JOB`), preventing any timesheet modifications once locked
-- **Team Directory & Department Management** — View project personnel and assign/update employee departments directly
-- **Audit Logs Querying** — Query, filter, and inspect manager's own audit log history with old/new value snapshots (`old_values`, `new_values`)
-- **Multi-Channel Real-time & Async Notifications** — Persisted notification center, background async email dispatch via Celery workers with 3x retry mechanism, and instant real-time WebSocket pushes via Django Channels (`ws/notifications/`)
-- **Report Export (Excel & PDF)** — Export Task Summary and Timesheet Detail reports formatted as `.xlsx` (via `openpyxl`) or `.pdf` (via `xhtml2pdf`)
-
-### 👤 Employee — Execution & Focus Workspace
-- **Personal Dashboard** — Own KPIs: overdue tasks, weekly hours logged, completion rate
-- **Quick Log** — Fast-access time entry directly from the dashboard
-- **My Tasks (List + Kanban + Drawer)** — Switch between list and kanban view; open task detail in a slide-over drawer
-- **Task Status Update** — Move tasks through the workflow: `TODO` → `IN_PROGRESS` → `IN_REVIEW` (State machine blocks self-approval)
-- **Log Work (24h/day validation)** — Declare hours per task; backend enforces a 24h/day cap per user and respects locked periods
-- **Collaboration & Comments** — Threaded comments on tasks with real-time WebSocket notifications
-- **Notification Center** — Persisted notification history, safe for offline access
-- **User Profile & Avatar** — Update personal info and upload profile avatar
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
+| Member | Scope |
 |---|---|
-| Frontend | React (Vite), TypeScript, Zustand, TanStack Table |
-| UI Components | Shadcn UI, Tailwind CSS, Recharts / Tremor |
-| Forms & Validation | React Hook Form + Zod |
-| Drag & Drop | dnd-kit |
-| Real-time Client | WebSockets via `react-use-websocket` |
-| Backend | Django 6.0.6, Django REST Framework 3.17.1 |
-| Auth & Security | `djangorestframework-simplejwt` + Redis Cached Is Active Check |
-| Real-time Server | Django Channels 4.2 + Daphne (ASGI) + Redis Channel Layer |
-| Task Queue | Celery 5.5 + Redis Broker + `django-celery-results` (PostgreSQL) |
-| Database | **PostgreSQL** (`worktracker_db`) |
-| API Docs | `drf-spectacular` (OpenAPI 3.0 / Swagger UI at `/api/docs/`) |
-| Report Export | `openpyxl` (Excel `.xlsx`), `xhtml2pdf` (PDF `.pdf`) |
-| Audit Logging | `django-simple-history` + Custom Audit Snapshot Service |
-| Automated Testing | Pytest 8.3 + `pytest-django` + `pytest-cov` (109 passing tests, 84% coverage) |
+| Trần Lê Minh Anh | Admin portal |
+| Nguyễn Đức Long | Manager portal |
+| Tăng Huỳnh Tuấn Tú | Authentication & Employee portal |
 
----
+## Project Overview
 
-## 🏗️ Architecture Overview
+**WorkTracker Pro** is a role-based enterprise work management system that lets companies manage clients, projects (Jobs), assign tasks, track daily working hours, and review team performance — all inside a single permission-controlled platform split across three roles:
+
+- **Admin** — company-wide governance: clients, users, departments, timesheet control, audit trail
+- **Manager** — owns a scoped set of Jobs: Kanban board, task QA review, timesheet approval, period locking, team workload
+- **Employee** — personal execution workspace: My Tasks, Timesheet, My Performance, Team Chat
+
+Every state-changing action (task transitions, timesheet edits, account changes, period locks) goes through a dedicated service layer enforcing business rules server-side — the frontend only reflects what the backend already allows.
+
+## Screenshots
+
+### Sign In
+![Sign In](docs/screenshots/login/sign-in.png)
+
+### Admin — Dashboard
+![Admin Dashboard](docs/screenshots/admin/dashboard.png)
+
+### Admin — User List
+![Admin User List](docs/screenshots/admin/user-list.png)
+
+### Admin — Clients
+![Admin Clients](docs/screenshots/admin/clients.png)
+
+### Admin — Audit Logs
+![Admin Audit Logs](docs/screenshots/admin/audit-logs.png)
+
+### Manager — Dashboard
+![Manager Dashboard](docs/screenshots/manager/dashboard.png)
+
+### Manager — Create Project (2-column enterprise form)
+![Manager Create Project](docs/screenshots/manager/create-project.png)
+
+### Manager — Kanban Board
+![Manager Kanban Board](docs/screenshots/manager/kanban-board.png)
+
+### Manager — QA Review Queue
+![Manager QA Review Queue](docs/screenshots/manager/qa-review-queue.png)
+
+### Employee — Dashboard
+![Employee Dashboard](docs/screenshots/employee/dashboard.png)
+
+### Employee — My Tasks
+![Employee My Tasks](docs/screenshots/employee/my-tasks.png)
+
+### Employee — Task Detail Drawer
+![Employee Task Detail Drawer](docs/screenshots/employee/task-detail-drawer.png)
+
+### Employee — Timesheet (Week View)
+![Employee Timesheet Week View](docs/screenshots/employee/timesheet-week-view.png)
+
+### Employee — My Performance
+![Employee My Performance](docs/screenshots/employee/my-performance.png)
+
+## API Documentation
+
+Auto-generated OpenAPI 3.0 schema via `drf-spectacular`, served at `/api/docs/` (Swagger UI) once the backend is running.
+
+## Key Features
+
+### Public & Core Auth
+- JWT authentication (`djangorestframework-simplejwt`) with access/refresh tokens
+- Instant account revocation — active-status check cached in Redis and re-validated on every request, so a locked account's existing token stops working immediately, not just on next login
+- Forgot / Reset password via email (SMTP), password-strength rules enforced both client and server side
+- Show/hide toggle on every password field
+- Role-based redirect after login (Admin / Manager / Employee land on their own portal)
+
+### Admin — System Governance
+- **Dashboard** — active clients, total/locked accounts, jobs by status, clients overview, today's account-security activity
+- **Clients** — full CRUD, soft-delete only (`is_active=False`, never hard-deleted)
+- **User List** — create/search/filter accounts by role, department, manager, status; forced password change on first sign-in
+- **Departments** — organisational units with an accountable manager
+- **Timesheet Control** — company-wide monthly compliance view per employee (hours logged vs. expected, over-limit flags) and **GLOBAL period lock** (freezes LogWork edits company-wide for payroll close)
+- **Support Desk** — internal support ticket inbox
+- **Audit Logs** — immutable trail of every sensitive action (role changes, password resets, locks, deletes) with severity levels
+- **Notification Center** — persisted, real-time system notifications
+
+### Manager — Orchestration & Review
+- **Dashboard** — managed jobs, team members, pending timesheets, monthly effort chart, task status distribution, live activity feed
+- **My Jobs** — create/manage projects with a 2-column enterprise form (client governance + team capacity allocation), 1 Client = 1 Manager model
+- **Kanban Board** — drag-and-drop task board (`@dnd-kit`) with instant reorder, backed by lexicographical `order_index` so reordering never triggers a bulk DB update
+- **QA Review Queue** — inspect submitted deliverables and handover notes, then Approve & Complete or Reject with mandatory fix notes (task returns to `IN_PROGRESS`)
+- **Timesheets** — daily cockpit to approve/reject/adjust each LogWork entry, or approve an entire day at once
+- **Period Locks** — lock/unlock a completed month **per Job**, independent of the Admin's company-wide lock; blocked while pending logs remain
+- **Team Members** — real-time workload capacity per person (assigned tasks, hours/day, Overloaded/Balanced/Available)
+- **Reports & Analytics** — task delivery summary and detailed timesheet effort, exportable to Excel (`openpyxl`) or PDF (`xhtml2pdf`)
+- **Team Chat** — project-scoped channels + direct messages, real-time via WebSocket
+- **Audit Logs** — manager-scoped activity trail
+
+### Employee — Execution Workspace
+- **Dashboard** — last-30-day KPI window (total/overdue tasks, completion rate, hours this week), task status breakdown, upcoming tasks
+- **My Tasks** — Active / Frozen / Upcoming tabs (Frozen = parent Job on hold or client deactivated; Upcoming = Manager-scheduled `start_date` still in the future); client-side search/filter/sort
+- **Task detail drawer** — comments, work-log history, attachments, and the `TODO → IN_PROGRESS → REVIEWING` submission flow (self-approval blocked; Manager must QA-approve to reach `COMPLETED`)
+- **Timesheet** — quick-log form with hour presets, List/Week views, Edit and Void (soft-delete, reason required) on pending entries — both gated by ownership, entry status, and period lock
+- **My Performance** — completion rate, on-time rate, logged-hours trend, hours-by-project breakdown, per-task detail table
+- **My Team** — read-only view of every project the employee is part of and who else is on it
+- **Team Chat** — same real-time messaging as Manager, scoped to the employee's own project channels
+- **Notification Center** — persisted feed, real-time push over WebSocket, mark-as-read
+- **My Activity** — personal audit trail with before/after field diffs
+- **Profile** — update display name/phone, change password
+
+## Key Business Rules
+
+- **Soft delete only** — Clients and users are never hard-deleted (`is_active=False` preserves history)
+- **Immutable LogWork history** — entries are never deleted; mistakes are corrected via Edit (reason required) or marked `VOIDED` via Void (reason required), never removed
+- **2-layer period lock** — `GLOBAL` (Admin, company-wide) and `JOB` (Manager, per project) locks are checked independently before any LogWork create/edit/void
+- **Daily hours cap** — a user's total logged hours for one calendar day cannot exceed 8.00h, recomputed server-side with row-level locking (`select_for_update`) to survive concurrent requests
+- **State machine, not free-form status** — every task transition is validated against an explicit `TASK_TRANSITIONS` table with role-aware actors (assignee / manager / admin), not just toggled from the client
+- **Frozen project guard** — no task on a Job that is `ON_HOLD`/`CANCELLED`, or whose Client is deactivated, can change status (except cancelling)
+
+## Project Components
+
+- **Backend**: Django 5.2 + Django REST Framework (REST API, service-layer business rules, JWT auth)
+- **Real-time**: Django Channels 4.2 + Daphne (ASGI) + Redis channel layer — `ws/notifications/` and `ws/chat/<room_id>/`
+- **Async tasks**: Celery 5.6 + Redis broker + `django-celery-results` — background email dispatch, scheduled period auto-lock
+- **Database**: PostgreSQL
+- **Frontend**: React 19 (Vite) — plain JSX, no TypeScript — TanStack Query (server cache) + TanStack Table, Zustand (client state), Radix UI primitives + Tailwind CSS v4, recharts, `@dnd-kit` (Manager Kanban only)
+
+## Monorepo Structure
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    React (Vite)                         │
-│    Zustand │ TanStack Table │ Shadcn UI │ dnd-kit       │
-└────────────────────────────┬────────────────────────────┘
-                             │ REST API / WebSocket
-┌────────────────────────────▼────────────────────────────┐
-│              Django REST Framework / Daphne             │
-│   JWT Auth │ 3-Layer RBAC │ Scope Guards │ Swagger      │
-├─────────────────────────────────────────────────────────┤
-│        Django Channels Layer (WebSocket / Redis)        │
-│        Celery Workers (Async Email Task Queue)          │
-└───────────────┬─────────────────────────┬───────────────┘
-                │                         │
-           PostgreSQL                   Redis
-     (Primary DB: worktracker_db)   (DB1: Cache, DB2: Celery, DB4: Channels)
+worktracker-django-react/
+├── backend/                ← Django REST API server (port 8000)
+│   ├── accounts/           ← auth, users, roles/permissions, employee/manager/admin sub-apps
+│   ├── projects/           ← Clients & Jobs
+│   ├── tasks/              ← Task state machine, attachments, comments
+│   ├── timesheets/         ← LogWork, DailyUserTimesheet, TimeLock
+│   ├── chat/                ← Team Chat (WebSocket)
+│   ├── reports/            ← Excel/PDF export
+│   ├── system/             ← audit log, notifications (WebSocket)
+│   └── worktracker_core/   ← settings, urls, asgi (Channels), celery
+├── frontend/               ← React 19 SPA (port 5173)
+│   └── src/
+│       ├── pages/          ← admin/ manager/ employee/ auth/
+│       ├── components/     ← shared + per-role UI
+│       ├── hooks/queries/  ← TanStack Query hooks, per role
+│       ├── api/            ← axios client + endpoint modules
+│       ├── stores/         ← Zustand stores
+│       └── utils/
+└── docs/screenshots/       ← images used in this README
 ```
 
----
+## Installation & Usage Guide
 
-## 🔒 Key Business Rules
+### Requirements
 
-- **Soft Delete Only** — Clients and users are never hard-deleted (`is_active=False` preserves complete history)
-- **Immutable LogWork History** — LogWork entries are never hard-deleted; invalid entries are marked as `VOIDED`
-- **Data Scoping & Isolation** — Managers can only view and manipulate data belonging to their assigned jobs (`jobs.manager_id`)
-- **3-Layer Security Guard** — Requests must pass `IsActiveAuthenticated`, `IsManagerRole`, and granular `HasPermissionCode`
-- **Instant Account Revocation** — Account status changes are cached in Redis and evaluated on every request to invalidate active JWTs instantly
-- **Lexicographical Ordering** — LexoRank string keys allow instant Kanban drag-and-drop reordering without bulk database updates
-- **Timesheet Locking** — Monthly job-scoped locks (`JOB`) prevent any LogWork modifications once period is locked
-- **Daily Hours Cap** — Backend strictly enforces a maximum limit of 24.00 logged hours per user per day
+- Python 3.11+
+- PostgreSQL 14+
+- Redis 6+ (cache, Channels layer, Celery broker)
+- Node.js 18+
 
----
-
-## 🚀 Getting Started
+### Backend Setup
 
 ```bash
-# 1. Backend Setup
 cd backend
 
-# Create & activate virtual environment (Windows)
-python -m venv venv
-.\venv\Scripts\activate
+# Create & activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
+# Configure environment
+cp .env.example .env           # then fill in DB credentials, SECRET_KEY, SMTP, etc.
+
 # Run migrations
 python manage.py migrate
 
-# Seed initial Manager permissions
-python manage.py shell -c "import seed_manager_permissions"
+# Seed roles/permissions, then demo data
+python manage.py seed_roles
+python manage.py seed_data --reset
 
-# Run development server
+# Run the development server (make sure PostgreSQL & Redis are running)
 python manage.py runserver
 
-# 2. Automated Tests (Pytest)
-.\venv\Scripts\pytest testcase/
+# Optional: async email / scheduled locks
+celery -A worktracker_core worker -l info
+```
 
-# 3. Frontend Setup
-cd ../frontend
+### Automated Tests (Pytest)
+
+```bash
+cd backend
+python -m pytest
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
 npm install
+
+# Point the SPA at the backend
+echo "VITE_API_BASE_URL=http://localhost:8000" > .env
+
 npm run dev
 ```
 
----
+## Testing & Quality Assurance
 
-## 🧪 Testing & Quality Assurance
+- **394 automated tests**, 100% passing (`pytest`, `pytest-django`, `model-bakery`)
+- **76% overall backend code coverage**
 
-The backend includes a comprehensive automated test suite built with **Pytest**:
-
-- **109 Automated Tests** passing 100% (`109/109 passed`)
-- **84% Overall Code Coverage**
-- **100% Coverage** on Manager Filter & Query Parameter classes (`ManagerJobFilter`, `ManagerTaskFilter`, `ManagerLogWorkFilter`, `ManagerTimeLockFilter`)
-
----
-
-## 👥 Team
-
-Built as a capstone project — [Aptech Vietnam](https://aptech.edu.vn/)
-
----
-
-## 📄 License
+## License
 
 MIT
