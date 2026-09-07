@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
 import {
   Clock,
   Send,
@@ -29,7 +30,9 @@ export default function QuickLogWorkFormCard({
   className
 }) {
   const [taskId, setTaskId] = useState(defaultTaskId);
-  const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
+  // format() dùng giờ LOCAL — new Date().toISOString() quy đổi UTC, sai
+  // lệch "hôm nay" trong khung 0h-7h sáng giờ VN (UTC+7).
+  const [workDate, setWorkDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [hoursSpent, setHoursSpent] = useState('2.00');
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState({});

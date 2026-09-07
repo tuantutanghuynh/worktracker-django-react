@@ -165,7 +165,7 @@ export default function ManagerJobsPage() {
       job_name: '',
       job_code: '',
       client_id: clientOptions.length > 0 ? clientOptions[0].value : '',
-      start_date: new Date().toISOString().split('T')[0],
+      start_date: format(new Date(), 'yyyy-MM-dd'), // giờ LOCAL, không quy đổi UTC
       deadline: '',
       priority: 'MEDIUM',
       description: '',
@@ -219,7 +219,7 @@ export default function ManagerJobsPage() {
         job_code: data.job_code?.trim() || undefined,
         client_id: parseInt(data.client_id, 10),
         priority: data.priority,
-        start_date: data.start_date || new Date().toISOString().split('T')[0],
+        start_date: data.start_date || format(new Date(), 'yyyy-MM-dd'), // giờ LOCAL, không quy đổi UTC
         deadline: data.deadline,
         description: data.description?.trim() || undefined,
         initial_team_member_ids: data.initial_team_member_ids || [],

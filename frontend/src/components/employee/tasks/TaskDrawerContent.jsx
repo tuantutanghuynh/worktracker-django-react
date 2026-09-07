@@ -30,7 +30,9 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
     } = useTaskDetail(task?.id)
 
     const [commentText, setCommentText] = useState("")
-    const [workDate, setWorkDate] = useState(new Date().toISOString().split("T")[0])
+    // format() dùng giờ LOCAL — new Date().toISOString() quy đổi UTC, sai
+    // lệch "hôm nay" trong khung 0h-7h sáng giờ VN (UTC+7).
+    const [workDate, setWorkDate] = useState(format(new Date(), "yyyy-MM-dd"))
     const [hoursSpent, setHoursSpent] = useState("")
     const [logDescription, setLogDescription] = useState("")
     const [voidingLogId, setVoidingLogId] = useState(null)
@@ -190,7 +192,7 @@ export function TaskDrawerContent({ task, onClose, onStartTask, onRequestSubmit,
                                         <label className="text-xs font-bold text-slate-700">Date</label>
                                         <input
                                             type="date"
-                                            max={new Date().toISOString().split("T")[0]}
+                                            max={format(new Date(), "yyyy-MM-dd")}
                                             value={workDate}
                                             onChange={(e) => setWorkDate(e.target.value)}
                                             className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs transition"

@@ -1,3 +1,5 @@
+import { format } from "date-fns"
+
 // task.start_date — ngày Manager lên lịch cho task bắt đầu, chỉ sửa được
 // khi task còn TODO (khóa lại khi đã IN_PROGRESS/REVIEWING, xem
 // task_manager_service.py). Khác hẳn 2 khái niệm "tương lai" khác đã có
@@ -13,6 +15,8 @@ export function isUpcomingTask(task) {
     if (task.status !== "TODO") return false
     if (!task.start_date) return false
 
-    const today = new Date().toISOString().split("T")[0]
+    // format() dùng giờ LOCAL — không dùng toISOString() (quy đổi UTC,
+    // sai lệch "hôm nay" trong khung 0h-7h sáng giờ VN/UTC+7).
+    const today = format(new Date(), "yyyy-MM-dd")
     return task.start_date > today
 }

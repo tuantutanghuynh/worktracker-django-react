@@ -129,7 +129,9 @@ export function MyPerformancePage() {
         return `${(1 / rate).toFixed(1)}h/task`
     })()
 
-    const today = new Date().toISOString().split("T")[0]
+    // format() dùng giờ LOCAL — new Date().toISOString() quy đổi UTC, sai
+    // lệch "hôm nay" trong khung 0h-7h sáng giờ VN (UTC+7).
+    const today = format(new Date(), "yyyy-MM-dd")
 
     const hoursByTaskId = {}
     for (const e of entries) {

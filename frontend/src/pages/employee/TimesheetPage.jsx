@@ -33,7 +33,9 @@ const STATUS_OPTIONS = [
     { value: "VOIDED", label: "Voided" },
 ]
 
-const today = new Date().toISOString().split("T")[0]
+// format() dùng giờ LOCAL — new Date().toISOString() quy đổi UTC, sai
+// lệch "hôm nay" trong khung 0h-7h sáng giờ VN (UTC+7).
+const today = format(new Date(), "yyyy-MM-dd")
 
 // 6 ngày làm việc/tuần × 8h — khớp WORK_DAYS_PER_WEEK/DAILY_WORKING_HOURS
 // trong backend/.env (giá trị hiện tại: 6, 8). Backend chưa expose 2 số này
