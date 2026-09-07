@@ -1,5 +1,5 @@
 """
-One-off seed script: adds LogWork entries for sophia.johnson@worktracker.vn
+One-off seed script: adds LogWork entries for sophia.martinez@worktracker.vn
 covering the next 3 weeks (2026-08-25 -> 2026-09-11) so the Timesheet
 Week View has real content when clicking "Next Week" a couple of times,
 not just the current week. Additive only (get_or_create), safe to re-run.
@@ -55,10 +55,10 @@ def pick_sophia_tasks(sophia):
 
 
 class Command(BaseCommand):
-    help = "Seed 3 more weeks of LogWork for sophia.johnson@worktracker.vn (Timesheet Week View demo)"
+    help = "Seed 3 more weeks of LogWork for sophia.martinez@worktracker.vn (Timesheet Week View demo)"
 
     def handle(self, *args, **options):
-        sophia = CustomUser.objects.get(email="sophia.johnson@worktracker.vn")
+        sophia = CustomUser.objects.get(email="sophia.martinez@worktracker.vn")
         manager = CustomUser.objects.get(email="manager@worktracker.vn")
 
         # Slot index (0-6) -> Task, resolved dynamically — xem docstring đầu file.

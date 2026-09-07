@@ -1,5 +1,5 @@
 """
-One-off seed script: enrich sophia.johnson@worktracker.vn's data so the
+One-off seed script: enrich sophia.martinez@worktracker.vn's data so the
 Employee Dashboard / My Performance charts have something real to show
 (14-day trend, multi-project hours, mixed task statuses/overdue, varied
 notifications) instead of the sparse data left over from earlier manual
@@ -49,6 +49,29 @@ def next_order_index(job, status):
     return key_between(last, None)
 
 
+def pick_job_for_sophia(sophia, used_job_ids):
+    """Returns a Job sophia doesn't already have a task on (used to build
+    3 fresh tasks for her on "new" projects). Was 3 hardcoded job_code
+    lookups (JOB-SEC-06/JOB-WEB-03/JOB-HRM-09) — broke the moment
+    seed_data.py's job-code scheme changed (e.g. DEMO-JOB001 codes after a
+    later merge). Picked structurally instead: prefer an ACTIVE job so the
+    new tasks land somewhere actually workable, falling back to any status
+    if no ACTIVE job is free. Job NAME in the demo text (Security/Website/
+    HRM) may no longer literally match the job it lands on — cosmetic only,
+    doesn't affect any real business rule."""
+    sophia_job_ids = Task.objects.filter(assignee=sophia).values_list("job_id", flat=True)
+    candidates = Job.objects.exclude(id__in=sophia_job_ids).exclude(id__in=used_job_ids)
+    job = candidates.filter(status=Job.Status.ACTIVE).order_by("id").first()
+    if job is None:
+        job = candidates.order_by("id").first()
+    if job is None:
+        raise CommandError(
+            "Not enough jobs in the DB to seed Sophia's dashboard demo — run seed_data first."
+        )
+    used_job_ids.add(job.id)
+    return job
+
+
 def pick_task_for_sophia(sophia, used_ids):
     """Returns a Task belonging to sophia that hasn't been picked yet in
     this run. Prefers one she's already assigned; falls back to grabbing
@@ -73,10 +96,10 @@ def pick_task_for_sophia(sophia, used_ids):
 
 
 class Command(BaseCommand):
-    help = "Seed richer, more diverse data for sophia.johnson@worktracker.vn (Dashboard/My Performance demo)"
+    help = "Seed richer, more diverse data for sophia.martinez@worktracker.vn (Dashboard/My Performance demo)"
 
     def handle(self, *args, **options):
-        sophia = CustomUser.objects.get(email="sophia.johnson@worktracker.vn")
+        sophia = CustomUser.objects.get(email="sophia.martinez@worktracker.vn")
         manager = CustomUser.objects.get(email="manager@worktracker.vn")
         today = timezone.localdate()
 
@@ -100,9 +123,10 @@ class Command(BaseCommand):
             # -----------------------------------------------------------
             self.stdout.write("2. Adding tasks on new projects for Sophia...")
 
-            job_sec = Job.objects.get(job_code="JOB-SEC-06")
-            job_web = Job.objects.get(job_code="JOB-WEB-03")
-            job_hrm = Job.objects.get(job_code="JOB-HRM-09")
+            used_job_ids = set()
+            job_sec = pick_job_for_sophia(sophia, used_job_ids)
+            job_web = pick_job_for_sophia(sophia, used_job_ids)
+            job_hrm = pick_job_for_sophia(sophia, used_job_ids)
 
             sec_task, _ = Task.objects.get_or_create(
                 title="Penetration Test Report Writeup",
