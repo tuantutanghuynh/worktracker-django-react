@@ -36,6 +36,7 @@ import { useProfile } from '../../../hooks/queries/common/useProfile';
 import { chatService } from '../../../services/common/chatService';
 import UserAvatar from '../avatar/UserAvatar';
 import { cn } from '../../../utils/cn';
+import { isFrozenOpenTask } from '../../../utils/taskFrozen';
 
 // 1. BẢNG CẤU HÌNH MENU DÙNG CHUNG CHO TẤT CẢ CÁC VAI TRÒ (ROLE)
 const MENU_CONFIG = {
@@ -196,12 +197,14 @@ export default function Sidebar() {
     return uniqueDays.size;
   }, [pendingLogWorksData]);
 
-  // 🚀 REACT QUERY: Lấy số lượng Task đang cần làm (TODO / IN_PROGRESS) của Employee
+  // 🚀 REACT QUERY: Lấy số lượng Task đang cần làm (TODO / IN_PROGRESS) của Employee (loại trừ Cancelled và Frozen)
   const isEmployee = userRole === 'EMPLOYEE';
   const { tasks: employeeTasks } = useMyTasks({ enabled: isEmployee });
   const employeePendingTaskCount = useMemo(() => {
     if (!isEmployee || !Array.isArray(employeeTasks)) return 0;
-    return employeeTasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
+    return employeeTasks.filter(
+      t => t.status !== 'CANCELLED' && !isFrozenOpenTask(t) && (t.status === 'TODO' || t.status === 'IN_PROGRESS')
+    ).length;
   }, [isEmployee, employeeTasks]);
 
   // 🚀 REACT QUERY: Lấy tổng số lượng tin nhắn chưa đọc từ các phòng chat

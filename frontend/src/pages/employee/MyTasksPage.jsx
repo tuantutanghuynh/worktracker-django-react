@@ -60,40 +60,42 @@ export function MyTasksPage() {
     const [recallingTask, setRecallingTask] = useState(null)
     const [isRecalling, setIsRecalling] = useState(false)
 
+    // Loại bỏ triệt để các task CANCELLED để tránh gây nhầm lẫn trên giao diện
+    const nonCancelledTasks = useMemo(() => tasks.filter((t) => t.status !== "CANCELLED"), [tasks])
+
     // Tách trước theo tab — Active/Frozen/Upcoming là 3 rổ LOẠI TRỪ NHAU,
     // các filter/sort bên dưới chỉ áp dụng bên trong đúng rổ đang xem.
     // Ưu tiên Frozen trước Upcoming (task nào vừa bị Job đóng băng vừa
     // được hẹn lịch tương lai thì lý do "Frozen" đáng chú ý hơn — đây là
     // vấn đề ở Job, chặn CẢ SAU KHI qua ngày start_date; còn Upcoming chỉ
     // đơn thuần là "chưa tới lúc", không phải bị chặn gì).
-    const frozenTasks = useMemo(() => tasks.filter(isFrozenOpenTask), [tasks])
+    const frozenTasks = useMemo(() => nonCancelledTasks.filter(isFrozenOpenTask), [nonCancelledTasks])
     const upcomingTasks = useMemo(
-        () => tasks.filter((t) => !isFrozenOpenTask(t) && isUpcomingTask(t)),
-        [tasks]
+        () => nonCancelledTasks.filter((t) => !isFrozenOpenTask(t) && isUpcomingTask(t)),
+        [nonCancelledTasks]
     )
     const activeTasks = useMemo(
-        () => tasks.filter((t) => !isFrozenOpenTask(t) && !isUpcomingTask(t)),
-        [tasks]
+        () => nonCancelledTasks.filter((t) => !isFrozenOpenTask(t) && !isUpcomingTask(t)),
+        [nonCancelledTasks]
     )
     const tabTasks = activeTab === "frozen" ? frozenTasks : activeTab === "upcoming" ? upcomingTasks : activeTasks
 
-    // Summary luôn tính trên TOÀN BỘ task (không đổi theo tab Active/Frozen
-    // đang xem) — giống cách KPI ở My Team/My Performance không đổi theo
-    // filter bảng bên dưới, chỉ là "tổng quan nhanh" cố định.
+    // Summary chỉ tính trên các task đang hoạt động (loại trừ task Frozen và Cancelled)
+    // để phản ánh đúng số lượng task đang thực sự làm việc
     const summary = useMemo(() => {
-        const openTasks = tasks.filter((t) => t.status !== "CANCELLED")
-        const dueSoon = openTasks.filter((t) => {
+        const activeWorkingTasks = nonCancelledTasks.filter((t) => !isFrozenOpenTask(t))
+        const dueSoon = activeWorkingTasks.filter((t) => {
             if (!t.deadline || t.status === "COMPLETED") return false
             const days = differenceInCalendarDays(parseISO(t.deadline), new Date())
             return days >= 0 && days <= DUE_SOON_DAYS
         })
         return {
-            total: openTasks.length,
-            inProgress: openTasks.filter((t) => t.status === "IN_PROGRESS").length,
-            reviewing: openTasks.filter((t) => t.status === "REVIEWING").length,
+            total: activeWorkingTasks.length,
+            inProgress: activeWorkingTasks.filter((t) => t.status === "IN_PROGRESS").length,
+            reviewing: activeWorkingTasks.filter((t) => t.status === "REVIEWING").length,
             dueSoon: dueSoon.length,
         }
-    }, [tasks])
+    }, [nonCancelledTasks])
 
     const projectOptions = useMemo(() => {
         const seen = new Set()

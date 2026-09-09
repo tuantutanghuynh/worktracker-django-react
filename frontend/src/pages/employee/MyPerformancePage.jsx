@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { format, subDays, startOfMonth } from "date-fns"
+import { format, subDays, startOfMonth, endOfMonth } from "date-fns"
 import { useMyPerformance } from "../../hooks/queries/employee/useMyPerformance"
 import EmployeeStatCard from "../../components/employee/EmployeeStatCard"
 import LineChartCard from "../../components/common/charts/LineChartCard"
@@ -58,7 +58,7 @@ const PERIOD_PRESETS = [
 function resolvePeriodRange(preset) {
     const today = new Date()
     if (preset === "this_month") {
-        return { start_date: format(startOfMonth(today), "yyyy-MM-dd"), end_date: format(today, "yyyy-MM-dd") }
+        return { start_date: format(startOfMonth(today), "yyyy-MM-dd"), end_date: format(endOfMonth(today), "yyyy-MM-dd") }
     }
     if (preset === "last_30") {
         return { start_date: format(subDays(today, 29), "yyyy-MM-dd"), end_date: format(today, "yyyy-MM-dd") }
@@ -198,6 +198,8 @@ export function MyPerformancePage() {
     ]
 
 
+    const totalAssignedTasks = taskRows.length
+
     return (
         <div className="space-y-6">
             <div>
@@ -211,9 +213,9 @@ export function MyPerformancePage() {
                     <EmployeeStatCard
                         icon={AlertTriangle} hex="#6F9576" label="Overdue Tasks"
                         value={kpi?.overdue_tasks_count ?? 0}
-                        subtext={kpi?.completion_rate?.total ? `of ${kpi.completion_rate.total} tasks` : undefined}
+                        subtext={totalAssignedTasks ? `of ${totalAssignedTasks} tasks` : undefined}
                     />
-                    <EmployeeStatCard icon={ListChecks} hex="#CBA37E" label="Total Tasks" value={kpi?.completion_rate?.total ?? 0} />
+                    <EmployeeStatCard icon={ListChecks} hex="#CBA37E" label="Total Tasks" value={totalAssignedTasks} />
                     <EmployeeStatCard icon={Clock} hex="#D2D2D1" label="Hours This Week" value={kpi?.hours_logged_this_week ?? 0} />
                 </div>
             </div>

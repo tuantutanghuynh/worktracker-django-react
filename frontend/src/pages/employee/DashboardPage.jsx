@@ -1,7 +1,10 @@
+import React, { useState, useMemo, useCallback } from "react"
 import { Link } from "react-router-dom"
-import { format, subDays } from "date-fns"
+import { format } from "date-fns"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { useDashboard } from "../../hooks/queries/employee/useDashboard"
-import { useMyTasks } from "../../hooks/queries/employee/useMyTasks"
+import { useMyTasks, myTasksKeys } from "../../hooks/queries/employee/useMyTasks"
 import { useProfile } from "../../hooks/queries/employee/useProfile"
 import { getErrorMessage } from "../../utils/errorMessages"
 import { describeDeadline, DEADLINE_TONE_STYLES } from "../../utils/deadline"
@@ -10,7 +13,7 @@ import EmployeeStatCard from "../../components/employee/EmployeeStatCard"
 import { DataTable } from "../../components/common/table/DataTable"
 import StatusBadge from "../../components/common/badges/StatusBadge"
 import PriorityBadge from "../../components/common/badges/PriorityBadge"
-import { AlertTriangle, Clock, TrendingUp, PauseCircle, ListChecks, AlertOctagon } from "lucide-react"
+import { AlertTriangle, Clock, TrendingUp, PauseCircle, ListChecks, AlertOctagon, Calendar, RotateCcw } from "lucide-react"
 
 // 6 ngày làm việc/tuần × 8h — cùng hằng số đã dùng cho Timesheet's Weekly
 // Summary (backend/.env: WORK_DAYS_PER_WEEK=6, DAILY_WORKING_HOURS=8), để
@@ -26,34 +29,30 @@ const STATUS_ROWS = [
     { key: "COMPLETED", label: "Completed", bar: "bg-orange-500" },
 ]
 
-// Employee Dashboard (Ngày 6) — hero banner + KPI summary, backed by real
-// data from PersonalKPIView. Recent Tasks (useMyTasks) was added later once
-// the Employee Task API existed (Ngày 7). Quick Log Work used to be a full
-// QuickLogWorkFormCard here too, but that duplicated the exact same form
-// already on the Timesheet page — replaced with a "Log Work →" link so
-// logging work has 1 canonical place, not 2 in sync by coincidence.
-//
-// KPI window fixed to "last 30 days" (not user-selectable, unlike My
-// Performance's own preset picker) — before this, Total Tasks/Completion
-// Rate/Task Overview read all-time data with no window at all, so a
-// long-tenured employee's Completed count only ever grew and buried the
-// actually-actionable To Do/In Progress/Reviewing rows under a wall of
-// "Completed 95%". Dashboard now answers "how am I doing recently";
-// My Performance stays the place to inspect all-time or a custom range.
-const DASHBOARD_KPI_WINDOW_DAYS = 30
-
-function getDashboardKpiRange() {
-    const today = new Date()
-    return {
-        start_date: format(subDays(today, DASHBOARD_KPI_WINDOW_DAYS - 1), "yyyy-MM-dd"),
-        end_date: format(today, "yyyy-MM-dd"),
-    }
-}
-
 export function DashboardPage() {
-    const { data: kpi, isLoading: loading, error } = useDashboard(getDashboardKpiRange())
+    const today = new Date()
+    const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1)
+    const [selectedYear, setSelectedYear] = useState(today.getFullYear())
+
+    const monthRange = useMemo(() => {
+        const start = new Date(selectedYear, selectedMonth - 1, 1)
+        const end = new Date(selectedYear, selectedMonth, 0)
+        return {
+            start_date: format(start, "yyyy-MM-dd"),
+            end_date: format(end, "yyyy-MM-dd"),
+        }
+    }, [selectedMonth, selectedYear])
+
+    const queryClient = useQueryClient()
+    const { data: kpi, isLoading: loading, isRefetching, error, refetch } = useDashboard(monthRange)
     const { tasks } = useMyTasks()
     const { profile } = useProfile()
+
+    const handleRefresh = useCallback(() => {
+        refetch()
+        queryClient.invalidateQueries({ queryKey: myTasksKeys.all })
+        toast.success("Dashboard metrics refreshed!")
+    }, [refetch, queryClient])
 
     if (loading) {
         return <p className="text-xs text-slate-400">Loading dashboard...</p>
@@ -138,7 +137,7 @@ export function DashboardPage() {
             <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold">Welcome back{firstName ? `, ${firstName}` : ""} 👋</h1>
-                    <p className="text-xs text-blue-100 mt-1">Here's your work summary for the last {DASHBOARD_KPI_WINDOW_DAYS} days.</p>
+                    <p className="text-xs text-blue-100 mt-1">Here's your work summary for Month {selectedMonth < 10 ? `0${selectedMonth}` : selectedMonth} / {selectedYear}.</p>
                 </div>
                 <Link
                     to="/employee/timesheet"
@@ -148,11 +147,49 @@ export function DashboardPage() {
                 </Link>
             </div>
 
-            {/* Cùng màu với đúng các chỉ số này ở My Performance — nhất
-                quán xuyên trang, không phải màu mới. */}
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Last {DASHBOARD_KPI_WINDOW_DAYS} days
-            </p>
+            {/* Thanh điều khiển: Tiêu đề tháng + Dropdown chọn Tháng/Năm + Nút Refresh */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Month {selectedMonth < 10 ? `0${selectedMonth}` : selectedMonth} / {selectedYear}
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                            className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                        >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                                <option key={m} value={m}>
+                                    Month {m < 10 ? `0${m}` : m}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                            className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer border-l border-slate-200 pl-2"
+                        >
+                            {[2025, 2026, 2027].map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={handleRefresh}
+                        disabled={loading || isRefetching}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs transition cursor-pointer disabled:opacity-50"
+                        title="Refresh Live Data"
+                    >
+                        <RotateCcw className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`} />
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <EmployeeStatCard
                     icon={ListChecks} hex="#CBA37E" label="Total Tasks"
@@ -180,7 +217,7 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-sm font-medium text-slate-900">Task Overview</p>
-                        <p className="text-[11px] text-slate-400">Last {DASHBOARD_KPI_WINDOW_DAYS} days</p>
+                        <p className="text-[11px] text-slate-400">Month {selectedMonth < 10 ? `0${selectedMonth}` : selectedMonth} / {selectedYear}</p>
                     </div>
                     <span className="text-xs text-slate-400">{total} task{total !== 1 ? "s" : ""}</span>
                 </div>

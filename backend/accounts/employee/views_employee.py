@@ -119,7 +119,8 @@ class PersonalKPIView(APIView):
             completion_tasks = completion_tasks.filter(deadline__lte=end_date)
 
         total_count = completion_tasks.count()
-        completed_count = completion_tasks.filter(status=Task.Status.COMPLETED).count()
+        completed_tasks_qs = completion_tasks.filter(status=Task.Status.COMPLETED)
+        completed_count = completed_tasks_qs.count()
         completion_rate = (completed_count / total_count) if total_count else None
 
         completed_with_date_qs = completion_tasks.filter(
@@ -133,11 +134,14 @@ class PersonalKPIView(APIView):
             (on_time_count / completed_with_date_count) if completed_with_date_count else None
         )
 
-        hours_logged_total = LogWork.objects.filter(user=user).exclude(
+        completed_hours_logged = LogWork.objects.filter(
+            user=user,
+            task__in=completed_tasks_qs,
+        ).exclude(
             review_status__in=[LogWork.ReviewStatus.VOIDED, LogWork.ReviewStatus.REJECTED]
         ).aggregate(total=Sum("hours_spent"))["total"] or Decimal("0.00")
         productivity_rate = (
-            (completed_count / float(hours_logged_total)) if hours_logged_total > 0 else None
+            (completed_count / float(completed_hours_logged)) if completed_hours_logged > 0 and completed_count > 0 else None
         )
 
         # Reuse completion_tasks (already scoped by start_date/end_date above)
@@ -192,7 +196,7 @@ class PersonalKPIView(APIView):
             },
             "productivity": {
                 "tasks_completed": completed_count,
-                "hours_logged": float(hours_logged_total),
+                "hours_logged": float(completed_hours_logged),
                 "tasks_per_hour": productivity_rate,
             },
             "task_status_breakdown": task_status_breakdown,

@@ -105,9 +105,9 @@ export default function JobGanttTab({
     };
   }, [job, tasks, today]);
 
-  // 2. Filter Tasks
+  // 2. Filter & Sort Tasks (Active tasks keep order, CANCELLED sink to the bottom)
   const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
+    const list = tasks.filter((t) => {
       const matchSearch =
         !searchQuery ||
         (t.title && t.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -118,10 +118,19 @@ export default function JobGanttTab({
       const matchStatus =
         statusFilter === 'ALL' ||
         (statusFilter === 'OVERDUE'
-          ? t.deadline && parseISO(t.deadline) < today && t.status !== 'COMPLETED'
+          ? t.deadline && parseISO(t.deadline) < today && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
           : t.status === statusFilter);
 
       return matchSearch && matchStatus;
+    });
+
+    // Đẩy task CANCELLED xuống đáy bảng, các task khác giữ nguyên thứ tự
+    return [...list].sort((a, b) => {
+      const aCancelled = a.status === 'CANCELLED';
+      const bCancelled = b.status === 'CANCELLED';
+      if (aCancelled && !bCancelled) return 1;
+      if (!aCancelled && bCancelled) return -1;
+      return 0;
     });
   }, [tasks, searchQuery, statusFilter, today]);
 
@@ -292,7 +301,7 @@ export default function JobGanttTab({
 
           {/* Status Filter Pills */}
           <div className="flex items-center space-x-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 shadow-inner">
-            {['ALL', 'IN_PROGRESS', 'REVIEWING', 'COMPLETED', 'TODO'].map((st) => (
+            {['ALL', 'TODO', 'IN_PROGRESS', 'REVIEWING', 'COMPLETED', 'CANCELLED'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -383,39 +392,59 @@ export default function JobGanttTab({
 
               {/* Table Rows */}
               <div className="divide-y divide-slate-100 text-xs">
-                {calculatedTasks.map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => handleTaskClick(t)}
-                    className="h-[42px] px-3.5 flex items-center justify-between cursor-pointer transition hover:bg-blue-50/40 group"
-                    title="Click to view task details in Drawer"
-                  >
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      {t.code && (
-                        <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
-                          {t.code}
+                {calculatedTasks.map((t) => {
+                  const isCancelled = t.status === 'CANCELLED';
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => handleTaskClick(t)}
+                      className={cn(
+                        'h-[42px] px-3.5 flex items-center justify-between cursor-pointer transition hover:bg-blue-50/40 group',
+                        isCancelled && 'bg-slate-50/80 opacity-50'
+                      )}
+                      title={isCancelled ? 'Task is Cancelled - Click to view details' : 'Click to view task details in Drawer'}
+                    >
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        {t.code && (
+                          <span
+                            className={cn(
+                              'font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border shrink-0',
+                              isCancelled
+                                ? 'text-slate-400 bg-slate-100 border-slate-200 line-through'
+                                : 'text-blue-700 bg-blue-50 border-blue-100'
+                            )}
+                          >
+                            {t.code}
+                          </span>
+                        )}
+                        <span
+                          className={cn(
+                            'font-semibold truncate',
+                            isCancelled
+                              ? 'text-slate-400 line-through'
+                              : 'text-slate-800 group-hover:text-blue-600'
+                          )}
+                        >
+                          {t.title}
                         </span>
-                      )}
-                      <span className="font-semibold text-slate-800 group-hover:text-blue-600 truncate">
-                        {t.title}
-                      </span>
-                    </div>
+                      </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 text-right">
-                      {t.assignee ? (
-                        <UserAvatar
-                          user={t.assignee}
-                          src={t.assignee.avatar_url || t.assignee.avatar}
-                          fullName={t.assignee.full_name || t.assignee.email}
-                          size="xs"
-                          className="shrink-0 shadow-2xs"
-                        />
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic">Unassigned</span>
-                      )}
+                      <div className={cn('flex items-center gap-1.5 shrink-0 text-right', isCancelled && 'opacity-60')}>
+                        {t.assignee ? (
+                          <UserAvatar
+                            user={t.assignee}
+                            src={t.assignee.avatar_url || t.assignee.avatar}
+                            fullName={t.assignee.full_name || t.assignee.email}
+                            size="xs"
+                            className="shrink-0 shadow-2xs"
+                          />
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">Unassigned</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {calculatedTasks.length === 0 && (
                   <div className="p-8 text-center text-xs text-slate-400">
@@ -489,9 +518,13 @@ export default function JobGanttTab({
                     REVIEWING: 'from-purple-600 to-indigo-600 border-purple-400 text-white shadow-purple-500/20',
                     TODO: 'from-slate-400 to-slate-500 border-slate-300 text-white shadow-slate-500/10',
                     OVERDUE: 'from-rose-600 to-red-600 border-rose-400 text-white shadow-rose-500/25',
+                    CANCELLED: 'from-slate-200 to-slate-300 border-dashed border-slate-400 text-slate-500 shadow-none opacity-50',
                   };
 
-                  const activeStyle = t.isOverdue
+                  const isCancelled = t.status === 'CANCELLED';
+                  const activeStyle = isCancelled
+                    ? barGradients.CANCELLED
+                    : t.isOverdue
                     ? barGradients.OVERDUE
                     : barGradients[t.status] || barGradients.TODO;
 
@@ -507,19 +540,23 @@ export default function JobGanttTab({
                           'absolute h-6 rounded-lg bg-gradient-to-r border shadow-xs flex items-center px-2 text-[11px] font-bold transition transform hover:scale-[1.02] active:scale-100 cursor-pointer overflow-hidden group',
                           activeStyle
                         )}
-                        title={`${t.title} (${t.durationDays} days) • Start: ${format(t.taskStart, 'dd/MM/yyyy')} • Due: ${format(t.taskDeadline, 'dd/MM/yyyy')}`}
+                        title={`${t.title} (${t.durationDays} days) • Start: ${format(t.taskStart, 'dd/MM/yyyy')} • Due: ${format(t.taskDeadline, 'dd/MM/yyyy')}${isCancelled ? ' (CANCELLED)' : ''}`}
                       >
                         {/* Progress Fill Background */}
-                        <div
-                          style={{ width: `${t.progressPct}%` }}
-                          className="h-full absolute left-0 top-0 bg-white/20 rounded-l-xl pointer-events-none"
-                        />
+                        {!isCancelled && (
+                          <div
+                            style={{ width: `${t.progressPct}%` }}
+                            className="h-full absolute left-0 top-0 bg-white/20 rounded-l-xl pointer-events-none"
+                          />
+                        )}
 
                         {/* Bar Label */}
                         <div className="relative z-10 flex items-center justify-between w-full truncate gap-1.5">
-                          <span className="truncate">{t.title}</span>
+                          <span className={cn('truncate', isCancelled && 'line-through text-slate-500')}>
+                            {t.title}
+                          </span>
                           {t.widthPx >= 36 && (
-                            <span className="text-[10px] font-extrabold opacity-90 shrink-0">
+                            <span className={cn('text-[10px] font-extrabold opacity-90 shrink-0', isCancelled && 'line-through text-slate-500')}>
                               {t.durationDays}d
                             </span>
                           )}
